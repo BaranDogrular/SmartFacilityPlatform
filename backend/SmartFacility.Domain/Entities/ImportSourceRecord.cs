@@ -6,6 +6,7 @@ public sealed class ImportSourceRecord
     public long ImportBatchId { get; set; }
     public string SourceSheet { get; set; } = string.Empty;
     public int SourceRowNumber { get; set; }
+    public string RowFingerprint { get; set; } = string.Empty;
     public string RawData { get; set; } = string.Empty;
     public string? RawFormulaData { get; set; }
     public string ParseStatus { get; set; } = string.Empty;

@@ -19,7 +19,7 @@ internal sealed class HistoricalWorkOrderConfiguration : IEntityTypeConfiguratio
         builder.Property(x => x.BuildingNameRaw).HasMaxLength(500);
         builder.Property(x => x.LocationNameRaw).HasMaxLength(1000);
         builder.Property(x => x.ResolutionDurationRaw).HasMaxLength(100);
-        builder.Property(x => x.RawData).HasColumnType("nvarchar(max)");
+        builder.Property(x => x.RawData);
         builder.Property(x => x.CreatedAt).HasDefaultValueSql("SYSUTCDATETIME()");
 
         builder.HasIndex(x => x.ReportedDateTime);

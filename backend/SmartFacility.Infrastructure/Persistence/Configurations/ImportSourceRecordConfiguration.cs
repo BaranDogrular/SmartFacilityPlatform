@@ -12,12 +12,14 @@ internal sealed class ImportSourceRecordConfiguration : IEntityTypeConfiguration
         builder.HasKey(x => x.Id);
 
         builder.Property(x => x.SourceSheet).HasMaxLength(200).IsRequired();
-        builder.Property(x => x.RawData).HasColumnType("nvarchar(max)").IsRequired();
-        builder.Property(x => x.RawFormulaData).HasColumnType("nvarchar(max)");
+        builder.Property(x => x.RowFingerprint).HasMaxLength(64).IsUnicode(false).IsRequired();
+        builder.Property(x => x.RawData).IsRequired();
+        builder.Property(x => x.RawFormulaData);
         builder.Property(x => x.ParseStatus).HasMaxLength(100).IsRequired();
         builder.Property(x => x.CreatedAt).HasDefaultValueSql("SYSUTCDATETIME()");
 
         builder.HasIndex(x => new { x.ImportBatchId, x.SourceSheet, x.SourceRowNumber });
+        builder.HasIndex(x => new { x.SourceSheet, x.RowFingerprint });
 
         builder.HasOne(x => x.ImportBatch)
             .WithMany(x => x.SourceRecords)

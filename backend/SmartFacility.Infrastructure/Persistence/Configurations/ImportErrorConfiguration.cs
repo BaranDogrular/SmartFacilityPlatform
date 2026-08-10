@@ -12,7 +12,7 @@ internal sealed class ImportErrorConfiguration : IEntityTypeConfiguration<Import
         builder.HasKey(x => x.Id);
 
         builder.Property(x => x.ErrorMessage).HasMaxLength(4000).IsRequired();
-        builder.Property(x => x.RawData).HasColumnType("nvarchar(max)");
+        builder.Property(x => x.RawData);
         builder.HasIndex(x => x.ImportBatchId);
 
         builder.HasOne(x => x.ImportBatch)
