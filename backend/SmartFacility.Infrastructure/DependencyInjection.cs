@@ -45,6 +45,7 @@ public static class DependencyInjection
             new ScadaOutageImportProfile(GetProfileOptions(profiles, ImportProfileKeys.ScadaOutage)));
 
         services.AddSingleton<IImportProfileCatalog, ImportProfileCatalog>();
+        services.AddSingleton<IImportFingerprintProvider, ImportFingerprintProvider>();
         services.AddScoped<IExcelWorkbookReader, ClosedXmlWorkbookReader>();
         services.AddScoped<IImportDataStore, EfImportDataStore>();
         services.AddScoped<IImportRowProcessor, AssetImportProcessor>();

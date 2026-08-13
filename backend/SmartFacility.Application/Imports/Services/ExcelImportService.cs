@@ -9,6 +9,7 @@ public sealed class ExcelImportService(
     IExcelWorkbookReader workbookReader,
     IImportDataStore dataStore,
     IImportProfileCatalog profileCatalog,
+    IImportFingerprintProvider fingerprintProvider,
     IEnumerable<IImportRowProcessor> processors,
     ILogger<ExcelImportService> logger) : IImportService
 {
@@ -47,9 +48,11 @@ public sealed class ExcelImportService(
         try
         {
             var sheetNames = profile.Worksheets.Select(worksheet => worksheet.Name).ToArray();
+            var fingerprintAlgorithm = fingerprintProvider.GetIdempotencyAlgorithm(profile.SourceType);
             var knownFingerprints = await dataStore.GetSuccessfulFingerprintsAsync(
                 profile.SourceType,
                 sheetNames,
+                fingerprintAlgorithm,
                 cancellationToken);
             var validatedSheets = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
@@ -91,13 +94,15 @@ public sealed class ExcelImportService(
                 }
 
                 totalRows++;
-                var fingerprint = RowFingerprintCalculator.Calculate(profile.SourceType, row);
+                var fingerprints = fingerprintProvider.Calculate(profile.SourceType, row);
                 var sourceRecord = new ImportSourceRecord
                 {
                     ImportBatchId = batch.Id,
                     SourceSheet = row.SheetName,
                     SourceRowNumber = row.RowNumber,
-                    RowFingerprint = fingerprint,
+                    RowFingerprint = fingerprints.RowFingerprint,
+                    IdempotencyFingerprint = fingerprints.IdempotencyFingerprint,
+                    FingerprintAlgorithm = fingerprints.FingerprintAlgorithm,
                     RawData = RawRowSerializer.SerializeValues(row),
                     RawFormulaData = RawRowSerializer.SerializeFormulas(row),
                     ParseStatus = "Processing",
@@ -105,7 +110,7 @@ public sealed class ExcelImportService(
                 };
 
                 var decision = ImportRowDecision.Ignore();
-                if (knownFingerprints.Contains(fingerprint))
+                if (knownFingerprints.Contains(fingerprints.DuplicateFingerprint))
                 {
                     decision = ImportRowDecision.Duplicate();
                     await dataStore.ExecuteRowAsync(
@@ -150,6 +155,8 @@ public sealed class ExcelImportService(
                             SourceSheet = sourceRecord.SourceSheet,
                             SourceRowNumber = sourceRecord.SourceRowNumber,
                             RowFingerprint = sourceRecord.RowFingerprint,
+                            IdempotencyFingerprint = sourceRecord.IdempotencyFingerprint,
+                            FingerprintAlgorithm = sourceRecord.FingerprintAlgorithm,
                             RawData = sourceRecord.RawData,
                             RawFormulaData = sourceRecord.RawFormulaData,
                             ParseStatus = "Processing",
@@ -166,7 +173,7 @@ public sealed class ExcelImportService(
                 {
                     case ImportRowDisposition.Success:
                         successfulRows++;
-                        knownFingerprints.Add(fingerprint);
+                        knownFingerprints.Add(fingerprints.DuplicateFingerprint);
                         break;
                     case ImportRowDisposition.Error:
                         failedRows++;

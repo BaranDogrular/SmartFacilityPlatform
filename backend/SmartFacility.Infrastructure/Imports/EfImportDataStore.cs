@@ -78,16 +78,26 @@ public sealed class EfImportDataStore(SmartFacilityDbContext dbContext) : IImpor
     public async Task<ISet<string>> GetSuccessfulFingerprintsAsync(
         string sourceType,
         IReadOnlyCollection<string> sheetNames,
+        string? fingerprintAlgorithm,
         CancellationToken cancellationToken)
     {
-        var fingerprints = await dbContext.ImportSourceRecords
+        var records = dbContext.ImportSourceRecords
             .AsNoTracking()
             .Where(record =>
                 record.ImportBatch.SourceType == sourceType &&
                 sheetNames.Contains(record.SourceSheet) &&
-                (record.ParseStatus == "Succeeded" || record.ParseStatus == "Duplicate"))
-            .Select(record => record.RowFingerprint)
-            .ToListAsync(cancellationToken);
+                (record.ParseStatus == "Succeeded" || record.ParseStatus == "Duplicate"));
+
+        var fingerprints = fingerprintAlgorithm is null
+            ? await records
+                .Select(record => record.RowFingerprint)
+                .ToListAsync(cancellationToken)
+            : await records
+                .Where(record =>
+                    record.FingerprintAlgorithm == fingerprintAlgorithm &&
+                    record.IdempotencyFingerprint != null)
+                .Select(record => record.IdempotencyFingerprint!)
+                .ToListAsync(cancellationToken);
 
         return fingerprints.ToHashSet(StringComparer.Ordinal);
     }

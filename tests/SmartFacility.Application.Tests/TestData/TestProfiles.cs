@@ -53,4 +53,32 @@ internal static class TestProfiles
             ["ClearedTime"] = "K"
         }
     });
+
+    public static HistoricalWorkOrderImportProfile HistoricalWorkOrder() => new(new ImportProfileOptions
+    {
+        SourceType = ImportSourceTypes.HistoricalWorkOrder,
+        Worksheets =
+        [
+            new WorksheetProfileOptions
+            {
+                Name = "Toplam İş Emri",
+                HeaderRowNumber = 1,
+                FirstDataRowNumber = 2,
+                ExpectedHeaders = new Dictionary<string, string>
+                {
+                    ["A"] = "Şikayet Kodu"
+                }
+            }
+        ],
+        Columns = new Dictionary<string, string>
+        {
+            ["SourceReference"] = "A",
+            ["LocationNameRaw"] = "C",
+            ["PersonnelName"] = "D",
+            ["ReportedDateTime"] = "E",
+            ["Discipline"] = "K",
+            ["Description"] = "M",
+            ["ResolutionDurationRaw"] = "P"
+        }
+    });
 }

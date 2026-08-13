@@ -29,6 +29,7 @@ public interface IImportDataStore
     Task<ISet<string>> GetSuccessfulFingerprintsAsync(
         string sourceType,
         IReadOnlyCollection<string> sheetNames,
+        string? fingerprintAlgorithm,
         CancellationToken cancellationToken);
 
     Task ExecuteRowAsync(

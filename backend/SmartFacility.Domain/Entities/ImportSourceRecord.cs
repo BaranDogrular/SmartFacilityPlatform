@@ -7,6 +7,8 @@ public sealed class ImportSourceRecord
     public string SourceSheet { get; set; } = string.Empty;
     public int SourceRowNumber { get; set; }
     public string RowFingerprint { get; set; } = string.Empty;
+    public string? IdempotencyFingerprint { get; set; }
+    public string? FingerprintAlgorithm { get; set; }
     public string RawData { get; set; } = string.Empty;
     public string? RawFormulaData { get; set; }
     public string ParseStatus { get; set; } = string.Empty;

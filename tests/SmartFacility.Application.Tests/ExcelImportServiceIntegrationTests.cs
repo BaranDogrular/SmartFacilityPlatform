@@ -66,6 +66,7 @@ public sealed class ExcelImportServiceIntegrationTests
             new FakeWorkbookReader(rows),
             database.Store,
             catalog,
+            new ImportFingerprintProvider(),
             processors,
             NullLogger<ExcelImportService>.Instance);
     }
