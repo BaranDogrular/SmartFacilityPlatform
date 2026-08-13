@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using SmartFacility.Application.Imports.Abstractions;
 using SmartFacility.Application.Imports.Models;
 using SmartFacility.Domain.Entities;
@@ -6,7 +7,9 @@ using SmartFacility.Infrastructure.Persistence;
 
 namespace SmartFacility.Infrastructure.Imports;
 
-public sealed class EfImportDataStore(SmartFacilityDbContext dbContext) : IImportDataStore
+public sealed class EfImportDataStore(
+    SmartFacilityDbContext dbContext,
+    ILogger<EfImportDataStore> logger) : IImportDataStore
 {
     public async Task<ImportBatch> CreateBatchAsync(
         string sourceType,
@@ -141,9 +144,21 @@ public sealed class EfImportDataStore(SmartFacilityDbContext dbContext) : IImpor
             await dbContext.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
         }
-        catch
+        catch (Exception originalException)
         {
-            await transaction.RollbackAsync(CancellationToken.None);
+            try
+            {
+                await transaction.RollbackAsync(CancellationToken.None);
+            }
+            catch (Exception rollbackException)
+            {
+                logger.LogWarning(
+                    rollbackException,
+                    "Import row transaction rollback failed after {OriginalExceptionType}. " +
+                    "The original exception will be rethrown.",
+                    originalException.GetType().FullName);
+            }
+
             throw;
         }
         finally

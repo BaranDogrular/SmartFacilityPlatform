@@ -6,6 +6,7 @@ using SmartFacility.Application.Imports.Models;
 using SmartFacility.Application.Imports.Processors;
 using SmartFacility.Application.Imports.Profiles;
 using SmartFacility.Application.Imports.Services;
+using SmartFacility.Infrastructure.Configuration;
 using SmartFacility.Infrastructure.Imports;
 using SmartFacility.Infrastructure.Persistence;
 
@@ -20,12 +21,25 @@ public static class DependencyInjection
         var connectionString = configuration.GetConnectionString("SmartFacilityDatabase")
             ?? throw new InvalidOperationException(
                 "Connection string 'SmartFacilityDatabase' was not found.");
+        var sqlServerOptions = configuration
+            .GetSection(SqlServerOptions.SectionName)
+            .Get<SqlServerOptions>() ?? new SqlServerOptions();
+
+        if (sqlServerOptions.CommandTimeoutSeconds <= 0)
+        {
+            throw new InvalidOperationException(
+                $"{SqlServerOptions.SectionName}:{nameof(SqlServerOptions.CommandTimeoutSeconds)} " +
+                "must be greater than zero.");
+        }
 
         services.AddDbContext<SmartFacilityDbContext>(options =>
             options.UseSqlServer(
                 connectionString,
-                sqlServerOptions => sqlServerOptions.MigrationsAssembly(
-                    typeof(SmartFacilityDbContext).Assembly.FullName)));
+                sqlOptions =>
+                {
+                    sqlOptions.CommandTimeout(sqlServerOptions.CommandTimeoutSeconds);
+                    sqlOptions.MigrationsAssembly(typeof(SmartFacilityDbContext).Assembly.FullName);
+                }));
 
         var profiles = configuration
             .GetSection("ImportProfiles")

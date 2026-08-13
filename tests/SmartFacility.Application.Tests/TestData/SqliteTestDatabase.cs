@@ -1,5 +1,6 @@
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging.Abstractions;
 using SmartFacility.Infrastructure.Imports;
 using SmartFacility.Infrastructure.Persistence;
 
@@ -13,7 +14,7 @@ internal sealed class SqliteTestDatabase : IAsyncDisposable
     {
         _connection = connection;
         Context = context;
-        Store = new EfImportDataStore(context);
+        Store = new EfImportDataStore(context, NullLogger<EfImportDataStore>.Instance);
     }
 
     public SmartFacilityDbContext Context { get; }
