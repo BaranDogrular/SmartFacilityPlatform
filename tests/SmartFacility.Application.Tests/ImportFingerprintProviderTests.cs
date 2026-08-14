@@ -11,7 +11,6 @@ public sealed class ImportFingerprintProviderTests
     [InlineData(ImportSourceTypes.Asset)]
     [InlineData(ImportSourceTypes.WorkOrder)]
     [InlineData(ImportSourceTypes.ScadaAlarm)]
-    [InlineData(ImportSourceTypes.ScadaOutage)]
     public async Task Legacy_sources_keep_RowFingerprint_for_duplicate_detection(string sourceType)
     {
         var row = RawRowFactory.Row("Data", 2, RawRowFactory.Text("A", "Value"));
@@ -56,5 +55,36 @@ public sealed class ImportFingerprintProviderTests
             CancellationToken.None);
 
         Assert.Contains(fingerprints.RowFingerprint, known);
+    }
+
+    [Fact]
+    public void ScadaOutage_uses_versioned_idempotency_fingerprint_and_keeps_legacy_fingerprint()
+    {
+        var row = RawRowFactory.Row(
+            "SCADA SÜREKLİLİK",
+            2,
+            RawRowFactory.Text("B", "Power interruption"),
+            RawRowFactory.Text("C", "Main feed"),
+            RawRowFactory.DateTimeCell("D", new DateTime(2026, 8, 1)),
+            RawRowFactory.TimeCell("E", new TimeSpan(10, 30, 0)));
+        var provider = new ImportFingerprintProvider();
+
+        var fingerprints = provider.Calculate(ImportSourceTypes.ScadaOutage, row);
+
+        Assert.Equal(
+            RowFingerprintCalculator.Calculate(ImportSourceTypes.ScadaOutage, row),
+            fingerprints.RowFingerprint);
+        Assert.Equal(
+            ScadaOutageIdempotencyFingerprintCalculator.Calculate(
+                ImportSourceTypes.ScadaOutage,
+                row),
+            fingerprints.IdempotencyFingerprint);
+        Assert.Equal(
+            ScadaOutageIdempotencyFingerprintCalculator.Algorithm,
+            fingerprints.FingerprintAlgorithm);
+        Assert.Equal(fingerprints.IdempotencyFingerprint, fingerprints.DuplicateFingerprint);
+        Assert.Equal(
+            ScadaOutageIdempotencyFingerprintCalculator.Algorithm,
+            provider.GetIdempotencyAlgorithm(ImportSourceTypes.ScadaOutage));
     }
 }
