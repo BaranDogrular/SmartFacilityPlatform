@@ -26,4 +26,26 @@ internal static class RawRowFactory
             null,
             null,
             null);
+
+    public static RawExcelCell DateTimeCell(string column, DateTime value) =>
+        new(
+            column,
+            value.ToString("O", System.Globalization.CultureInfo.InvariantCulture),
+            value.ToString("O", System.Globalization.CultureInfo.InvariantCulture),
+            "DateTime",
+            null,
+            value,
+            null,
+            null);
+
+    public static RawExcelCell TimeCell(string column, TimeSpan value) =>
+        new(
+            column,
+            value.ToString("c", System.Globalization.CultureInfo.InvariantCulture),
+            value.ToString("c", System.Globalization.CultureInfo.InvariantCulture),
+            "TimeSpan",
+            null,
+            null,
+            value,
+            null);
 }

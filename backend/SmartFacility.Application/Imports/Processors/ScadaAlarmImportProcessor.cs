@@ -21,9 +21,9 @@ public sealed class ScadaAlarmImportProcessor : IImportRowProcessor
         var received = ExcelValueParser.CombineDateAndTime(
             profile.GetCell(row, "ReceivedDate"),
             profile.GetCell(row, "ReceivedTime"));
-        var cleared = ExcelValueParser.CombineDateAndTime(
+        var cleared = ApplyClearedAtPolicy(ExcelValueParser.CombineDateAndTime(
             profile.GetCell(row, "ClearedDate"),
-            profile.GetCell(row, "ClearedTime"));
+            profile.GetCell(row, "ClearedTime")));
 
         if (description is null && alarmType is null && status is null &&
             received.Status == "Missing" && cleared.Status == "Missing")
@@ -52,4 +52,9 @@ public sealed class ScadaAlarmImportProcessor : IImportRowProcessor
 
         return Task.FromResult(ImportRowDecision.Success(entity));
     }
+
+    private static ParsedDateTime ApplyClearedAtPolicy(ParsedDateTime parsed) =>
+        parsed.Status == "ParsedDateOnly"
+            ? new ParsedDateTime(null, "DateOnlySource")
+            : parsed;
 }
