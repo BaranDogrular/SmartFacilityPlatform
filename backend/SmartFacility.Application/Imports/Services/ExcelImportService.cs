@@ -48,12 +48,19 @@ public sealed class ExcelImportService(
         try
         {
             var sheetNames = profile.Worksheets.Select(worksheet => worksheet.Name).ToArray();
-            var fingerprintAlgorithm = fingerprintProvider.GetIdempotencyAlgorithm(profile.SourceType);
-            var knownFingerprints = await dataStore.GetSuccessfulFingerprintsAsync(
-                profile.SourceType,
-                sheetNames,
-                fingerprintAlgorithm,
-                cancellationToken);
+            var knownFingerprints = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var sheetName in sheetNames)
+            {
+                var fingerprintAlgorithm = fingerprintProvider.GetIdempotencyAlgorithm(
+                    profile.SourceType,
+                    sheetName);
+                var sheetFingerprints = await dataStore.GetSuccessfulFingerprintsAsync(
+                    profile.SourceType,
+                    [sheetName],
+                    fingerprintAlgorithm,
+                    cancellationToken);
+                knownFingerprints.UnionWith(sheetFingerprints);
+            }
             var validatedSheets = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
             var readRequest = new ExcelReadRequest(

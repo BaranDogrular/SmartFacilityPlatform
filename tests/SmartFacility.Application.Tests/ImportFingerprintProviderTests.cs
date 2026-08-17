@@ -21,7 +21,7 @@ public sealed class ImportFingerprintProviderTests
         Assert.Equal(fingerprints.RowFingerprint, fingerprints.DuplicateFingerprint);
         Assert.Null(fingerprints.IdempotencyFingerprint);
         Assert.Null(fingerprints.FingerprintAlgorithm);
-        Assert.Null(provider.GetIdempotencyAlgorithm(sourceType));
+        Assert.Null(provider.GetIdempotencyAlgorithm(sourceType, row.SheetName));
 
         await using var database = await SqliteTestDatabase.CreateAsync();
         var batch = new ImportBatch
@@ -85,6 +85,6 @@ public sealed class ImportFingerprintProviderTests
         Assert.Equal(fingerprints.IdempotencyFingerprint, fingerprints.DuplicateFingerprint);
         Assert.Equal(
             ScadaOutageIdempotencyFingerprintCalculator.Algorithm,
-            provider.GetIdempotencyAlgorithm(ImportSourceTypes.ScadaOutage));
+            provider.GetIdempotencyAlgorithm(ImportSourceTypes.ScadaOutage, row.SheetName));
     }
 }

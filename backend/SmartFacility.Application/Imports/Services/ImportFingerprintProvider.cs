@@ -5,15 +5,20 @@ namespace SmartFacility.Application.Imports.Services;
 
 public sealed class ImportFingerprintProvider : IImportFingerprintProvider
 {
-    public string? GetIdempotencyAlgorithm(string sourceType)
+    public string? GetIdempotencyAlgorithm(string sourceType, string sourceSheet)
     {
         if (IsHistoricalWorkOrder(sourceType))
         {
             return HistoricalWorkOrderIdempotencyFingerprintCalculator.Algorithm;
         }
 
-        return IsScadaOutage(sourceType)
-            ? ScadaOutageIdempotencyFingerprintCalculator.Algorithm
+        if (IsScadaOutage(sourceType))
+        {
+            return ScadaOutageIdempotencyFingerprintCalculator.Algorithm;
+        }
+
+        return IsYanginAlarm(sourceType, sourceSheet)
+            ? ScadaFireAlarmIdempotencyFingerprintCalculator.Algorithm
             : null;
     }
 
@@ -28,11 +33,19 @@ public sealed class ImportFingerprintProvider : IImportFingerprintProvider
                 HistoricalWorkOrderIdempotencyFingerprintCalculator.Algorithm);
         }
 
-        return IsScadaOutage(sourceType)
-            ? new ImportRowFingerprints(
+        if (IsScadaOutage(sourceType))
+        {
+            return new ImportRowFingerprints(
                 rowFingerprint,
                 ScadaOutageIdempotencyFingerprintCalculator.Calculate(sourceType, row),
-                ScadaOutageIdempotencyFingerprintCalculator.Algorithm)
+                ScadaOutageIdempotencyFingerprintCalculator.Algorithm);
+        }
+
+        return IsYanginAlarm(sourceType, row.SheetName)
+            ? new ImportRowFingerprints(
+                rowFingerprint,
+                ScadaFireAlarmIdempotencyFingerprintCalculator.Calculate(sourceType, row),
+                ScadaFireAlarmIdempotencyFingerprintCalculator.Algorithm)
             : new ImportRowFingerprints(rowFingerprint, null, null);
     }
 
@@ -47,4 +60,8 @@ public sealed class ImportFingerprintProvider : IImportFingerprintProvider
             sourceType,
             ImportSourceTypes.ScadaOutage,
             StringComparison.OrdinalIgnoreCase);
+
+    private static bool IsYanginAlarm(string sourceType, string sourceSheet) =>
+        string.Equals(sourceType, ImportSourceTypes.ScadaAlarm, StringComparison.OrdinalIgnoreCase) &&
+        string.Equals(sourceSheet, ScadaAlarmWorksheetNames.Yangin, StringComparison.OrdinalIgnoreCase);
 }

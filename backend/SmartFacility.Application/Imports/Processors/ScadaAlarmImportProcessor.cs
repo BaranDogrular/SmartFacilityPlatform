@@ -18,12 +18,29 @@ public sealed class ScadaAlarmImportProcessor : IImportRowProcessor
         var description = ProfileCellReader.Text(profile, row, "Description");
         var alarmType = ProfileCellReader.Text(profile, row, "AlarmType");
         var status = ProfileCellReader.Text(profile, row, "StatusRaw");
-        var received = ExcelValueParser.CombineDateAndTime(
-            profile.GetCell(row, "ReceivedDate"),
-            profile.GetCell(row, "ReceivedTime"));
-        var cleared = ApplyClearedAtPolicy(ExcelValueParser.CombineDateAndTime(
-            profile.GetCell(row, "ClearedDate"),
-            profile.GetCell(row, "ClearedTime")));
+        ParsedDateTime received;
+        ParsedDateTime cleared;
+        string dateTimeParseStatus;
+        if (string.Equals(
+                row.SheetName,
+                ScadaAlarmWorksheetNames.Yangin,
+                StringComparison.OrdinalIgnoreCase))
+        {
+            var evaluation = ScadaFireAlarmDateTimePolicy.Evaluate(row, profile);
+            received = evaluation.Received;
+            cleared = evaluation.Cleared;
+            dateTimeParseStatus = evaluation.Status;
+        }
+        else
+        {
+            received = ExcelValueParser.CombineDateAndTime(
+                profile.GetCell(row, "ReceivedDate"),
+                profile.GetCell(row, "ReceivedTime"));
+            cleared = ApplyClearedAtPolicy(ExcelValueParser.CombineDateAndTime(
+                profile.GetCell(row, "ClearedDate"),
+                profile.GetCell(row, "ClearedTime")));
+            dateTimeParseStatus = $"Received:{received.Status};Cleared:{cleared.Status}";
+        }
 
         if (description is null && alarmType is null && status is null &&
             received.Status == "Missing" && cleared.Status == "Missing")
@@ -46,7 +63,7 @@ public sealed class ScadaAlarmImportProcessor : IImportRowProcessor
             ResponsibleRaw = ProfileCellReader.Text(profile, row, "ResponsibleRaw"),
             StatusRaw = status,
             Note = ProfileCellReader.Text(profile, row, "Note"),
-            DateTimeParseStatus = $"Received:{received.Status};Cleared:{cleared.Status}",
+            DateTimeParseStatus = dateTimeParseStatus,
             CreatedAt = DateTimeOffset.UtcNow
         };
 

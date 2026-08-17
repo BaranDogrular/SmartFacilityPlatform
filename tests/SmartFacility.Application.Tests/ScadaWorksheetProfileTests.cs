@@ -33,6 +33,45 @@ public sealed class ScadaWorksheetProfileTests
     }
 
     [Fact]
+    public void Fire_alarm_configuration_uses_second_row_header_third_row_data_and_reference_date()
+    {
+        var alarmProfile = new ScadaAlarmImportProfile(LoadProfileOptions(ImportProfileKeys.ScadaAlarm));
+        var fire = alarmProfile.GetWorksheet("YANGIN");
+
+        Assert.Equal(2, fire.HeaderRowNumber);
+        Assert.Equal(3, fire.FirstDataRowNumber);
+        Assert.Equal(new DateTime(2026, 8, 7), fire.ReferenceDate);
+        Assert.Equal(14, fire.ExpectedHeaders.Count);
+    }
+
+    [Fact]
+    public async Task Fire_header_is_validated_and_not_classified_as_data()
+    {
+        var filePath = CreateScadaFixture();
+
+        try
+        {
+            var profile = new ScadaAlarmImportProfile(LoadProfileOptions(ImportProfileKeys.ScadaAlarm));
+            var rows = await ReadRowsAsync(filePath, profile);
+            var worksheet = profile.GetWorksheet("YANGIN");
+            var fireRows = rows.Where(row => row.SheetName == worksheet.Name).ToArray();
+            var header = Assert.Single(fireRows, row => row.RowNumber == worksheet.HeaderRowNumber);
+            var data = Assert.Single(fireRows, row => row.RowNumber >= worksheet.FirstDataRowNumber);
+
+            Assert.Empty(ProfileHeaderValidator.Validate(header, worksheet));
+            Assert.Equal(3, data.RowNumber);
+            Assert.DoesNotContain(fireRows, row => row.RowNumber == 1);
+            Assert.DoesNotContain(
+                fireRows.Where(row => row.RowNumber >= worksheet.FirstDataRowNumber),
+                row => row.RowNumber == worksheet.HeaderRowNumber);
+        }
+        finally
+        {
+            File.Delete(filePath);
+        }
+    }
+
+    [Fact]
     public void Scada_outage_configuration_keeps_existing_row_boundaries()
     {
         var outageProfile = new ScadaOutageImportProfile(LoadProfileOptions(ImportProfileKeys.ScadaOutage));
@@ -199,6 +238,11 @@ public sealed class ScadaWorksheetProfileTests
         mechanical.Cell("A1").Value = "MEKANİK - SCADA KONTROL";
         WriteAlarmHeaders(mechanical, 2);
         WriteAlarmData(mechanical, 3, "MEKANİK", "BASINÇ");
+
+        var fire = workbook.AddWorksheet("YANGIN");
+        fire.Cell("A1").Value = "YANGIN - SCADA KONTROL";
+        WriteAlarmHeaders(fire, 2);
+        WriteAlarmData(fire, 3, "YANGIN", "YANGIN ALARMI");
 
         var outage = workbook.AddWorksheet("SCADA SÜREKLLİK");
         var outageHeaders = new[]
