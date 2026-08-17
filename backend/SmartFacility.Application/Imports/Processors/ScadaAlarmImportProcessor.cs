@@ -31,6 +31,16 @@ public sealed class ScadaAlarmImportProcessor : IImportRowProcessor
             cleared = evaluation.Cleared;
             dateTimeParseStatus = evaluation.Status;
         }
+        else if (string.Equals(
+                     row.SheetName,
+                     ScadaAlarmWorksheetNames.Enerji,
+                     StringComparison.OrdinalIgnoreCase))
+        {
+            var evaluation = ScadaEnergyAlarmDateTimePolicy.Evaluate(row, profile);
+            received = evaluation.Received;
+            cleared = evaluation.Cleared;
+            dateTimeParseStatus = evaluation.Status;
+        }
         else
         {
             received = ExcelValueParser.CombineDateAndTime(

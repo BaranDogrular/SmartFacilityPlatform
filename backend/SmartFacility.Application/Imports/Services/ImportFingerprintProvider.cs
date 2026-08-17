@@ -17,8 +17,13 @@ public sealed class ImportFingerprintProvider : IImportFingerprintProvider
             return ScadaOutageIdempotencyFingerprintCalculator.Algorithm;
         }
 
-        return IsYanginAlarm(sourceType, sourceSheet)
-            ? ScadaFireAlarmIdempotencyFingerprintCalculator.Algorithm
+        if (IsYanginAlarm(sourceType, sourceSheet))
+        {
+            return ScadaFireAlarmIdempotencyFingerprintCalculator.Algorithm;
+        }
+
+        return IsEnergyAlarm(sourceType, sourceSheet)
+            ? ScadaEnergyAlarmIdempotencyFingerprintCalculator.Algorithm
             : null;
     }
 
@@ -41,11 +46,19 @@ public sealed class ImportFingerprintProvider : IImportFingerprintProvider
                 ScadaOutageIdempotencyFingerprintCalculator.Algorithm);
         }
 
-        return IsYanginAlarm(sourceType, row.SheetName)
-            ? new ImportRowFingerprints(
+        if (IsYanginAlarm(sourceType, row.SheetName))
+        {
+            return new ImportRowFingerprints(
                 rowFingerprint,
                 ScadaFireAlarmIdempotencyFingerprintCalculator.Calculate(sourceType, row),
-                ScadaFireAlarmIdempotencyFingerprintCalculator.Algorithm)
+                ScadaFireAlarmIdempotencyFingerprintCalculator.Algorithm);
+        }
+
+        return IsEnergyAlarm(sourceType, row.SheetName)
+            ? new ImportRowFingerprints(
+                rowFingerprint,
+                ScadaEnergyAlarmIdempotencyFingerprintCalculator.Calculate(sourceType, row),
+                ScadaEnergyAlarmIdempotencyFingerprintCalculator.Algorithm)
             : new ImportRowFingerprints(rowFingerprint, null, null);
     }
 
@@ -64,4 +77,8 @@ public sealed class ImportFingerprintProvider : IImportFingerprintProvider
     private static bool IsYanginAlarm(string sourceType, string sourceSheet) =>
         string.Equals(sourceType, ImportSourceTypes.ScadaAlarm, StringComparison.OrdinalIgnoreCase) &&
         string.Equals(sourceSheet, ScadaAlarmWorksheetNames.Yangin, StringComparison.OrdinalIgnoreCase);
+
+    private static bool IsEnergyAlarm(string sourceType, string sourceSheet) =>
+        string.Equals(sourceType, ImportSourceTypes.ScadaAlarm, StringComparison.OrdinalIgnoreCase) &&
+        string.Equals(sourceSheet, ScadaAlarmWorksheetNames.Enerji, StringComparison.OrdinalIgnoreCase);
 }

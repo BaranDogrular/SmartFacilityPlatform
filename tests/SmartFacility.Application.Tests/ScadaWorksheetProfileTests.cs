@@ -45,6 +45,22 @@ public sealed class ScadaWorksheetProfileTests
     }
 
     [Fact]
+    public void Energy_alarm_configuration_uses_second_row_header_third_row_data_and_reference_date()
+    {
+        var alarmProfile = new ScadaAlarmImportProfile(LoadProfileOptions(ImportProfileKeys.ScadaAlarm));
+        var energy = alarmProfile.GetWorksheet("ENERJİ");
+
+        Assert.Equal(2, energy.HeaderRowNumber);
+        Assert.Equal(3, energy.FirstDataRowNumber);
+        Assert.Equal(new DateTime(2026, 8, 7), energy.ReferenceDate);
+        Assert.Equal(14, energy.ExpectedHeaders.Count);
+        Assert.Equal("A", alarmProfile.Columns["SectionRaw"]);
+        Assert.Equal("N", alarmProfile.Columns["Note"]);
+        Assert.DoesNotContain("S", alarmProfile.Columns.Values);
+        Assert.DoesNotContain("T", alarmProfile.Columns.Values);
+    }
+
+    [Fact]
     public async Task Fire_header_is_validated_and_not_classified_as_data()
     {
         var filePath = CreateScadaFixture();
@@ -165,6 +181,39 @@ public sealed class ScadaWorksheetProfileTests
         }
     }
 
+    [Fact]
+    public async Task Energy_header_is_validated_and_first_data_row_maps_A_through_N()
+    {
+        var filePath = CreateScadaFixture();
+
+        try
+        {
+            var profile = new ScadaAlarmImportProfile(LoadProfileOptions(ImportProfileKeys.ScadaAlarm));
+            var rows = await ReadRowsAsync(filePath, profile);
+            var worksheet = profile.GetWorksheet("ENERJİ");
+            var energyRows = rows.Where(row => row.SheetName == worksheet.Name).ToArray();
+            var header = Assert.Single(energyRows, row => row.RowNumber == worksheet.HeaderRowNumber);
+            var data = Assert.Single(energyRows, row => row.RowNumber >= worksheet.FirstDataRowNumber);
+
+            Assert.Empty(ProfileHeaderValidator.Validate(header, worksheet));
+            Assert.Equal(3, data.RowNumber);
+            Assert.DoesNotContain(energyRows, row => row.RowNumber == 1);
+
+            var decision = await new ScadaAlarmImportProcessor()
+                .ProcessAsync(data, profile, CancellationToken.None);
+            var alarm = Assert.IsType<ScadaAlarmEvent>(decision.Entity);
+
+            Assert.Equal("ENERJİ", alarm.SourceSheet);
+            Assert.Equal("ENERJİ", alarm.SectionRaw);
+            Assert.Equal("ENERJİ ALARMI", alarm.AlarmType);
+            Assert.Equal(new DateTime(2026, 8, 7, 8, 30, 0), alarm.ReceivedAt);
+        }
+        finally
+        {
+            File.Delete(filePath);
+        }
+    }
+
     private static async Task<List<RawExcelRow>> ReadRowsAsync(
         string filePath,
         IImportSourceProfile profile)
@@ -243,6 +292,13 @@ public sealed class ScadaWorksheetProfileTests
         fire.Cell("A1").Value = "YANGIN - SCADA KONTROL";
         WriteAlarmHeaders(fire, 2);
         WriteAlarmData(fire, 3, "YANGIN", "YANGIN ALARMI");
+
+        var energy = workbook.AddWorksheet("ENERJİ");
+        energy.Cell("A1").Value = "ENERJİ - SCADA KONTROL";
+        WriteAlarmHeaders(energy, 2);
+        WriteAlarmData(energy, 3, "ENERJİ", "ENERJİ ALARMI");
+        energy.Cell("S3").Value = "Helper intervention";
+        energy.Cell("T3").Value = "Helper alarm type";
 
         var outage = workbook.AddWorksheet("SCADA SÜREKLLİK");
         var outageHeaders = new[]

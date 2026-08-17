@@ -96,6 +96,39 @@ internal static class TestProfiles
         }
     });
 
+    public static ScadaAlarmImportProfile ScadaEnergyAlarm() => new(new ImportProfileOptions
+    {
+        SourceType = ImportSourceTypes.ScadaAlarm,
+        Worksheets =
+        [
+            new WorksheetProfileOptions
+            {
+                Name = "ENERJİ",
+                HeaderRowNumber = 2,
+                FirstDataRowNumber = 3,
+                ReferenceDate = new DateTime(2026, 8, 7),
+                ExpectedHeaders = new Dictionary<string, string> { ["G"] = "AÇIKLAMA" }
+            }
+        ],
+        Columns = new Dictionary<string, string>
+        {
+            ["SectionRaw"] = "A",
+            ["LocationRaw"] = "B",
+            ["FloorRaw"] = "C",
+            ["AlarmType"] = "D",
+            ["InterventionLevel"] = "E",
+            ["ZoneRaw"] = "F",
+            ["Description"] = "G",
+            ["ReceivedDate"] = "H",
+            ["ReceivedTime"] = "I",
+            ["ClearedDate"] = "J",
+            ["ClearedTime"] = "K",
+            ["ResponsibleRaw"] = "L",
+            ["StatusRaw"] = "M",
+            ["Note"] = "N"
+        }
+    });
+
     public static ScadaOutageImportProfile ScadaOutage() => new(new ImportProfileOptions
     {
         SourceType = ImportSourceTypes.ScadaOutage,
