@@ -1,0 +1,160 @@
+export type KpiReliability = 'Green' | 'Yellow' | 'Red'
+
+export type TimeGrain = 'Month'
+
+export interface CategoryCount {
+  category: string
+  count: number
+}
+
+export interface DimensionCount {
+  id: number | null
+  name: string
+  count: number
+}
+
+export interface TrendPoint {
+  period: string
+  count: number
+}
+
+export interface QualitySummary {
+  validRecordCount: number
+  excludedByQualityCount: number
+}
+
+export interface SnapshotAnalyticsMetadata {
+  reliability: KpiReliability
+  sourceDataset: string
+  dataAsOf: string
+  sampleSize: number
+  notes: string[]
+}
+
+export interface DateRangeMetadata {
+  reliability: KpiReliability
+  sourceDataset: string
+  dataAsOf: string
+  requestedDateFrom: string | null
+  requestedDateTo: string | null
+  actualMinDate: string | null
+  actualMaxDate: string | null
+  dateField: string
+  matchedRecordCount: number
+  validRecordCount: number
+  excludedByQualityCount: number
+  timeZoneAssumption: string
+  qualityRuleVersion: string
+  notes: string[]
+}
+
+export interface AssetWorkOrderCount {
+  assetId: number
+  assetCode: string
+  assetName: string
+  workOrderCount: number
+}
+
+export interface AssetOverviewResponse {
+  totalAssetCount: number
+  countByBuilding: DimensionCount[]
+  countByLocation: DimensionCount[]
+  countByAssetGroup: DimensionCount[]
+  assetsWithCurrentWorkOrders: number
+  assetsWithoutCurrentWorkOrders: number
+  topAssetsByWorkOrderCount: AssetWorkOrderCount[]
+  topAssetsReliability: KpiReliability
+  metadata: SnapshotAnalyticsMetadata
+}
+
+export interface WorkOrderOverviewResponse {
+  totalWorkOrders: number
+  byDiscipline: CategoryCount[]
+  byWorkType: CategoryCount[]
+  byStatus: CategoryCount[]
+  byFailureType: CategoryCount[]
+  byBuilding: DimensionCount[]
+  byLocation: DimensionCount[]
+  byBuildingReliability: KpiReliability
+  byLocationReliability: KpiReliability
+  metadata: DateRangeMetadata
+}
+
+export interface WorkOrderTrendResponse {
+  grain: TimeGrain
+  points: TrendPoint[]
+  metadata: DateRangeMetadata
+}
+
+export interface ScadaOverviewResponse {
+  totalAlarmOccurrences: number
+  bySourceSheet: CategoryCount[]
+  byAlarmType: CategoryCount[]
+  byInterventionLevel: CategoryCount[]
+  bySection: CategoryCount[]
+  byLocationRaw: CategoryCount[]
+  invalidOrMissingTimestampCount: number
+  dateQualityIssueCount: number
+  bySectionReliability: KpiReliability
+  byLocationRawReliability: KpiReliability
+  metadata: DateRangeMetadata
+}
+
+export interface ScadaTrendResponse {
+  grain: TimeGrain
+  points: TrendPoint[]
+  quality: QualitySummary
+  metadata: DateRangeMetadata
+}
+
+export interface SourceTypeBatchCount {
+  sourceType: string
+  count: number
+}
+
+export interface ImportQualityOverviewResponse {
+  totalBatches: number
+  batchesByStatus: CategoryCount[]
+  batchesBySourceType: SourceTypeBatchCount[]
+  sourceRecordsByParseStatus: CategoryCount[]
+  importErrorCount: number
+  errorsBySourceType: SourceTypeBatchCount[]
+  fingerprintAlgorithmDistribution: CategoryCount[]
+  legacySourceRecordCount: number
+  versionedSourceRecordCount: number
+  metadata: SnapshotAnalyticsMetadata
+}
+
+export interface AssetOverviewQuery {
+  buildingId?: number
+  locationId?: number
+  assetGroupId?: number
+  assetId?: number
+  workOrderDateFrom?: string
+  workOrderDateTo?: string
+  top?: number
+}
+
+export interface WorkOrderAnalyticsQuery {
+  dateFrom?: string
+  dateTo?: string
+  discipline?: string
+  workType?: string
+  status?: string
+  failureType?: string
+  buildingId?: number
+  locationId?: number
+  assetId?: number
+  grain?: TimeGrain
+}
+
+export interface ScadaAnalyticsQuery {
+  dateFrom?: string
+  dateTo?: string
+  sourceSheet?: string
+  alarmType?: string
+  interventionLevel?: string
+  section?: string
+  locationRaw?: string
+  grain?: TimeGrain
+}

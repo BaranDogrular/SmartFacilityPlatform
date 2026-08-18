@@ -1,9 +1,28 @@
+import { lazy, Suspense } from 'react'
+import { Navigate, Route, Routes } from 'react-router-dom'
+import { AppLayout } from './components/AppLayout'
+import { LoadingState } from './components/DashboardUi'
+
+const OverviewPage = lazy(async () => ({ default: (await import('./pages/OverviewPage')).OverviewPage }))
+const AssetsPage = lazy(async () => ({ default: (await import('./pages/AssetsPage')).AssetsPage }))
+const WorkOrdersPage = lazy(async () => ({ default: (await import('./pages/WorkOrdersPage')).WorkOrdersPage }))
+const ScadaPage = lazy(async () => ({ default: (await import('./pages/ScadaPage')).ScadaPage }))
+const DataQualityPage = lazy(async () => ({ default: (await import('./pages/DataQualityPage')).DataQualityPage }))
+
 function App() {
   return (
-    <main className="container py-5">
-      <h1>Smart Facility Maintenance &amp; Analytics Platform</h1>
-      <p className="text-secondary mb-0">Uygulama iskeleti hazır.</p>
-    </main>
+    <Suspense fallback={<LoadingState label="Dashboard ekranı yükleniyor" />}>
+      <Routes>
+        <Route element={<AppLayout />}>
+          <Route index element={<OverviewPage />} />
+          <Route path="assets" element={<AssetsPage />} />
+          <Route path="work-orders" element={<WorkOrdersPage />} />
+          <Route path="scada" element={<ScadaPage />} />
+          <Route path="data-quality" element={<DataQualityPage />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Route>
+      </Routes>
+    </Suspense>
   )
 }
 
