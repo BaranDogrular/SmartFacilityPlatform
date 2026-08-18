@@ -1,12 +1,14 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using SmartFacility.Application.Analytics.Abstractions;
 using SmartFacility.Application.Imports.Abstractions;
 using SmartFacility.Application.Imports.Models;
 using SmartFacility.Application.Imports.Processors;
 using SmartFacility.Application.Imports.Profiles;
 using SmartFacility.Application.Imports.Services;
 using SmartFacility.Infrastructure.Configuration;
+using SmartFacility.Infrastructure.Analytics;
 using SmartFacility.Infrastructure.Imports;
 using SmartFacility.Infrastructure.Persistence;
 
@@ -40,6 +42,16 @@ public static class DependencyInjection
                     sqlOptions.CommandTimeout(sqlServerOptions.CommandTimeoutSeconds);
                     sqlOptions.MigrationsAssembly(typeof(SmartFacilityDbContext).Assembly.FullName);
                 }));
+
+        services.AddScoped<EfAnalyticsQueryService>();
+        services.AddScoped<IAssetAnalyticsService>(provider =>
+            provider.GetRequiredService<EfAnalyticsQueryService>());
+        services.AddScoped<IWorkOrderAnalyticsService>(provider =>
+            provider.GetRequiredService<EfAnalyticsQueryService>());
+        services.AddScoped<IScadaAnalyticsService>(provider =>
+            provider.GetRequiredService<EfAnalyticsQueryService>());
+        services.AddScoped<IImportQualityAnalyticsService>(provider =>
+            provider.GetRequiredService<EfAnalyticsQueryService>());
 
         var profiles = configuration
             .GetSection("ImportProfiles")
