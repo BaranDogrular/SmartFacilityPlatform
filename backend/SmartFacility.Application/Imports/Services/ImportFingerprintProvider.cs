@@ -22,6 +22,11 @@ public sealed class ImportFingerprintProvider : IImportFingerprintProvider
             return ScadaFireAlarmIdempotencyFingerprintCalculator.Algorithm;
         }
 
+        if (IsKampusTakipAlarm(sourceType, sourceSheet))
+        {
+            return ScadaCampusTrackingIdempotencyFingerprintCalculator.Algorithm;
+        }
+
         return IsEnergyAlarm(sourceType, sourceSheet)
             ? ScadaEnergyAlarmIdempotencyFingerprintCalculator.Algorithm
             : null;
@@ -54,6 +59,14 @@ public sealed class ImportFingerprintProvider : IImportFingerprintProvider
                 ScadaFireAlarmIdempotencyFingerprintCalculator.Algorithm);
         }
 
+        if (IsKampusTakipAlarm(sourceType, row.SheetName))
+        {
+            return new ImportRowFingerprints(
+                rowFingerprint,
+                ScadaCampusTrackingIdempotencyFingerprintCalculator.Calculate(sourceType, row),
+                ScadaCampusTrackingIdempotencyFingerprintCalculator.Algorithm);
+        }
+
         return IsEnergyAlarm(sourceType, row.SheetName)
             ? new ImportRowFingerprints(
                 rowFingerprint,
@@ -81,4 +94,8 @@ public sealed class ImportFingerprintProvider : IImportFingerprintProvider
     private static bool IsEnergyAlarm(string sourceType, string sourceSheet) =>
         string.Equals(sourceType, ImportSourceTypes.ScadaAlarm, StringComparison.OrdinalIgnoreCase) &&
         string.Equals(sourceSheet, ScadaAlarmWorksheetNames.Enerji, StringComparison.OrdinalIgnoreCase);
+
+    private static bool IsKampusTakipAlarm(string sourceType, string sourceSheet) =>
+        string.Equals(sourceType, ImportSourceTypes.ScadaAlarm, StringComparison.OrdinalIgnoreCase) &&
+        ScadaAlarmWorksheetNames.IsKampusTakip(sourceSheet);
 }

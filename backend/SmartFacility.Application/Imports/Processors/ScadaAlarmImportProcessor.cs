@@ -41,6 +41,13 @@ public sealed class ScadaAlarmImportProcessor : IImportRowProcessor
             cleared = evaluation.Cleared;
             dateTimeParseStatus = evaluation.Status;
         }
+        else if (ScadaAlarmWorksheetNames.IsKampusTakip(row.SheetName))
+        {
+            var evaluation = ScadaCampusTrackingDateTimePolicy.Evaluate(row, profile);
+            received = evaluation.Received;
+            cleared = evaluation.Cleared;
+            dateTimeParseStatus = evaluation.Status;
+        }
         else
         {
             received = ExcelValueParser.CombineDateAndTime(

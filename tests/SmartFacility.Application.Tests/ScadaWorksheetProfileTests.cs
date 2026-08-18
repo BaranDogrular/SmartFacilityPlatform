@@ -61,6 +61,36 @@ public sealed class ScadaWorksheetProfileTests
     }
 
     [Fact]
+    public void Campus_tracking_configuration_uses_exact_sheet_rows_and_A_through_N_mapping()
+    {
+        var alarmProfile = new ScadaAlarmImportProfile(LoadProfileOptions(ImportProfileKeys.ScadaAlarm));
+        var campus = alarmProfile.GetWorksheet("KAMPÜS TAKİP");
+
+        Assert.Equal("KAMPÜS TAKİP", campus.Name);
+        Assert.Equal(2, campus.HeaderRowNumber);
+        Assert.Equal(3, campus.FirstDataRowNumber);
+        Assert.Equal(new DateTime(2026, 8, 7), campus.ReferenceDate);
+        Assert.Equal(14, campus.ExpectedHeaders.Count);
+        Assert.Equal("A", alarmProfile.Columns["SectionRaw"]);
+        Assert.Equal("B", alarmProfile.Columns["LocationRaw"]);
+        Assert.Equal("C", alarmProfile.Columns["FloorRaw"]);
+        Assert.Equal("D", alarmProfile.Columns["AlarmType"]);
+        Assert.Equal("E", alarmProfile.Columns["InterventionLevel"]);
+        Assert.Equal("F", alarmProfile.Columns["ZoneRaw"]);
+        Assert.Equal("G", alarmProfile.Columns["Description"]);
+        Assert.Equal("H", alarmProfile.Columns["ReceivedDate"]);
+        Assert.Equal("I", alarmProfile.Columns["ReceivedTime"]);
+        Assert.Equal("J", alarmProfile.Columns["ClearedDate"]);
+        Assert.Equal("K", alarmProfile.Columns["ClearedTime"]);
+        Assert.Equal("L", alarmProfile.Columns["ResponsibleRaw"]);
+        Assert.Equal("M", alarmProfile.Columns["StatusRaw"]);
+        Assert.Equal("N", alarmProfile.Columns["Note"]);
+        Assert.DoesNotContain("S", alarmProfile.Columns.Values);
+        Assert.DoesNotContain("T", alarmProfile.Columns.Values);
+        Assert.DoesNotContain("U", alarmProfile.Columns.Values);
+    }
+
+    [Fact]
     public async Task Fire_header_is_validated_and_not_classified_as_data()
     {
         var filePath = CreateScadaFixture();
@@ -299,6 +329,13 @@ public sealed class ScadaWorksheetProfileTests
         WriteAlarmData(energy, 3, "ENERJİ", "ENERJİ ALARMI");
         energy.Cell("S3").Value = "Helper intervention";
         energy.Cell("T3").Value = "Helper alarm type";
+
+        var campus = workbook.AddWorksheet("KAMPÜS TAKİP");
+        campus.Cell("A1").Value = "KAMPÜS TAKİP - SCADA KONTROL";
+        WriteAlarmHeaders(campus, 2);
+        WriteAlarmData(campus, 3, "KAMPÜS", "KAMPÜS ALARMI");
+        campus.Cell("S3").Value = "Helper intervention";
+        campus.Cell("T3").Value = "Helper alarm type";
 
         var outage = workbook.AddWorksheet("SCADA SÜREKLLİK");
         var outageHeaders = new[]
