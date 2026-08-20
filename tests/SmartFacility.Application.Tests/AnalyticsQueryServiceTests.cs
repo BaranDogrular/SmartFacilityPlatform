@@ -1,4 +1,6 @@
+using System.Data.Common;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using SmartFacility.Application.Analytics.Models;
 using SmartFacility.Application.Tests.TestData;
 using SmartFacility.Domain.Entities;
@@ -45,6 +47,100 @@ public sealed class AnalyticsQueryServiceTests
         Assert.Equal(1, response.AssetsWithoutCurrentWorkOrders);
         Assert.Equal("A-1", Assert.Single(response.TopAssetsByWorkOrderCount).AssetCode);
         Assert.Equal(KpiReliability.Yellow, response.TopAssetsReliability);
+    }
+
+    [Fact]
+    public async Task Asset_pareto_applies_server_side_top_and_calculates_shares()
+    {
+        var commandCapture = new CommandCaptureInterceptor();
+        await using var database = await SqliteTestDatabase.CreateAsync(commandCapture);
+        var (building, location, group, firstAsset, secondAsset) =
+            await SeedAssetDimensionsAsync(database);
+        var thirdAsset = Asset("A-3", "Third Asset", building, location, group);
+        database.Context.Assets.Add(thirdAsset);
+        await database.Context.SaveChangesAsync();
+
+        database.Context.WorkOrders.AddRange(
+            WorkOrder("WO-1", new DateTime(2026, 1, 1), firstAsset, building, location),
+            WorkOrder("WO-2", new DateTime(2026, 1, 2), firstAsset, building, location),
+            WorkOrder("WO-3", new DateTime(2026, 1, 31, 23, 59, 59), firstAsset, building, location),
+            WorkOrder("WO-4", new DateTime(2026, 1, 3), secondAsset, building, location),
+            WorkOrder("WO-5", new DateTime(2026, 1, 4), secondAsset, building, location),
+            WorkOrder("WO-6", new DateTime(2026, 1, 5), thirdAsset, building, location));
+        database.Context.HistoricalWorkOrders.Add(new HistoricalWorkOrder
+        {
+            SourceReference = "HISTORICAL-ONLY",
+            ReportedDateTime = new DateTime(2026, 1, 6),
+            Discipline = "Electrical",
+            CreatedAt = DateTimeOffset.UtcNow
+        });
+        await database.Context.SaveChangesAsync();
+        commandCapture.Commands.Clear();
+
+        var service = new EfAnalyticsQueryService(database.Context);
+        var response = await service.GetMaintenanceActivityParetoAsync(
+            new AssetMaintenanceActivityParetoQuery
+            {
+                DateFrom = new DateOnly(2026, 1, 1),
+                DateTo = new DateOnly(2026, 1, 31),
+                Top = 2
+            });
+
+        Assert.Equal(6, response.TotalCurrentWorkOrders);
+        Assert.Equal(3, response.AssetsWithCurrentWorkOrders);
+        Assert.Equal(2, response.AppliedTop);
+        Assert.Collection(
+            response.TopAssets,
+            item =>
+            {
+                Assert.Equal("A-1", item.AssetCode);
+                Assert.Equal(3, item.CurrentWorkOrderCount);
+                Assert.Equal(50m, item.SharePercent);
+                Assert.Equal(50m, item.CumulativeSharePercent);
+            },
+            item =>
+            {
+                Assert.Equal("A-2", item.AssetCode);
+                Assert.Equal(2, item.CurrentWorkOrderCount);
+                Assert.Equal(33.3333m, item.SharePercent);
+                Assert.Equal(83.3333m, item.CumulativeSharePercent);
+            });
+        Assert.Equal(KpiReliability.Yellow, response.Metadata.Reliability);
+        Assert.Contains(commandCapture.Commands, command =>
+            command.Contains("GROUP BY", StringComparison.OrdinalIgnoreCase)
+            && command.Contains("ORDER BY", StringComparison.OrdinalIgnoreCase)
+            && command.Contains("LIMIT", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public async Task Asset_pareto_uses_deterministic_tie_order_and_returns_empty_for_no_match()
+    {
+        await using var database = await SqliteTestDatabase.CreateAsync();
+        var (building, location, _, firstAsset, secondAsset) =
+            await SeedAssetDimensionsAsync(database);
+        database.Context.WorkOrders.AddRange(
+            WorkOrder("WO-2", new DateTime(2026, 1, 2), secondAsset, building, location),
+            WorkOrder("WO-1", new DateTime(2026, 1, 1), firstAsset, building, location));
+        await database.Context.SaveChangesAsync();
+
+        var service = new EfAnalyticsQueryService(database.Context);
+        var tied = await service.GetMaintenanceActivityParetoAsync(
+            new AssetMaintenanceActivityParetoQuery());
+        Assert.Collection(
+            tied.TopAssets,
+            item => Assert.Equal("A-1", item.AssetCode),
+            item => Assert.Equal("A-2", item.AssetCode));
+
+        var empty = await service.GetMaintenanceActivityParetoAsync(
+            new AssetMaintenanceActivityParetoQuery
+            {
+                DateFrom = new DateOnly(2025, 1, 1),
+                DateTo = new DateOnly(2025, 1, 31)
+            });
+        Assert.Equal(0, empty.TotalCurrentWorkOrders);
+        Assert.Equal(0, empty.AssetsWithCurrentWorkOrders);
+        Assert.Empty(empty.TopAssets);
+        Assert.Null(empty.Metadata.ActualMinDate);
     }
 
     [Fact]
@@ -152,6 +248,76 @@ public sealed class AnalyticsQueryServiceTests
                 Assert.Equal(1, point.Count);
             });
         Assert.Equal(3, response.Metadata.MatchedRecordCount);
+    }
+
+    [Fact]
+    public async Task Historical_activity_groups_months_and_raw_disciplines_without_current_rows()
+    {
+        await using var database = await SqliteTestDatabase.CreateAsync();
+        var (building, location, _, asset, _) = await SeedAssetDimensionsAsync(database);
+        database.Context.WorkOrders.Add(
+            WorkOrder("CURRENT", new DateTime(2026, 1, 10), asset, building, location));
+        database.Context.HistoricalWorkOrders.AddRange(
+            Historical("H-1", new DateTime(2026, 1, 1), "Electrical"),
+            Historical("H-2", new DateTime(2026, 1, 31, 23, 59, 59), "Mechanical"),
+            Historical("H-3", new DateTime(2026, 2, 1), "Electrical"),
+            Historical("H-4", null, "Electrical"));
+        await database.Context.SaveChangesAsync();
+
+        var service = new EfAnalyticsQueryService(database.Context);
+        var response = await service.GetActivityAsync(new HistoricalMaintenanceActivityQuery());
+
+        Assert.Equal(4, response.Metadata.MatchedRecordCount);
+        Assert.Equal(3, response.Metadata.ValidRecordCount);
+        Assert.Equal(1, response.Metadata.ExcludedByQualityCount);
+        Assert.Collection(
+            response.Trend,
+            point =>
+            {
+                Assert.Equal(new DateOnly(2026, 1, 1), point.Period);
+                Assert.Equal(2, point.Count);
+            },
+            point =>
+            {
+                Assert.Equal(new DateOnly(2026, 2, 1), point.Period);
+                Assert.Equal(1, point.Count);
+            });
+        Assert.Contains(response.ByDiscipline, item =>
+            item.Category == "Electrical" && item.Count == 3);
+        Assert.Contains(response.ByDiscipline, item =>
+            item.Category == "Mechanical" && item.Count == 1);
+        Assert.Equal("analytics.HistoricalWorkOrders", response.Metadata.SourceDataset);
+        Assert.Equal(KpiReliability.Green, response.Metadata.Reliability);
+    }
+
+    [Fact]
+    public async Task Historical_activity_applies_exact_filter_and_returns_empty_for_no_match()
+    {
+        await using var database = await SqliteTestDatabase.CreateAsync();
+        database.Context.HistoricalWorkOrders.AddRange(
+            Historical("H-1", new DateTime(2026, 1, 31, 23, 59, 59), "Electrical"),
+            Historical("H-2", new DateTime(2026, 2, 1), "Mechanical"));
+        await database.Context.SaveChangesAsync();
+
+        var service = new EfAnalyticsQueryService(database.Context);
+        var filtered = await service.GetActivityAsync(new HistoricalMaintenanceActivityQuery
+        {
+            DateFrom = new DateOnly(2026, 1, 31),
+            DateTo = new DateOnly(2026, 1, 31),
+            Discipline = "Electrical"
+        });
+        Assert.Equal(1, filtered.Metadata.MatchedRecordCount);
+        Assert.Equal("Electrical", filtered.AppliedDiscipline);
+        Assert.Equal("Electrical", Assert.Single(filtered.ByDiscipline).Category);
+
+        var empty = await service.GetActivityAsync(new HistoricalMaintenanceActivityQuery
+        {
+            Discipline = "NoMatch"
+        });
+        Assert.Equal(0, empty.Metadata.MatchedRecordCount);
+        Assert.Empty(empty.Trend);
+        Assert.Empty(empty.ByDiscipline);
+        Assert.Null(empty.Metadata.ActualMinDate);
     }
 
     [Fact]
@@ -322,6 +488,19 @@ public sealed class AnalyticsQueryServiceTests
             UpdatedAt = DateTimeOffset.UtcNow
         };
 
+    private static HistoricalWorkOrder Historical(
+        string sourceReference,
+        DateTime? reportedAt,
+        string discipline) =>
+        new()
+        {
+            SourceReference = sourceReference,
+            ReportedDateTime = reportedAt,
+            Description = $"Description {sourceReference}",
+            Discipline = discipline,
+            CreatedAt = DateTimeOffset.UtcNow
+        };
+
     private static void SeedScadaEvents(SqliteTestDatabase database)
     {
         database.Context.ScadaAlarmEvents.AddRange(
@@ -391,4 +570,19 @@ public sealed class AnalyticsQueryServiceTests
             ParseStatus = parseStatus,
             CreatedAt = DateTimeOffset.UtcNow
         };
+}
+
+internal sealed class CommandCaptureInterceptor : DbCommandInterceptor
+{
+    public List<string> Commands { get; } = [];
+
+    public override ValueTask<InterceptionResult<DbDataReader>> ReaderExecutingAsync(
+        DbCommand command,
+        CommandEventData eventData,
+        InterceptionResult<DbDataReader> result,
+        CancellationToken cancellationToken = default)
+    {
+        Commands.Add(command.CommandText);
+        return base.ReaderExecutingAsync(command, eventData, result, cancellationToken);
+    }
 }

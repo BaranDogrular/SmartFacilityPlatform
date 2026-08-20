@@ -23,6 +23,12 @@ public static class AnalyticsEndpoints
             .Produces<AssetOverviewResponse>()
             .ProducesValidationProblem();
 
+        group.MapGet("/assets/maintenance-activity-pareto", GetAssetMaintenanceActivityParetoAsync)
+            .WithName("GetAssetMaintenanceActivityPareto")
+            .WithSummary("Returns the concentration of current work-order records by asset.")
+            .Produces<AssetMaintenanceActivityParetoResponse>()
+            .ProducesValidationProblem();
+
         group.MapGet("/work-orders/overview", GetWorkOrderOverviewAsync)
             .WithName("GetWorkOrderOverview")
             .WithSummary("Returns current WorkOrder aggregations without historical data.")
@@ -35,6 +41,12 @@ public static class AnalyticsEndpoints
             .Produces<WorkOrderTrendResponse>()
             .ProducesValidationProblem();
 
+        group.MapGet("/historical-work-orders/activity", GetHistoricalMaintenanceActivityAsync)
+            .WithName("GetHistoricalMaintenanceActivity")
+            .WithSummary("Returns historical-only monthly record activity and raw discipline counts.")
+            .Produces<HistoricalMaintenanceActivityResponse>()
+            .ProducesValidationProblem();
+
         group.MapGet("/scada/overview", GetScadaOverviewAsync)
             .WithName("GetScadaOverview")
             .WithSummary("Returns SCADA source-occurrence and timestamp-quality metrics.")
@@ -45,6 +57,12 @@ public static class AnalyticsEndpoints
             .WithName("GetScadaTrend")
             .WithSummary("Returns a monthly SCADA source-occurrence trend using valid ReceivedAt values.")
             .Produces<ScadaTrendResponse>()
+            .ProducesValidationProblem();
+
+        group.MapGet("/scada/clearance-interval", GetScadaClearanceIntervalAsync)
+            .WithName("GetScadaClearanceInterval")
+            .WithSummary("Returns clearance interval percentiles for timestamp-quality eligible occurrences.")
+            .Produces<ScadaClearanceIntervalResponse>()
             .ProducesValidationProblem();
 
         return endpoints;
@@ -67,6 +85,22 @@ public static class AnalyticsEndpoints
         }
 
         return TypedResults.Ok(await service.GetOverviewAsync(query, cancellationToken));
+    }
+
+    private static async Task<Results<Ok<AssetMaintenanceActivityParetoResponse>, ValidationProblem>>
+        GetAssetMaintenanceActivityParetoAsync(
+            [AsParameters] AssetMaintenanceActivityParetoQuery query,
+            IAssetAnalyticsService service,
+            CancellationToken cancellationToken)
+    {
+        var errors = AnalyticsQueryValidation.Validate(query);
+        if (errors.Count > 0)
+        {
+            return TypedResults.ValidationProblem(errors);
+        }
+
+        return TypedResults.Ok(
+            await service.GetMaintenanceActivityParetoAsync(query, cancellationToken));
     }
 
     private static async Task<Results<Ok<WorkOrderOverviewResponse>, ValidationProblem>> GetWorkOrderOverviewAsync(
@@ -97,6 +131,21 @@ public static class AnalyticsEndpoints
         return TypedResults.Ok(await service.GetTrendAsync(query, cancellationToken));
     }
 
+    private static async Task<Results<Ok<HistoricalMaintenanceActivityResponse>, ValidationProblem>>
+        GetHistoricalMaintenanceActivityAsync(
+            [AsParameters] HistoricalMaintenanceActivityQuery query,
+            IHistoricalWorkOrderAnalyticsService service,
+            CancellationToken cancellationToken)
+    {
+        var errors = AnalyticsQueryValidation.Validate(query);
+        if (errors.Count > 0)
+        {
+            return TypedResults.ValidationProblem(errors);
+        }
+
+        return TypedResults.Ok(await service.GetActivityAsync(query, cancellationToken));
+    }
+
     private static async Task<Results<Ok<ScadaOverviewResponse>, ValidationProblem>> GetScadaOverviewAsync(
         [AsParameters] ScadaAnalyticsQuery query,
         IScadaAnalyticsService service,
@@ -123,6 +172,21 @@ public static class AnalyticsEndpoints
         }
 
         return TypedResults.Ok(await service.GetTrendAsync(query, cancellationToken));
+    }
+
+    private static async Task<Results<Ok<ScadaClearanceIntervalResponse>, ValidationProblem>>
+        GetScadaClearanceIntervalAsync(
+            [AsParameters] ScadaClearanceIntervalQuery query,
+            IScadaAnalyticsService service,
+            CancellationToken cancellationToken)
+    {
+        var errors = AnalyticsQueryValidation.Validate(query);
+        if (errors.Count > 0)
+        {
+            return TypedResults.ValidationProblem(errors);
+        }
+
+        return TypedResults.Ok(await service.GetClearanceIntervalAsync(query, cancellationToken));
     }
 }
 
@@ -151,12 +215,30 @@ internal static class AnalyticsQueryValidation
         return errors;
     }
 
+    public static Dictionary<string, string[]> Validate(AssetMaintenanceActivityParetoQuery query)
+    {
+        var errors = ValidateDateRange(query.DateFrom, query.DateTo, "dateFrom", "dateTo");
+
+        if (query.Top.HasValue && query.Top is < 1 or > 100)
+        {
+            errors["top"] = ["Top must be between 1 and 100."];
+        }
+
+        return errors;
+    }
+
+    public static Dictionary<string, string[]> Validate(HistoricalMaintenanceActivityQuery query) =>
+        ValidateDateRange(query.DateFrom, query.DateTo, "dateFrom", "dateTo");
+
     public static Dictionary<string, string[]> Validate(ScadaAnalyticsQuery query)
     {
         var errors = ValidateDateRange(query.DateFrom, query.DateTo, "dateFrom", "dateTo");
         ValidateGrain(query.Grain, errors);
         return errors;
     }
+
+    public static Dictionary<string, string[]> Validate(ScadaClearanceIntervalQuery query) =>
+        ValidateDateRange(query.DateFrom, query.DateTo, "dateFrom", "dateTo");
 
     private static Dictionary<string, string[]> ValidateDateRange(
         DateOnly? dateFrom,

@@ -17,6 +17,21 @@ public sealed record AssetOverviewResponse(
     KpiReliability TopAssetsReliability,
     SnapshotAnalyticsMetadataDto Metadata);
 
+public sealed record AssetMaintenanceActivityParetoItemDto(
+    long AssetId,
+    string AssetCode,
+    string AssetName,
+    long CurrentWorkOrderCount,
+    decimal SharePercent,
+    decimal CumulativeSharePercent);
+
+public sealed record AssetMaintenanceActivityParetoResponse(
+    long TotalCurrentWorkOrders,
+    long AssetsWithCurrentWorkOrders,
+    int AppliedTop,
+    IReadOnlyList<AssetMaintenanceActivityParetoItemDto> TopAssets,
+    DateRangeMetadataDto Metadata);
+
 public sealed record WorkOrderOverviewResponse(
     long TotalWorkOrders,
     IReadOnlyList<CategoryCountDto> ByDiscipline,
@@ -32,6 +47,13 @@ public sealed record WorkOrderOverviewResponse(
 public sealed record WorkOrderTrendResponse(
     TimeGrain Grain,
     IReadOnlyList<TrendPointDto> Points,
+    DateRangeMetadataDto Metadata);
+
+public sealed record HistoricalMaintenanceActivityResponse(
+    TimeGrain Grain,
+    IReadOnlyList<TrendPointDto> Trend,
+    IReadOnlyList<CategoryCountDto> ByDiscipline,
+    string? AppliedDiscipline,
     DateRangeMetadataDto Metadata);
 
 public sealed record ScadaOverviewResponse(
@@ -51,6 +73,23 @@ public sealed record ScadaTrendResponse(
     TimeGrain Grain,
     IReadOnlyList<TrendPointDto> Points,
     QualitySummaryDto Quality,
+    DateRangeMetadataDto Metadata);
+
+public sealed record ScadaClearanceIntervalAppliedFiltersDto(
+    string? SourceSheet,
+    string? AlarmType,
+    string? InterventionLevel,
+    string? Section,
+    string? LocationRaw);
+
+public sealed record ScadaClearanceIntervalResponse(
+    long TotalMatchedOccurrences,
+    long EligibleOccurrences,
+    long ExcludedOccurrences,
+    decimal? EligibilityPercent,
+    decimal? MedianMinutes,
+    decimal? P90Minutes,
+    ScadaClearanceIntervalAppliedFiltersDto AppliedFilters,
     DateRangeMetadataDto Metadata);
 
 public sealed record SourceTypeBatchCountDto(

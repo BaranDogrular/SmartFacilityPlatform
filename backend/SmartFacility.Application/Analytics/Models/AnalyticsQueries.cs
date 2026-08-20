@@ -11,6 +11,13 @@ public sealed record AssetOverviewQuery
     public int? Top { get; init; }
 }
 
+public sealed record AssetMaintenanceActivityParetoQuery
+{
+    public DateOnly? DateFrom { get; init; }
+    public DateOnly? DateTo { get; init; }
+    public int? Top { get; init; }
+}
+
 public sealed record WorkOrderAnalyticsQuery
 {
     public DateOnly? DateFrom { get; init; }
@@ -35,4 +42,22 @@ public sealed record ScadaAnalyticsQuery
     public string? Section { get; init; }
     public string? LocationRaw { get; init; }
     public TimeGrain? Grain { get; init; }
+}
+
+public sealed record HistoricalMaintenanceActivityQuery
+{
+    public DateOnly? DateFrom { get; init; }
+    public DateOnly? DateTo { get; init; }
+    public string? Discipline { get; init; }
+}
+
+public sealed record ScadaClearanceIntervalQuery
+{
+    public DateOnly? DateFrom { get; init; }
+    public DateOnly? DateTo { get; init; }
+    public string? SourceSheet { get; init; }
+    public string? AlarmType { get; init; }
+    public string? InterventionLevel { get; init; }
+    public string? Section { get; init; }
+    public string? LocationRaw { get; init; }
 }

@@ -7,6 +7,10 @@ public interface IAssetAnalyticsService
     Task<AssetOverviewResponse> GetOverviewAsync(
         AssetOverviewQuery query,
         CancellationToken cancellationToken = default);
+
+    Task<AssetMaintenanceActivityParetoResponse> GetMaintenanceActivityParetoAsync(
+        AssetMaintenanceActivityParetoQuery query,
+        CancellationToken cancellationToken = default);
 }
 
 public interface IWorkOrderAnalyticsService
@@ -20,6 +24,13 @@ public interface IWorkOrderAnalyticsService
         CancellationToken cancellationToken = default);
 }
 
+public interface IHistoricalWorkOrderAnalyticsService
+{
+    Task<HistoricalMaintenanceActivityResponse> GetActivityAsync(
+        HistoricalMaintenanceActivityQuery query,
+        CancellationToken cancellationToken = default);
+}
+
 public interface IScadaAnalyticsService
 {
     Task<ScadaOverviewResponse> GetOverviewAsync(
@@ -28,6 +39,10 @@ public interface IScadaAnalyticsService
 
     Task<ScadaTrendResponse> GetTrendAsync(
         ScadaAnalyticsQuery query,
+        CancellationToken cancellationToken = default);
+
+    Task<ScadaClearanceIntervalResponse> GetClearanceIntervalAsync(
+        ScadaClearanceIntervalQuery query,
         CancellationToken cancellationToken = default);
 }
 

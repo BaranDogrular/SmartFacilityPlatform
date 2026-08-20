@@ -1,5 +1,6 @@
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Logging.Abstractions;
 using SmartFacility.Infrastructure.Imports;
 using SmartFacility.Infrastructure.Persistence;
@@ -24,14 +25,19 @@ internal sealed class SqliteTestDatabase : IAsyncDisposable
     public SmartFacilityDbContext Context { get; }
     public EfImportDataStore Store { get; }
 
-    public static async Task<SqliteTestDatabase> CreateAsync()
+    public static async Task<SqliteTestDatabase> CreateAsync(params IInterceptor[] interceptors)
     {
         var connection = new SqliteConnection("Data Source=:memory:");
         await connection.OpenAsync();
 
-        var options = new DbContextOptionsBuilder<SmartFacilityDbContext>()
-            .UseSqlite(connection)
-            .Options;
+        var optionsBuilder = new DbContextOptionsBuilder<SmartFacilityDbContext>()
+            .UseSqlite(connection);
+        if (interceptors.Length > 0)
+        {
+            optionsBuilder.AddInterceptors(interceptors);
+        }
+
+        var options = optionsBuilder.Options;
         var context = new SmartFacilityDbContext(options);
         await context.Database.EnsureCreatedAsync();
 

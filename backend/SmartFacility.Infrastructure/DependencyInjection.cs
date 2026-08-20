@@ -48,6 +48,8 @@ public static class DependencyInjection
             provider.GetRequiredService<EfAnalyticsQueryService>());
         services.AddScoped<IWorkOrderAnalyticsService>(provider =>
             provider.GetRequiredService<EfAnalyticsQueryService>());
+        services.AddScoped<IHistoricalWorkOrderAnalyticsService>(provider =>
+            provider.GetRequiredService<EfAnalyticsQueryService>());
         services.AddScoped<IScadaAnalyticsService>(provider =>
             provider.GetRequiredService<EfAnalyticsQueryService>());
         services.AddScoped<IImportQualityAnalyticsService>(provider =>

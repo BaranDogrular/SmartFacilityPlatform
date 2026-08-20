@@ -1,3 +1,5 @@
+using System.Data;
+using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using SmartFacility.Application.Analytics.Abstractions;
 using SmartFacility.Application.Analytics.Models;
@@ -9,12 +11,73 @@ namespace SmartFacility.Infrastructure.Analytics;
 public sealed class EfAnalyticsQueryService(SmartFacilityDbContext dbContext) :
     IAssetAnalyticsService,
     IWorkOrderAnalyticsService,
+    IHistoricalWorkOrderAnalyticsService,
     IScadaAnalyticsService,
     IImportQualityAnalyticsService
 {
     private const string UnknownCategory = "<Unknown>";
     private const string LegacyFingerprintAlgorithm = "<Legacy>";
     private const string TimeZoneAssumption = "UnspecifiedSourceLocal";
+
+    private const string ScadaClearanceStatisticsSql = """
+        WITH Matched AS
+        (
+            SELECT
+                [ReceivedAt],
+                [ClearedAt],
+                [DateTimeParseStatus]
+            FROM [core].[ScadaAlarmEvents]
+            WHERE
+                (@dateFrom IS NULL OR [ReceivedAt] >= @dateFrom)
+                AND (@dateToExclusive IS NULL OR [ReceivedAt] < @dateToExclusive)
+                AND (@sourceSheet IS NULL OR [SourceSheet] = @sourceSheet)
+                AND (@alarmType IS NULL OR [AlarmType] = @alarmType)
+                AND (@interventionLevel IS NULL OR [InterventionLevel] = @interventionLevel)
+                AND (@section IS NULL OR [SectionRaw] = @section)
+                AND (@locationRaw IS NULL OR [LocationRaw] = @locationRaw)
+        ),
+        Eligible AS
+        (
+            SELECT
+                [ReceivedAt],
+                DATEDIFF_BIG(millisecond, [ReceivedAt], [ClearedAt]) / 60000.0
+                    AS [DurationMinutes]
+            FROM Matched
+            WHERE
+                [ReceivedAt] IS NOT NULL
+                AND [ClearedAt] IS NOT NULL
+                AND [DateTimeParseStatus] IS NOT NULL
+                AND [DateTimeParseStatus] LIKE N'%Received:Parsed%'
+                AND [DateTimeParseStatus] LIKE N'%Cleared:Parsed%'
+                AND [ClearedAt] >= [ReceivedAt]
+                AND [ReceivedAt] < @sourceDateExclusive
+                AND [ClearedAt] < @sourceDateExclusive
+                AND [DateTimeParseStatus] NOT LIKE N'%InvalidDate%'
+                AND [DateTimeParseStatus] NOT LIKE N'%InvalidTime%'
+                AND [DateTimeParseStatus] NOT LIKE N'%DateOnlySource%'
+                AND [DateTimeParseStatus] NOT LIKE N'%PlaceholderX%'
+                AND [DateTimeParseStatus] NOT LIKE N'%SuspiciousYear%'
+                AND [DateTimeParseStatus] NOT LIKE N'%FutureDate%'
+                AND [DateTimeParseStatus] NOT LIKE N'%ClearedBeforeReceived%'
+        ),
+        Percentiles AS
+        (
+            SELECT
+                PERCENTILE_CONT(0.50) WITHIN GROUP (ORDER BY [DurationMinutes]) OVER ()
+                    AS [MedianMinutes],
+                PERCENTILE_CONT(0.90) WITHIN GROUP (ORDER BY [DurationMinutes]) OVER ()
+                    AS [P90Minutes]
+            FROM Eligible
+        )
+        SELECT
+            (SELECT COUNT_BIG(*) FROM Matched) AS [TotalMatchedOccurrences],
+            (SELECT COUNT_BIG(*) FROM Eligible) AS [EligibleOccurrences],
+            (SELECT MIN([ReceivedAt]) FROM Eligible) AS [ActualMinDate],
+            (SELECT MAX([ReceivedAt]) FROM Eligible) AS [ActualMaxDate],
+            CAST(MAX([MedianMinutes]) AS decimal(18,2)) AS [MedianMinutes],
+            CAST(MAX([P90Minutes]) AS decimal(18,2)) AS [P90Minutes]
+        FROM Percentiles
+        """;
 
     private readonly SmartFacilityDbContext _dbContext = dbContext;
 
@@ -116,6 +179,87 @@ public sealed class EfAnalyticsQueryService(SmartFacilityDbContext dbContext) :
                 ]));
     }
 
+    public async Task<AssetMaintenanceActivityParetoResponse> GetMaintenanceActivityParetoAsync(
+        AssetMaintenanceActivityParetoQuery query,
+        CancellationToken cancellationToken = default)
+    {
+        var appliedTop = query.Top ?? 10;
+        var workOrders = ApplyWorkOrderDateFilters(
+            _dbContext.WorkOrders.AsNoTracking(),
+            query.DateFrom,
+            query.DateTo);
+        var summary = await GetWorkOrderDateSummaryAsync(workOrders, cancellationToken);
+        var assetsWithCurrentWorkOrders = await workOrders
+            .Where(item => item.AssetId.HasValue)
+            .Join(
+                _dbContext.Assets.AsNoTracking(),
+                workOrder => workOrder.AssetId!.Value,
+                asset => asset.Id,
+                (_, asset) => asset.Id)
+            .Distinct()
+            .LongCountAsync(cancellationToken);
+
+        var topAssets = await (
+                from workOrder in workOrders
+                where workOrder.AssetId.HasValue
+                join asset in _dbContext.Assets.AsNoTracking()
+                    on workOrder.AssetId!.Value equals asset.Id
+                group workOrder by new { asset.Id, asset.AssetCode, asset.Name }
+                into grouped
+                select new
+                {
+                    AssetId = grouped.Key.Id,
+                    grouped.Key.AssetCode,
+                    AssetName = grouped.Key.Name,
+                    WorkOrderCount = grouped.LongCount()
+                })
+            .OrderByDescending(item => item.WorkOrderCount)
+            .ThenBy(item => item.AssetCode)
+            .ThenBy(item => item.AssetId)
+            .Take(appliedTop)
+            .ToListAsync(cancellationToken);
+
+        var cumulativeCount = 0L;
+        var paretoItems = topAssets
+            .Select(item =>
+            {
+                cumulativeCount += item.WorkOrderCount;
+                return new AssetMaintenanceActivityParetoItemDto(
+                    item.AssetId,
+                    item.AssetCode,
+                    item.AssetName,
+                    item.WorkOrderCount,
+                    CalculatePercent(item.WorkOrderCount, summary.MatchedRecordCount, 4),
+                    CalculatePercent(cumulativeCount, summary.MatchedRecordCount, 4));
+            })
+            .ToArray();
+
+        return new AssetMaintenanceActivityParetoResponse(
+            summary.MatchedRecordCount,
+            assetsWithCurrentWorkOrders,
+            appliedTop,
+            paretoItems,
+            new DateRangeMetadataDto(
+                KpiReliability.Yellow,
+                "core.WorkOrders + core.Assets",
+                DateTimeOffset.UtcNow,
+                query.DateFrom,
+                query.DateTo,
+                summary.ActualMinDate,
+                summary.ActualMaxDate,
+                nameof(WorkOrder.ReportedDateTime),
+                summary.MatchedRecordCount,
+                summary.ValidRecordCount,
+                summary.MatchedRecordCount - summary.ValidRecordCount,
+                TimeZoneAssumption,
+                "asset-maintenance-activity-pareto/v1",
+                [
+                    "HistoricalWorkOrders are excluded.",
+                    "Counts represent current work-order record activity.",
+                    "High activity does not indicate asset health, failure rate, or failure propensity."
+                ]));
+    }
+
     public async Task<WorkOrderOverviewResponse> GetOverviewAsync(
         WorkOrderAnalyticsQuery query,
         CancellationToken cancellationToken = default)
@@ -204,6 +348,64 @@ public sealed class EfAnalyticsQueryService(SmartFacilityDbContext dbContext) :
                     item.Count))
                 .ToArray(),
             CreateWorkOrderMetadata(query, summary, KpiReliability.Green));
+    }
+
+    public async Task<HistoricalMaintenanceActivityResponse> GetActivityAsync(
+        HistoricalMaintenanceActivityQuery query,
+        CancellationToken cancellationToken = default)
+    {
+        var historicalWorkOrders = ApplyHistoricalWorkOrderFilters(
+            _dbContext.HistoricalWorkOrders.AsNoTracking(),
+            query);
+        var summary = await GetHistoricalWorkOrderDateSummaryAsync(
+            historicalWorkOrders,
+            cancellationToken);
+        var groupedPoints = await historicalWorkOrders
+            .Where(item => item.ReportedDateTime.HasValue)
+            .GroupBy(item => new
+            {
+                Year = item.ReportedDateTime!.Value.Year,
+                Month = item.ReportedDateTime.Value.Month
+            })
+            .Select(group => new TrendPointProjection(
+                group.Key.Year,
+                group.Key.Month,
+                group.LongCount()))
+            .ToListAsync(cancellationToken);
+        var byDiscipline = await GetCategoryCountsAsync(
+            historicalWorkOrders.Select(item => item.Discipline),
+            cancellationToken);
+
+        return new HistoricalMaintenanceActivityResponse(
+            TimeGrain.Month,
+            groupedPoints
+                .OrderBy(item => item.Year)
+                .ThenBy(item => item.Month)
+                .Select(item => new TrendPointDto(
+                    new DateOnly(item.Year, item.Month, 1),
+                    item.Count))
+                .ToArray(),
+            byDiscipline,
+            NormalizeOptionalFilter(query.Discipline),
+            new DateRangeMetadataDto(
+                KpiReliability.Green,
+                "analytics.HistoricalWorkOrders",
+                DateTimeOffset.UtcNow,
+                query.DateFrom,
+                query.DateTo,
+                summary.ActualMinDate,
+                summary.ActualMaxDate,
+                nameof(HistoricalWorkOrder.ReportedDateTime),
+                summary.MatchedRecordCount,
+                summary.ValidRecordCount,
+                summary.MatchedRecordCount - summary.ValidRecordCount,
+                TimeZoneAssumption,
+                "historical-maintenance-activity/v1",
+                [
+                    "Current WorkOrders are excluded.",
+                    "Discipline values are exact raw source taxonomy.",
+                    "No Asset, Building, or Location relationship is inferred."
+                ]));
     }
 
     public async Task<ScadaOverviewResponse> GetOverviewAsync(
@@ -333,6 +535,75 @@ public sealed class EfAnalyticsQueryService(SmartFacilityDbContext dbContext) :
                 [
                     "Only records with a trustworthy ReceivedAt participate in the trend.",
                     "Empty months are not synthesized."
+                ]));
+    }
+
+    public async Task<ScadaClearanceIntervalResponse> GetClearanceIntervalAsync(
+        ScadaClearanceIntervalQuery query,
+        CancellationToken cancellationToken = default)
+    {
+        var dateFrom = query.DateFrom?.ToDateTime(TimeOnly.MinValue);
+        var dateToExclusive = query.DateTo?.AddDays(1).ToDateTime(TimeOnly.MinValue);
+        var sourceSheet = NormalizeOptionalFilter(query.SourceSheet);
+        var alarmType = NormalizeOptionalFilter(query.AlarmType);
+        var interventionLevel = NormalizeOptionalFilter(query.InterventionLevel);
+        var section = NormalizeOptionalFilter(query.Section);
+        var locationRaw = NormalizeOptionalFilter(query.LocationRaw);
+        var sourceDateExclusive = DateTime.Today.AddDays(1);
+
+        var statisticsRows = await _dbContext.Database
+            .SqlQueryRaw<ScadaClearanceStatisticsProjection>(
+                ScadaClearanceStatisticsSql,
+                DateTimeParameter("@dateFrom", dateFrom),
+                DateTimeParameter("@dateToExclusive", dateToExclusive),
+                StringParameter("@sourceSheet", sourceSheet, 200),
+                StringParameter("@alarmType", alarmType, 300),
+                StringParameter("@interventionLevel", interventionLevel, 200),
+                StringParameter("@section", section, 500),
+                StringParameter("@locationRaw", locationRaw, 1000),
+                DateTimeParameter("@sourceDateExclusive", sourceDateExclusive))
+            .ToListAsync(cancellationToken);
+        var statistics = statisticsRows.Single();
+        var excludedOccurrences =
+            statistics.TotalMatchedOccurrences - statistics.EligibleOccurrences;
+        decimal? eligibilityPercent = statistics.TotalMatchedOccurrences == 0
+            ? null
+            : CalculatePercent(
+                statistics.EligibleOccurrences,
+                statistics.TotalMatchedOccurrences,
+                2);
+
+        return new ScadaClearanceIntervalResponse(
+            statistics.TotalMatchedOccurrences,
+            statistics.EligibleOccurrences,
+            excludedOccurrences,
+            eligibilityPercent,
+            statistics.MedianMinutes,
+            statistics.P90Minutes,
+            new ScadaClearanceIntervalAppliedFiltersDto(
+                sourceSheet,
+                alarmType,
+                interventionLevel,
+                section,
+                locationRaw),
+            new DateRangeMetadataDto(
+                KpiReliability.Yellow,
+                "core.ScadaAlarmEvents",
+                DateTimeOffset.UtcNow,
+                query.DateFrom,
+                query.DateTo,
+                statistics.ActualMinDate,
+                statistics.ActualMaxDate,
+                nameof(ScadaAlarmEvent.ReceivedAt),
+                statistics.TotalMatchedOccurrences,
+                statistics.EligibleOccurrences,
+                excludedOccurrences,
+                TimeZoneAssumption,
+                "scada-clearance-interval/v1",
+                [
+                    "Intervals represent eligible SCADA source occurrences, not unique physical alarms.",
+                    "SCADA clearance interval is not MTTR or repair duration.",
+                    "Median and p90 exclude records that fail timestamp quality rules."
                 ]));
     }
 
@@ -499,6 +770,30 @@ public sealed class EfAnalyticsQueryService(SmartFacilityDbContext dbContext) :
         return query;
     }
 
+    private static IQueryable<HistoricalWorkOrder> ApplyHistoricalWorkOrderFilters(
+        IQueryable<HistoricalWorkOrder> query,
+        HistoricalMaintenanceActivityQuery filters)
+    {
+        if (filters.DateFrom.HasValue)
+        {
+            var inclusiveStart = filters.DateFrom.Value.ToDateTime(TimeOnly.MinValue);
+            query = query.Where(item => item.ReportedDateTime >= inclusiveStart);
+        }
+
+        if (filters.DateTo.HasValue)
+        {
+            var exclusiveEnd = filters.DateTo.Value.AddDays(1).ToDateTime(TimeOnly.MinValue);
+            query = query.Where(item => item.ReportedDateTime < exclusiveEnd);
+        }
+
+        if (!string.IsNullOrWhiteSpace(filters.Discipline))
+        {
+            query = query.Where(item => item.Discipline == filters.Discipline);
+        }
+
+        return query;
+    }
+
     private static IQueryable<ScadaAlarmEvent> ApplyScadaFilters(
         IQueryable<ScadaAlarmEvent> query,
         ScadaAnalyticsQuery filters)
@@ -593,6 +888,42 @@ public sealed class EfAnalyticsQueryService(SmartFacilityDbContext dbContext) :
             .SingleOrDefaultAsync(cancellationToken)
         ?? new DatedSummaryProjection(0, 0, null, null);
 
+    private static async Task<DatedSummaryProjection> GetHistoricalWorkOrderDateSummaryAsync(
+        IQueryable<HistoricalWorkOrder> workOrders,
+        CancellationToken cancellationToken) =>
+        await workOrders
+            .GroupBy(_ => 1)
+            .Select(group => new DatedSummaryProjection(
+                group.LongCount(),
+                group.LongCount(item => item.ReportedDateTime.HasValue),
+                group.Min(item => item.ReportedDateTime),
+                group.Max(item => item.ReportedDateTime)))
+            .SingleOrDefaultAsync(cancellationToken)
+        ?? new DatedSummaryProjection(0, 0, null, null);
+
+    private static decimal CalculatePercent(long numerator, long denominator, int decimals) =>
+        denominator == 0
+            ? 0m
+            : Math.Round(
+                numerator * 100m / denominator,
+                decimals,
+                MidpointRounding.AwayFromZero);
+
+    private static string? NormalizeOptionalFilter(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? null : value;
+
+    private static SqlParameter DateTimeParameter(string name, DateTime? value) =>
+        new(name, SqlDbType.DateTime2)
+        {
+            Value = value.HasValue ? value.Value : DBNull.Value
+        };
+
+    private static SqlParameter StringParameter(string name, string? value, int size) =>
+        new(name, SqlDbType.NVarChar, size)
+        {
+            Value = value is null ? DBNull.Value : value
+        };
+
     private static DateRangeMetadataDto CreateWorkOrderMetadata(
         WorkOrderAnalyticsQuery query,
         DatedSummaryProjection summary,
@@ -678,4 +1009,14 @@ public sealed class EfAnalyticsQueryService(SmartFacilityDbContext dbContext) :
         long ValidRecordCount,
         DateTime? ActualMinDate,
         DateTime? ActualMaxDate);
+
+    private sealed class ScadaClearanceStatisticsProjection
+    {
+        public long TotalMatchedOccurrences { get; init; }
+        public long EligibleOccurrences { get; init; }
+        public DateTime? ActualMinDate { get; init; }
+        public DateTime? ActualMaxDate { get; init; }
+        public decimal? MedianMinutes { get; init; }
+        public decimal? P90Minutes { get; init; }
+    }
 }
