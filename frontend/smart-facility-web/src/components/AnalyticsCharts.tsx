@@ -114,8 +114,8 @@ export function HorizontalBarChart({ data, maxItems = 12 }: { data: ChartDatum[]
         <p className="chart-limit-note">En yüksek {visible.length} kategori gösteriliyor.</p>
       ) : null}
       <ul className="visually-hidden">
-        {visible.map((item) => (
-          <li key={item.label}>{item.label}: {formatCount(item.count)}</li>
+        {visible.map((item, index) => (
+          <li key={`${item.label}-${index}`}>{item.label}: {formatCount(item.count)}</li>
         ))}
       </ul>
     </>
