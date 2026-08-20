@@ -98,8 +98,10 @@ public sealed class ScadaDateParsingRegressionTests
             string? fingerprintAlgorithm,
             CancellationToken cancellationToken) => throw new NotSupportedException();
 
-        public Task ExecuteRowAsync(
+        public Task<ImportRowDecision> ExecuteRowAsync(
+            string sourceType,
             ImportSourceRecord sourceRecord,
+            bool enforceIdempotency,
             Func<CancellationToken, Task<ImportRowDecision>> operation,
             CancellationToken cancellationToken) => throw new NotSupportedException();
 

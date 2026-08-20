@@ -23,6 +23,7 @@ public sealed class ClosedXmlWorkbookReader : IExcelWorkbookReader
             useAsync: true);
         using var workbook = new XLWorkbook(stream);
 
+        var worksheets = new List<WorksheetState>(request.Worksheets.Count);
         foreach (var worksheetRequest in request.Worksheets)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -37,30 +38,37 @@ public sealed class ClosedXmlWorkbookReader : IExcelWorkbookReader
                 .LastRowUsed(XLCellsUsedOptions.AllContents)?
                 .RowNumber() ?? 0;
 
-            for (var rowNumber = worksheetRequest.FirstRowNumber;
-                 rowNumber <= lastRowNumber;
+            worksheets.Add(new WorksheetState(worksheetRequest, worksheet, lastRowNumber));
+        }
+
+        foreach (var state in worksheets)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var headerRowNumber = state.Request.HeaderRowNumber ?? state.Request.FirstRowNumber;
+            yield return CreateRawRow(state.Worksheet.Row(headerRowNumber));
+        }
+
+        foreach (var state in worksheets)
+        {
+            var headerRowNumber = state.Request.HeaderRowNumber ?? state.Request.FirstRowNumber;
+
+            for (var rowNumber = state.Request.FirstRowNumber;
+                 rowNumber <= state.LastRowNumber;
                  rowNumber++)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                var row = worksheet.Row(rowNumber);
-                var cells = new Dictionary<string, RawExcelCell>(StringComparer.OrdinalIgnoreCase);
-
-                foreach (var cell in row.CellsUsed(XLCellsUsedOptions.AllContents))
-                {
-                    var rawCell = CreateRawCell(cell);
-                    if (!string.IsNullOrWhiteSpace(rawCell.RawValue) ||
-                        !string.IsNullOrWhiteSpace(rawCell.Formula))
-                    {
-                        cells[rawCell.Column] = rawCell;
-                    }
-                }
-
-                if (cells.Count == 0)
+                if (rowNumber == headerRowNumber)
                 {
                     continue;
                 }
 
-                yield return new RawExcelRow(worksheet.Name, rowNumber, cells);
+                var rawRow = CreateRawRow(state.Worksheet.Row(rowNumber));
+                if (rawRow.IsEmpty)
+                {
+                    continue;
+                }
+
+                yield return rawRow;
 
                 if (rowNumber % 1000 == 0)
                 {
@@ -68,6 +76,23 @@ public sealed class ClosedXmlWorkbookReader : IExcelWorkbookReader
                 }
             }
         }
+    }
+
+    private static RawExcelRow CreateRawRow(IXLRow row)
+    {
+        var cells = new Dictionary<string, RawExcelCell>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var cell in row.CellsUsed(XLCellsUsedOptions.AllContents))
+        {
+            var rawCell = CreateRawCell(cell);
+            if (!string.IsNullOrWhiteSpace(rawCell.RawValue) ||
+                !string.IsNullOrWhiteSpace(rawCell.Formula))
+            {
+                cells[rawCell.Column] = rawCell;
+            }
+        }
+
+        return new RawExcelRow(row.Worksheet.Name, row.RowNumber(), cells);
     }
 
     private static RawExcelCell CreateRawCell(IXLCell cell)
@@ -116,4 +141,9 @@ public sealed class ClosedXmlWorkbookReader : IExcelWorkbookReader
 
         return value.ToString(CultureInfo.InvariantCulture);
     }
+
+    private sealed record WorksheetState(
+        WorksheetReadRequest Request,
+        IXLWorksheet Worksheet,
+        int LastRowNumber);
 }

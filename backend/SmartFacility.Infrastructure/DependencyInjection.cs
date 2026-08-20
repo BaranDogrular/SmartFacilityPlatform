@@ -73,6 +73,8 @@ public static class DependencyInjection
         services.AddSingleton<IImportProfileCatalog, ImportProfileCatalog>();
         services.AddSingleton<IImportFingerprintProvider, ImportFingerprintProvider>();
         services.AddScoped<IExcelWorkbookReader, ClosedXmlWorkbookReader>();
+        services.AddScoped<IImportIdempotencyLock, SqlServerImportIdempotencyLock>();
+        services.AddScoped<IImportDimensionLock, SqlServerImportDimensionLock>();
         services.AddScoped<IImportDataStore, EfImportDataStore>();
         services.AddScoped<IImportRowProcessor, AssetImportProcessor>();
         services.AddScoped<IImportRowProcessor, WorkOrderImportProcessor>();

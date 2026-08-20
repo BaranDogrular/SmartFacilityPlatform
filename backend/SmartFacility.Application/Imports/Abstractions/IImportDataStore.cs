@@ -32,8 +32,10 @@ public interface IImportDataStore
         string? fingerprintAlgorithm,
         CancellationToken cancellationToken);
 
-    Task ExecuteRowAsync(
+    Task<ImportRowDecision> ExecuteRowAsync(
+        string sourceType,
         ImportSourceRecord sourceRecord,
+        bool enforceIdempotency,
         Func<CancellationToken, Task<ImportRowDecision>> operation,
         CancellationToken cancellationToken);
 

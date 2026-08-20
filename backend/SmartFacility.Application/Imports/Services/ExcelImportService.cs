@@ -48,7 +48,8 @@ public sealed class ExcelImportService(
         try
         {
             var sheetNames = profile.Worksheets.Select(worksheet => worksheet.Name).ToArray();
-            var knownFingerprints = new HashSet<string>(StringComparer.Ordinal);
+            var knownFingerprintsBySheet = new Dictionary<string, ISet<string>>(
+                StringComparer.OrdinalIgnoreCase);
             foreach (var sheetName in sheetNames)
             {
                 var fingerprintAlgorithm = fingerprintProvider.GetIdempotencyAlgorithm(
@@ -59,7 +60,7 @@ public sealed class ExcelImportService(
                     [sheetName],
                     fingerprintAlgorithm,
                     cancellationToken);
-                knownFingerprints.UnionWith(sheetFingerprints);
+                knownFingerprintsBySheet[sheetName] = sheetFingerprints;
             }
             var validatedSheets = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
@@ -68,7 +69,8 @@ public sealed class ExcelImportService(
                 profile.Worksheets
                     .Select(worksheet => new WorksheetReadRequest(
                         worksheet.Name,
-                        Math.Min(worksheet.HeaderRowNumber, worksheet.FirstDataRowNumber)))
+                        Math.Min(worksheet.HeaderRowNumber, worksheet.FirstDataRowNumber),
+                        worksheet.HeaderRowNumber))
                     .ToArray());
 
             await foreach (var row in workbookReader
@@ -76,6 +78,7 @@ public sealed class ExcelImportService(
                                .WithCancellation(cancellationToken))
             {
                 var worksheet = profile.GetWorksheet(row.SheetName);
+                var knownFingerprints = knownFingerprintsBySheet[worksheet.Name];
                 if (row.RowNumber == worksheet.HeaderRowNumber)
                 {
                     var headerErrors = ProfileHeaderValidator.Validate(row, worksheet);
@@ -87,6 +90,7 @@ public sealed class ExcelImportService(
                     }
 
                     validatedSheets.Add(row.SheetName);
+                    continue;
                 }
 
                 if (row.RowNumber < worksheet.FirstDataRowNumber || row.IsEmpty)
@@ -120,8 +124,10 @@ public sealed class ExcelImportService(
                 if (knownFingerprints.Contains(fingerprints.DuplicateFingerprint))
                 {
                     decision = ImportRowDecision.Duplicate();
-                    await dataStore.ExecuteRowAsync(
+                    decision = await dataStore.ExecuteRowAsync(
+                        profile.SourceType,
                         sourceRecord,
+                        enforceIdempotency: false,
                         _ => Task.FromResult(decision),
                         cancellationToken);
                 }
@@ -129,8 +135,10 @@ public sealed class ExcelImportService(
                 {
                     try
                     {
-                        await dataStore.ExecuteRowAsync(
+                        decision = await dataStore.ExecuteRowAsync(
+                            profile.SourceType,
                             sourceRecord,
+                            enforceIdempotency: true,
                             async token =>
                             {
                                 var missingFields = profile.RequiredFields
@@ -169,8 +177,10 @@ public sealed class ExcelImportService(
                             ParseStatus = "Processing",
                             CreatedAt = sourceRecord.CreatedAt
                         };
-                        await dataStore.ExecuteRowAsync(
+                        decision = await dataStore.ExecuteRowAsync(
+                            profile.SourceType,
                             failedSourceRecord,
+                            enforceIdempotency: false,
                             _ => Task.FromResult(decision),
                             cancellationToken);
                     }

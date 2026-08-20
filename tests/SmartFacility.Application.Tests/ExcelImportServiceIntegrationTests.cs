@@ -54,6 +54,42 @@ public sealed class ExcelImportServiceIntegrationTests
         Assert.Equal(2, await database.Context.ImportSourceRecords.CountAsync());
     }
 
+    [Fact]
+    public async Task Same_fingerprint_on_different_sheets_is_not_a_duplicate()
+    {
+        await using var database = await SqliteTestDatabase.CreateAsync();
+        var profile = new ScadaAlarmImportProfile(new ImportProfileOptions
+        {
+            SourceType = ImportSourceTypes.ScadaAlarm,
+            Worksheets = [Worksheet("First"), Worksheet("Second")],
+            Columns = new Dictionary<string, string>
+            {
+                ["Description"] = "G"
+            }
+        });
+        var rows = new[]
+        {
+            RawRowFactory.Row("First", 1, RawRowFactory.Text("G", "Description")),
+            RawRowFactory.Row("Second", 1, RawRowFactory.Text("G", "Description")),
+            RawRowFactory.Row("First", 2, RawRowFactory.Text("G", "Same alarm")),
+            RawRowFactory.Row("Second", 2, RawRowFactory.Text("G", "Same alarm"))
+        };
+        var service = new ExcelImportService(
+            new FakeWorkbookReader(rows),
+            database.Store,
+            new ImportProfileCatalog([profile]),
+            new ImportFingerprintProvider(),
+            [new ScadaAlarmImportProcessor()],
+            NullLogger<ExcelImportService>.Instance);
+
+        var result = await service.ImportAsync(
+            new ImportRequest(ImportProfileKeys.ScadaAlarm, "sample.xlsx"));
+
+        Assert.Equal(2, result.SuccessfulRows);
+        Assert.Equal(0, result.DuplicateRows);
+        Assert.Equal(2, await database.Context.ScadaAlarmEvents.CountAsync());
+    }
+
     private static ExcelImportService CreateService(
         SqliteTestDatabase database,
         IImportSourceProfile profile,
@@ -70,4 +106,15 @@ public sealed class ExcelImportServiceIntegrationTests
             processors,
             NullLogger<ExcelImportService>.Instance);
     }
+
+    private static WorksheetProfileOptions Worksheet(string name) => new()
+    {
+        Name = name,
+        HeaderRowNumber = 1,
+        FirstDataRowNumber = 2,
+        ExpectedHeaders = new Dictionary<string, string>
+        {
+            ["G"] = "Description"
+        }
+    };
 }

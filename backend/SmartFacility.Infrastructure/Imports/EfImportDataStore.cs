@@ -9,8 +9,12 @@ namespace SmartFacility.Infrastructure.Imports;
 
 public sealed class EfImportDataStore(
     SmartFacilityDbContext dbContext,
+    IImportIdempotencyLock idempotencyLock,
+    IImportDimensionLock dimensionLock,
     ILogger<EfImportDataStore> logger) : IImportDataStore
 {
+    private List<IAsyncDisposable>? _activeDimensionLockLeases;
+
     public async Task<ImportBatch> CreateBatchAsync(
         string sourceType,
         string fileName,
@@ -105,16 +109,42 @@ public sealed class EfImportDataStore(
         return fingerprints.ToHashSet(StringComparer.Ordinal);
     }
 
-    public async Task ExecuteRowAsync(
+    public async Task<ImportRowDecision> ExecuteRowAsync(
+        string sourceType,
         ImportSourceRecord sourceRecord,
+        bool enforceIdempotency,
         Func<CancellationToken, Task<ImportRowDecision>> operation,
         CancellationToken cancellationToken)
     {
         await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
+        IAsyncDisposable? idempotencyLease = null;
+        _activeDimensionLockLeases = [];
 
         try
         {
-            var decision = await operation(cancellationToken);
+            ImportRowDecision decision;
+            if (enforceIdempotency)
+            {
+                var duplicateFingerprint = sourceRecord.IdempotencyFingerprint
+                    ?? sourceRecord.RowFingerprint;
+                idempotencyLease = await idempotencyLock.AcquireAsync(
+                    sourceType,
+                    sourceRecord.SourceSheet,
+                    sourceRecord.FingerprintAlgorithm,
+                    duplicateFingerprint,
+                    cancellationToken);
+                decision = await HasSuccessfulFingerprintAsync(
+                    sourceType,
+                    sourceRecord,
+                    cancellationToken)
+                    ? ImportRowDecision.Duplicate()
+                    : await operation(cancellationToken);
+            }
+            else
+            {
+                decision = await operation(cancellationToken);
+            }
+
             sourceRecord.ParseStatus = decision.Disposition switch
             {
                 ImportRowDisposition.Success => "Succeeded",
@@ -143,6 +173,7 @@ public sealed class EfImportDataStore(
 
             await dbContext.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
+            return decision;
         }
         catch (Exception originalException)
         {
@@ -163,8 +194,46 @@ public sealed class EfImportDataStore(
         }
         finally
         {
+            if (idempotencyLease is not null)
+            {
+                await idempotencyLease.DisposeAsync();
+            }
+
+            var dimensionLockLeases = _activeDimensionLockLeases;
+            _activeDimensionLockLeases = null;
+            if (dimensionLockLeases is not null)
+            {
+                for (var index = dimensionLockLeases.Count - 1; index >= 0; index--)
+                {
+                    await dimensionLockLeases[index].DisposeAsync();
+                }
+            }
+
             dbContext.ChangeTracker.Clear();
         }
+    }
+
+    private Task<bool> HasSuccessfulFingerprintAsync(
+        string sourceType,
+        ImportSourceRecord sourceRecord,
+        CancellationToken cancellationToken)
+    {
+        var records = dbContext.ImportSourceRecords
+            .AsNoTracking()
+            .Where(record =>
+                record.ImportBatch.SourceType == sourceType &&
+                record.SourceSheet == sourceRecord.SourceSheet &&
+                (record.ParseStatus == "Succeeded" || record.ParseStatus == "Duplicate"));
+
+        return sourceRecord.FingerprintAlgorithm is null
+            ? records.AnyAsync(
+                record => record.RowFingerprint == sourceRecord.RowFingerprint,
+                cancellationToken)
+            : records.AnyAsync(
+                record =>
+                    record.FingerprintAlgorithm == sourceRecord.FingerprintAlgorithm &&
+                    record.IdempotencyFingerprint == sourceRecord.IdempotencyFingerprint,
+                cancellationToken);
     }
 
     public Task<Asset?> FindAssetByCodeAsync(string assetCode, CancellationToken cancellationToken) =>
@@ -177,6 +246,13 @@ public sealed class EfImportDataStore(
         string name,
         CancellationToken cancellationToken)
     {
+        await AcquireDimensionLockAsync(
+            "Building",
+            code,
+            name,
+            identityPart3: null,
+            cancellationToken);
+
         var building = await dbContext.Buildings.FirstOrDefaultAsync(
             item => item.Code == code && item.Name == name,
             cancellationToken);
@@ -196,6 +272,15 @@ public sealed class EfImportDataStore(
         string name,
         CancellationToken cancellationToken)
     {
+        await AcquireDimensionLockAsync(
+            building.Id == 0 ? "LocationForNewBuilding" : "Location",
+            building.Id == 0
+                ? building.Code
+                : building.Id.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            building.Id == 0 ? building.Name : name,
+            building.Id == 0 ? name : null,
+            cancellationToken);
+
         if (building.Id != 0)
         {
             var location = await dbContext.Locations.FirstOrDefaultAsync(
@@ -218,6 +303,13 @@ public sealed class EfImportDataStore(
         string name,
         CancellationToken cancellationToken)
     {
+        await AcquireDimensionLockAsync(
+            "AssetGroup",
+            code,
+            name,
+            identityPart3: null,
+            cancellationToken);
+
         var group = await dbContext.AssetGroups.FirstOrDefaultAsync(
             item => item.Code == code && item.Name == name,
             cancellationToken);
@@ -230,6 +322,25 @@ public sealed class EfImportDataStore(
         group = new AssetGroup { Code = code, Name = name };
         dbContext.AssetGroups.Add(group);
         return group;
+    }
+
+    private async Task AcquireDimensionLockAsync(
+        string dimensionName,
+        string? identityPart1,
+        string? identityPart2,
+        string? identityPart3,
+        CancellationToken cancellationToken)
+    {
+        var leases = _activeDimensionLockLeases
+            ?? throw new InvalidOperationException(
+                "An active row transaction is required before acquiring an import dimension lock.");
+        var lease = await dimensionLock.AcquireAsync(
+            dimensionName,
+            identityPart1,
+            identityPart2,
+            identityPart3,
+            cancellationToken);
+        leases.Add(lease);
     }
 
     public async Task<Location?> FindUniqueLocationByNameAsync(

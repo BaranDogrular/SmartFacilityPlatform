@@ -14,7 +14,11 @@ internal sealed class SqliteTestDatabase : IAsyncDisposable
     {
         _connection = connection;
         Context = context;
-        Store = new EfImportDataStore(context, NullLogger<EfImportDataStore>.Instance);
+        Store = new EfImportDataStore(
+            context,
+            new TestImportIdempotencyLock(),
+            new TestImportDimensionLock(),
+            NullLogger<EfImportDataStore>.Instance);
     }
 
     public SmartFacilityDbContext Context { get; }

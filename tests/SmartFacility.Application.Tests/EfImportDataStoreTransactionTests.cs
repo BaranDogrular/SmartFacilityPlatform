@@ -17,7 +17,9 @@ public sealed class EfImportDataStoreTransactionTests
         var sourceRecord = CreateSourceRecord(batchId);
 
         await database.Store.ExecuteRowAsync(
+            "HistoricalWorkOrder",
             sourceRecord,
+            enforceIdempotency: true,
             _ => Task.FromResult(ImportRowDecision.Success(new HistoricalWorkOrder
             {
                 SourceReference = "TIM-100",
@@ -39,7 +41,9 @@ public sealed class EfImportDataStoreTransactionTests
 
         var actual = await Assert.ThrowsAsync<TestImportException>(() =>
             database.Store.ExecuteRowAsync(
+                "HistoricalWorkOrder",
                 CreateSourceRecord(batchId),
+                enforceIdempotency: true,
                 async token =>
                 {
                     database.Context.HistoricalWorkOrders.Add(new HistoricalWorkOrder
@@ -64,11 +68,17 @@ public sealed class EfImportDataStoreTransactionTests
         var batchId = await CreateBatchAsync(database);
         var expected = new TestImportException("original failure after transaction completion");
         var logger = new RecordingLogger<EfImportDataStore>();
-        var store = new EfImportDataStore(database.Context, logger);
+        var store = new EfImportDataStore(
+            database.Context,
+            new TestImportIdempotencyLock(),
+            new TestImportDimensionLock(),
+            logger);
 
         var actual = await Assert.ThrowsAsync<TestImportException>(() =>
             store.ExecuteRowAsync(
+                "HistoricalWorkOrder",
                 CreateSourceRecord(batchId),
+                enforceIdempotency: true,
                 async token =>
                 {
                     var transaction = database.Context.Database.CurrentTransaction
