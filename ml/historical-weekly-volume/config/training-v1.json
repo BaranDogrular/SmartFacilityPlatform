@@ -1,0 +1,30 @@
+{
+  "trainingVersion": "historical-weekly-volume-training/v1",
+  "featureVersion": "historical-weekly-volume-features/v1",
+  "modelImplementation": "deterministic-ridge/v1",
+  "selectionMetric": "validation_mae",
+  "selectionMaeTieTolerance": 1.0,
+  "randomSeed": 20260821,
+  "ridgeAlphaCandidates": [
+    0.1,
+    1.0,
+    10.0,
+    100.0,
+    1000.0
+  ],
+  "artifactGate": {
+    "minimumValidationRelativeMaeImprovementPercent": 2.0,
+    "maximumExpandingVsFixedMaeDegradationPercent": 20.0,
+    "requireTestMaeNoWorseThanBaseline": true
+  },
+  "unavailableCandidates": [
+    {
+      "model": "RandomForestRegressor",
+      "reason": "No Python/scikit-learn runtime is installed; no dependency is added for this pilot."
+    },
+    {
+      "model": "GradientBoostingRegressor",
+      "reason": "No Python/scikit-learn runtime is installed; no dependency is added for this pilot."
+    }
+  ]
+}

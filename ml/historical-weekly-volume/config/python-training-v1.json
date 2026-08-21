@@ -1,0 +1,53 @@
+{
+  "trainingVersion": "historical-weekly-volume-python-training/v1",
+  "featureVersion": "historical-weekly-volume-features/v1",
+  "selectionMetric": "validation_mae",
+  "randomState": 20260821,
+  "validationBaseline": {
+    "mae": 118.47,
+    "wapePercent": 10.10,
+    "rmse": 176.14
+  },
+  "testBaseline": {
+    "mae": 120.96,
+    "wapePercent": 11.67,
+    "rmse": 163.48
+  },
+  "expected": {
+    "weeklyBuckets": 219,
+    "supervisedRows": 167,
+    "trainRows": 84,
+    "validationRows": 26,
+    "testRows": 57
+  },
+  "selectionRules": {
+    "maeTieTolerance": 1.0,
+    "maximumValidationToTrainMaeRatio": 2.0,
+    "maximumExpandingVsFixedMaeDegradationPercent": 15.0,
+    "maximumExpandingMaeVsBaselinePercent": 105.0,
+    "expandingTopOverall": 3,
+    "includeBestPerFamily": true
+  },
+  "elasticNet": [
+    { "id": "enet-a0.001-l10.1", "alpha": 0.001, "l1Ratio": 0.1 },
+    { "id": "enet-a0.001-l10.5", "alpha": 0.001, "l1Ratio": 0.5 },
+    { "id": "enet-a0.01-l10.1", "alpha": 0.01, "l1Ratio": 0.1 },
+    { "id": "enet-a0.01-l10.5", "alpha": 0.01, "l1Ratio": 0.5 },
+    { "id": "enet-a0.1-l10.1", "alpha": 0.1, "l1Ratio": 0.1 },
+    { "id": "enet-a0.1-l10.5", "alpha": 0.1, "l1Ratio": 0.5 }
+  ],
+  "randomForest": [
+    { "id": "rf-n100-d3-l5", "nEstimators": 100, "maxDepth": 3, "minSamplesLeaf": 5 },
+    { "id": "rf-n200-d3-l3", "nEstimators": 200, "maxDepth": 3, "minSamplesLeaf": 3 },
+    { "id": "rf-n200-d5-l3", "nEstimators": 200, "maxDepth": 5, "minSamplesLeaf": 3 },
+    { "id": "rf-n200-d5-l5", "nEstimators": 200, "maxDepth": 5, "minSamplesLeaf": 5 },
+    { "id": "rf-n200-dnull-l5", "nEstimators": 200, "maxDepth": null, "minSamplesLeaf": 5 }
+  ],
+  "histGradientBoosting": [
+    { "id": "hgb-i100-r0.05-l7-m10-reg1", "maxIter": 100, "learningRate": 0.05, "maxLeafNodes": 7, "minSamplesLeaf": 10, "l2Regularization": 1.0 },
+    { "id": "hgb-i100-r0.05-l15-m10-reg1", "maxIter": 100, "learningRate": 0.05, "maxLeafNodes": 15, "minSamplesLeaf": 10, "l2Regularization": 1.0 },
+    { "id": "hgb-i150-r0.03-l7-m10-reg1", "maxIter": 150, "learningRate": 0.03, "maxLeafNodes": 7, "minSamplesLeaf": 10, "l2Regularization": 1.0 },
+    { "id": "hgb-i100-r0.05-l7-m20-reg1", "maxIter": 100, "learningRate": 0.05, "maxLeafNodes": 7, "minSamplesLeaf": 20, "l2Regularization": 1.0 },
+    { "id": "hgb-i100-r0.1-l7-m10-reg5", "maxIter": 100, "learningRate": 0.1, "maxLeafNodes": 7, "minSamplesLeaf": 10, "l2Regularization": 5.0 }
+  ]
+}

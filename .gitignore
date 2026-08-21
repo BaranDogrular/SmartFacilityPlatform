@@ -40,3 +40,6 @@ TestResults/
 
 # Offline ML generated datasets (reproducible from read-only extraction)
 ml/**/artifacts/generated/
+ml/**/.venv/
+**/__pycache__/
+*.pyc

@@ -1,0 +1,18 @@
+﻿{
+    "selectionVersion":  "historical-weekly-volume-selection/v1",
+    "generatedAt":  "2026-08-21T12:17:48Z",
+    "selectionInputs":  [
+                            "train",
+                            "validation"
+                        ],
+    "testMetricsIncluded":  false,
+    "selectionMetric":  "validation_mae",
+    "maeTieTolerance":  1.0,
+    "selectedCandidateId":  "ridge-alpha-1",
+    "selectedAlpha":  1,
+    "selectedValidationMae":  168.03398845683535,
+    "validationBaselineMae":  118.47115384615384,
+    "validationGatePassed":  false,
+    "featureDataSha256":  "723b314c829cf29c15f5adbbeb50d66224ac7a7f9f4b20418ec8ba5fc715b11f",
+    "trainingConfigSha256":  "4bbdcd60de73d0375acd10f8ad35637b6f55574b3166faac00ab677018c139f0"
+}

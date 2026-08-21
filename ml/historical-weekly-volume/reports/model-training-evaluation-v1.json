@@ -1,0 +1,503 @@
+﻿{
+    "reportVersion":  "historical-weekly-volume-model-training/v1",
+    "generatedAt":  "2026-08-21T12:17:48Z",
+    "baselineContract":  {
+                             "validation":  {
+                                                "row_count":  26,
+                                                "mae":  118.47115384615384,
+                                                "wape_percent":  10.101167442775628,
+                                                "rmse":  176.13734124474919,
+                                                "mean_signed_error":  34.16346153846154,
+                                                "median_absolute_error":  72.875
+                                            },
+                             "test":  {
+                                          "row_count":  57,
+                                          "mae":  120.96491228070175,
+                                          "wape_percent":  11.672394237443077,
+                                          "rmse":  163.47596260881045,
+                                          "mean_signed_error":  -3.4912280701754388,
+                                          "median_absolute_error":  96.75
+                                      }
+                         },
+    "availableCandidates":  [
+                                "ridge_regression"
+                            ],
+    "unavailableCandidates":  [
+                                  {
+                                      "model":  "RandomForestRegressor",
+                                      "reason":  "No Python/scikit-learn runtime is installed; no dependency is added for this pilot."
+                                  },
+                                  {
+                                      "model":  "GradientBoostingRegressor",
+                                      "reason":  "No Python/scikit-learn runtime is installed; no dependency is added for this pilot."
+                                  }
+                              ],
+    "featureNames":  [
+                         "lag_1",
+                         "lag_2",
+                         "lag_4",
+                         "lag_13",
+                         "lag_52",
+                         "rolling_mean_4",
+                         "rolling_median_4",
+                         "rolling_std_4",
+                         "rolling_mean_13",
+                         "rolling_median_13",
+                         "rolling_std_13",
+                         "rolling_mean_26",
+                         "rolling_median_26",
+                         "rolling_std_26",
+                         "iso_week",
+                         "iso_week_sin",
+                         "iso_week_cos"
+                     ],
+    "randomSeed":  20260821,
+    "candidateResults":  [
+                             {
+                                 "candidate_id":  "ridge-alpha-0.1",
+                                 "model":  "ridge_regression",
+                                 "alpha":  0.1,
+                                 "scaler_fit_split":  "train-only",
+                                 "scaler_fit_row_count":  84,
+                                 "train_mae":  70.463465714296291,
+                                 "validation_mae":  176.76644989915471,
+                                 "validation_wape_percent":  15.071580302282491,
+                                 "validation_rmse":  208.08006832112278,
+                                 "validation_bias":  5.6644907026769324,
+                                 "validation_median_absolute_error":  175.77829918367456,
+                                 "train_validation_mae_gap":  106.30298418485842,
+                                 "validation_to_train_mae_ratio":  2.5086255424318518,
+                                 "expanding_validation_mae":  155.21098337988255,
+                                 "expanding_validation_wape_percent":  13.233703574070132,
+                                 "expanding_validation_rmse":  186.92525744430486,
+                                 "expanding_validation_bias":  -26.950040139996247,
+                                 "validation_relative_mae_improvement_vs_baseline_percent":  -49.206320830388125597925925773
+                             },
+                             {
+                                 "candidate_id":  "ridge-alpha-1",
+                                 "model":  "ridge_regression",
+                                 "alpha":  1,
+                                 "scaler_fit_split":  "train-only",
+                                 "scaler_fit_row_count":  84,
+                                 "train_mae":  73.346037213500878,
+                                 "validation_mae":  168.03398845683535,
+                                 "validation_wape_percent":  14.327027283654878,
+                                 "validation_rmse":  194.32176588790682,
+                                 "validation_bias":  -92.266337410520535,
+                                 "validation_median_absolute_error":  159.80429365535542,
+                                 "train_validation_mae_gap":  94.687951243334467,
+                                 "validation_to_train_mae_ratio":  2.290975693311283,
+                                 "expanding_validation_mae":  153.27631261097835,
+                                 "expanding_validation_wape_percent":  13.068748369795491,
+                                 "expanding_validation_rmse":  182.57593617098127,
+                                 "expanding_validation_bias":  -28.398849982710331,
+                                 "validation_relative_mae_improvement_vs_baseline_percent":  -41.835360762201452055403854217
+                             },
+                             {
+                                 "candidate_id":  "ridge-alpha-10",
+                                 "model":  "ridge_regression",
+                                 "alpha":  10,
+                                 "scaler_fit_split":  "train-only",
+                                 "scaler_fit_row_count":  84,
+                                 "train_mae":  75.888774425834725,
+                                 "validation_mae":  194.78456774315094,
+                                 "validation_wape_percent":  16.607853221361331,
+                                 "validation_rmse":  225.62317571958206,
+                                 "validation_bias":  -157.15858723902204,
+                                 "validation_median_absolute_error":  191.52285772067825,
+                                 "train_validation_mae_gap":  118.89579331731622,
+                                 "validation_to_train_mae_ratio":  2.5667112061944257,
+                                 "expanding_validation_mae":  143.65183659003395,
+                                 "expanding_validation_wape_percent":  12.24813980239025,
+                                 "expanding_validation_rmse":  177.15913589534989,
+                                 "expanding_validation_bias":  -29.067244499308043,
+                                 "validation_relative_mae_improvement_vs_baseline_percent":  -64.415185823291169972057375774
+                             },
+                             {
+                                 "candidate_id":  "ridge-alpha-100",
+                                 "model":  "ridge_regression",
+                                 "alpha":  100,
+                                 "scaler_fit_split":  "train-only",
+                                 "scaler_fit_row_count":  84,
+                                 "train_mae":  80.89947598230448,
+                                 "validation_mae":  190.04370662649612,
+                                 "validation_wape_percent":  16.203634722531969,
+                                 "validation_rmse":  217.40926219668771,
+                                 "validation_bias":  -141.07084803321629,
+                                 "validation_median_absolute_error":  182.7240918526237,
+                                 "train_validation_mae_gap":  109.14423064419164,
+                                 "validation_to_train_mae_ratio":  2.3491339630934727,
+                                 "expanding_validation_mae":  137.85224467888509,
+                                 "expanding_validation_wape_percent":  11.753651084314988,
+                                 "expanding_validation_rmse":  180.77992166302909,
+                                 "expanding_validation_bias":  -22.375373392590532,
+                                 "validation_relative_mae_improvement_vs_baseline_percent":  -60.413485018712645293777324241
+                             },
+                             {
+                                 "candidate_id":  "ridge-alpha-1000",
+                                 "model":  "ridge_regression",
+                                 "alpha":  1000,
+                                 "scaler_fit_split":  "train-only",
+                                 "scaler_fit_row_count":  84,
+                                 "train_mae":  132.13489396995914,
+                                 "validation_mae":  322.69226191907296,
+                                 "validation_wape_percent":  27.513605331855107,
+                                 "validation_rmse":  358.7391361567532,
+                                 "validation_bias":  -305.28298005017871,
+                                 "validation_median_absolute_error":  332.06656625786644,
+                                 "train_validation_mae_gap":  190.55736794911383,
+                                 "validation_to_train_mae_ratio":  2.4421426636361252,
+                                 "expanding_validation_mae":  258.067424271785,
+                                 "expanding_validation_wape_percent":  22.003518826872206,
+                                 "expanding_validation_rmse":  296.03613724922479,
+                                 "expanding_validation_bias":  -213.87120270960821,
+                                 "validation_relative_mae_improvement_vs_baseline_percent":  -172.3804499600973439106799752
+                             }
+                         ],
+    "selection":  {
+                      "selectedCandidateId":  "ridge-alpha-1",
+                      "selectedAlpha":  1,
+                      "selectionInputs":  [
+                                              "train",
+                                              "validation"
+                                          ],
+                      "selectionLockSha256":  "2ab4f1b76e0a3294af188446ad0e2fdbe99a037bf8eb6130a0555b53f50a8d1b",
+                      "selectionCompletedBeforeTestEvaluation":  true,
+                      "validationRelativeMaeImprovementPercent":  -41.835360762201452055403854217,
+                      "validationGatePassed":  false
+                  },
+    "finalRefit":  {
+                       "fitSplits":  [
+                                         "train",
+                                         "validation"
+                                     ],
+                       "fitRowCount":  110,
+                       "scalerFitRowCount":  110
+                   },
+    "untouchedTest":  {
+                          "evaluationCount":  1,
+                          "rowCount":  57,
+                          "metrics":  {
+                                          "row_count":  57,
+                                          "mae":  211.51173479694637,
+                                          "wape_percent":  20.40962381443677,
+                                          "rmse":  259.28146447261179,
+                                          "mean_signed_error":  -176.3692411620151,
+                                          "median_absolute_error":  187.51042452393972
+                                      },
+                          "baselineMetrics":  {
+                                                  "row_count":  57,
+                                                  "mae":  120.96491228070175,
+                                                  "wape_percent":  11.672394237443077,
+                                                  "rmse":  163.47596260881045,
+                                                  "mean_signed_error":  -3.4912280701754388,
+                                                  "median_absolute_error":  96.75
+                                              },
+                          "absoluteMaeImprovement":  -90.54682251624425,
+                          "relativeMaeImprovementPercent":  -74.853790912631217362356450784,
+                          "wapeImprovementPoints":  -8.737229576993723,
+                          "rmseImprovement":  -95.80550186380155
+                      },
+    "errorAnalysis":  {
+                          "targetMeans":  {
+                                              "train":  560.48809523809518,
+                                              "validation":  1172.8461538461538,
+                                              "test":  1036.3333333333333
+                                          },
+                          "modelWinsWeeks":  21,
+                          "baselineWinsWeeks":  36,
+                          "ties":  0,
+                          "underpredictionWeeks":  48,
+                          "overpredictionWeeks":  9,
+                          "worstTestWeeks":  [
+                                                 {
+                                                     "week":  "2026-03-02",
+                                                     "actual":  1426,
+                                                     "prediction":  739.26350847933509,
+                                                     "absolute_error":  686.73649152066491,
+                                                     "baseline_prediction":  1052.75,
+                                                     "baseline_absolute_error":  373.25,
+                                                     "week_over_week_change":  451
+                                                 },
+                                                 {
+                                                     "week":  "2026-04-13",
+                                                     "actual":  1434,
+                                                     "prediction":  874.15474658433857,
+                                                     "absolute_error":  559.84525341566143,
+                                                     "baseline_prediction":  1114.25,
+                                                     "baseline_absolute_error":  319.75,
+                                                     "week_over_week_change":  226
+                                                 },
+                                                 {
+                                                     "week":  "2026-01-05",
+                                                     "actual":  1224,
+                                                     "prediction":  693.267323788371,
+                                                     "absolute_error":  530.732676211629,
+                                                     "baseline_prediction":  975,
+                                                     "baseline_absolute_error":  249,
+                                                     "week_over_week_change":  405
+                                                 },
+                                                 {
+                                                     "week":  "2026-05-04",
+                                                     "actual":  1374,
+                                                     "prediction":  858.821267987854,
+                                                     "absolute_error":  515.178732012146,
+                                                     "baseline_prediction":  1232,
+                                                     "baseline_absolute_error":  142,
+                                                     "week_over_week_change":  333
+                                                 },
+                                                 {
+                                                     "week":  "2026-02-02",
+                                                     "actual":  1213,
+                                                     "prediction":  741.29939647749893,
+                                                     "absolute_error":  471.70060352250107,
+                                                     "baseline_prediction":  1059.25,
+                                                     "baseline_absolute_error":  153.75,
+                                                     "week_over_week_change":  245
+                                                 },
+                                                 {
+                                                     "week":  "2026-07-06",
+                                                     "actual":  1310,
+                                                     "prediction":  933.02696798559452,
+                                                     "absolute_error":  376.97303201440548,
+                                                     "baseline_prediction":  1187.75,
+                                                     "baseline_absolute_error":  122.25,
+                                                     "week_over_week_change":  199
+                                                 },
+                                                 {
+                                                     "week":  "2025-12-22",
+                                                     "actual":  1044,
+                                                     "prediction":  693.51476064426492,
+                                                     "absolute_error":  350.48523935573508,
+                                                     "baseline_prediction":  1015.25,
+                                                     "baseline_absolute_error":  28.75,
+                                                     "week_over_week_change":  46
+                                                 },
+                                                 {
+                                                     "week":  "2026-06-01",
+                                                     "actual":  1228,
+                                                     "prediction":  882.08227217283047,
+                                                     "absolute_error":  345.91772782716953,
+                                                     "baseline_prediction":  1070.25,
+                                                     "baseline_absolute_error":  157.75,
+                                                     "week_over_week_change":  642
+                                                 },
+                                                 {
+                                                     "week":  "2026-02-16",
+                                                     "actual":  1102,
+                                                     "prediction":  758.95702630860126,
+                                                     "absolute_error":  343.04297369139874,
+                                                     "baseline_prediction":  1032.75,
+                                                     "baseline_absolute_error":  69.25,
+                                                     "week_over_week_change":  181
+                                                 },
+                                                 {
+                                                     "week":  "2025-12-01",
+                                                     "actual":  1036,
+                                                     "prediction":  694.92931906419551,
+                                                     "absolute_error":  341.07068093580449,
+                                                     "baseline_prediction":  918.5,
+                                                     "baseline_absolute_error":  117.5,
+                                                     "week_over_week_change":  48
+                                                 }
+                                             ],
+                          "largestWeekOverWeekChanges":  [
+                                                             {
+                                                                 "week":  "2026-06-01",
+                                                                 "actual":  1228,
+                                                                 "prediction":  882.08227217283047,
+                                                                 "absolute_error":  345.91772782716953,
+                                                                 "baseline_prediction":  1070.25,
+                                                                 "baseline_absolute_error":  157.75,
+                                                                 "week_over_week_change":  642
+                                                             },
+                                                             {
+                                                                 "week":  "2026-05-25",
+                                                                 "actual":  586,
+                                                                 "prediction":  847.04102878953927,
+                                                                 "absolute_error":  261.04102878953927,
+                                                                 "baseline_prediction":  1184,
+                                                                 "baseline_absolute_error":  598,
+                                                                 "week_over_week_change":  -459
+                                                             },
+                                                             {
+                                                                 "week":  "2026-03-02",
+                                                                 "actual":  1426,
+                                                                 "prediction":  739.26350847933509,
+                                                                 "absolute_error":  686.73649152066491,
+                                                                 "baseline_prediction":  1052.75,
+                                                                 "baseline_absolute_error":  373.25,
+                                                                 "week_over_week_change":  451
+                                                             },
+                                                             {
+                                                                 "week":  "2026-01-05",
+                                                                 "actual":  1224,
+                                                                 "prediction":  693.267323788371,
+                                                                 "absolute_error":  530.732676211629,
+                                                                 "baseline_prediction":  975,
+                                                                 "baseline_absolute_error":  249,
+                                                                 "week_over_week_change":  405
+                                                             },
+                                                             {
+                                                                 "week":  "2026-03-16",
+                                                                 "actual":  893,
+                                                                 "prediction":  945.11137032609486,
+                                                                 "absolute_error":  52.111370326094857,
+                                                                 "baseline_prediction":  1193,
+                                                                 "baseline_absolute_error":  300,
+                                                                 "week_over_week_change":  -376
+                                                             },
+                                                             {
+                                                                 "week":  "2026-07-13",
+                                                                 "actual":  938,
+                                                                 "prediction":  1053.1538658251732,
+                                                                 "absolute_error":  115.15386582517317,
+                                                                 "baseline_prediction":  1182.25,
+                                                                 "baseline_absolute_error":  244.25,
+                                                                 "week_over_week_change":  -372
+                                                             },
+                                                             {
+                                                                 "week":  "2026-05-04",
+                                                                 "actual":  1374,
+                                                                 "prediction":  858.821267987854,
+                                                                 "absolute_error":  515.178732012146,
+                                                                 "baseline_prediction":  1232,
+                                                                 "baseline_absolute_error":  142,
+                                                                 "week_over_week_change":  333
+                                                             },
+                                                             {
+                                                                 "week":  "2026-02-09",
+                                                                 "actual":  921,
+                                                                 "prediction":  847.85305722125281,
+                                                                 "absolute_error":  73.146942778747189,
+                                                                 "baseline_prediction":  1056.5,
+                                                                 "baseline_absolute_error":  135.5,
+                                                                 "week_over_week_change":  -292
+                                                             },
+                                                             {
+                                                                 "week":  "2026-03-23",
+                                                                 "actual":  1152,
+                                                                 "prediction":  870.91257757493975,
+                                                                 "absolute_error":  281.08742242506025,
+                                                                 "baseline_prediction":  1140.75,
+                                                                 "baseline_absolute_error":  11.25,
+                                                                 "week_over_week_change":  259
+                                                             },
+                                                             {
+                                                                 "week":  "2026-07-20",
+                                                                 "actual":  1186,
+                                                                 "prediction":  936.35837903156084,
+                                                                 "absolute_error":  249.64162096843916,
+                                                                 "baseline_prediction":  1098.75,
+                                                                 "baseline_absolute_error":  87.25,
+                                                                 "week_over_week_change":  248
+                                                             }
+                                                         ]
+                      },
+    "interpretability":  {
+                             "statement":  "Standardized coefficient magnitude is association/influence in this fitted model, not causality.",
+                             "coefficients":  [
+                                                  {
+                                                      "feature":  "lag_1",
+                                                      "standardized_coefficient":  125.09973557208288,
+                                                      "absolute_standardized_coefficient":  125.09973557208288
+                                                  },
+                                                  {
+                                                      "feature":  "rolling_std_26",
+                                                      "standardized_coefficient":  107.27576660705182,
+                                                      "absolute_standardized_coefficient":  107.27576660705182
+                                                  },
+                                                  {
+                                                      "feature":  "rolling_mean_4",
+                                                      "standardized_coefficient":  77.524237802798126,
+                                                      "absolute_standardized_coefficient":  77.524237802798126
+                                                  },
+                                                  {
+                                                      "feature":  "rolling_median_13",
+                                                      "standardized_coefficient":  -67.591863213569155,
+                                                      "absolute_standardized_coefficient":  67.591863213569155
+                                                  },
+                                                  {
+                                                      "feature":  "rolling_median_26",
+                                                      "standardized_coefficient":  59.594230963862515,
+                                                      "absolute_standardized_coefficient":  59.594230963862515
+                                                  },
+                                                  {
+                                                      "feature":  "rolling_median_4",
+                                                      "standardized_coefficient":  -49.67415037487784,
+                                                      "absolute_standardized_coefficient":  49.67415037487784
+                                                  },
+                                                  {
+                                                      "feature":  "rolling_mean_13",
+                                                      "standardized_coefficient":  41.942492686978468,
+                                                      "absolute_standardized_coefficient":  41.942492686978468
+                                                  },
+                                                  {
+                                                      "feature":  "rolling_mean_26",
+                                                      "standardized_coefficient":  -37.54402515738596,
+                                                      "absolute_standardized_coefficient":  37.54402515738596
+                                                  },
+                                                  {
+                                                      "feature":  "iso_week_sin",
+                                                      "standardized_coefficient":  -36.52853749658864,
+                                                      "absolute_standardized_coefficient":  36.52853749658864
+                                                  },
+                                                  {
+                                                      "feature":  "iso_week_cos",
+                                                      "standardized_coefficient":  33.404778379366789,
+                                                      "absolute_standardized_coefficient":  33.404778379366789
+                                                  },
+                                                  {
+                                                      "feature":  "lag_2",
+                                                      "standardized_coefficient":  32.769321124506362,
+                                                      "absolute_standardized_coefficient":  32.769321124506362
+                                                  },
+                                                  {
+                                                      "feature":  "lag_13",
+                                                      "standardized_coefficient":  32.432082093982181,
+                                                      "absolute_standardized_coefficient":  32.432082093982181
+                                                  },
+                                                  {
+                                                      "feature":  "rolling_std_4",
+                                                      "standardized_coefficient":  30.869262370896912,
+                                                      "absolute_standardized_coefficient":  30.869262370896912
+                                                  },
+                                                  {
+                                                      "feature":  "lag_52",
+                                                      "standardized_coefficient":  -25.753984208407331,
+                                                      "absolute_standardized_coefficient":  25.753984208407331
+                                                  },
+                                                  {
+                                                      "feature":  "rolling_std_13",
+                                                      "standardized_coefficient":  24.03362159935579,
+                                                      "absolute_standardized_coefficient":  24.03362159935579
+                                                  },
+                                                  {
+                                                      "feature":  "iso_week",
+                                                      "standardized_coefficient":  -20.223830013124356,
+                                                      "absolute_standardized_coefficient":  20.223830013124356
+                                                  },
+                                                  {
+                                                      "feature":  "lag_4",
+                                                      "standardized_coefficient":  8.51704136812954,
+                                                      "absolute_standardized_coefficient":  8.51704136812954
+                                                  }
+                                              ]
+                         },
+    "artifactGate":  {
+                         "validationGatePassed":  false,
+                         "expandingWindowGatePassed":  true,
+                         "testNoWorseThanBaselineGatePassed":  false,
+                         "artifactSaved":  false
+                     },
+    "offlineMlFeasibility":  "NO-GO",
+    "productionInference":  "NO-GO",
+    "productionReason":  "A data refresh and as-of availability contract is still absent.",
+    "reproducibility":  {
+                            "trainingConfigSha256":  "4bbdcd60de73d0375acd10f8ad35637b6f55574b3166faac00ab677018c139f0",
+                            "featureDataSha256":  "723b314c829cf29c15f5adbbeb50d66224ac7a7f9f4b20418ec8ba5fc715b11f",
+                            "datasetQuerySha256":  "218d367bc732121310585bd89a2a80b1d956227d249a39ae77d670065bcb4567",
+                            "modelImplementation":  "deterministic-ridge/v1",
+                            "runtime":  "Desktop PowerShell 5.1.26100.9168"
+                        }
+}

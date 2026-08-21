@@ -11,8 +11,9 @@ It does not train a complex model, serve production inference, use current
 ## Runtime
 
 The repository host has Windows PowerShell 5.1 and the SQL Server
-`Invoke-Sqlcmd` command. No Python runtime is installed, so this minimal pilot
-uses those existing dependencies rather than adding a runtime or ML framework.
+`Invoke-Sqlcmd` command. The extraction/baseline stages use those existing
+dependencies. Python 3.12 is installed outside `PATH`; the final controlled
+comparison uses the project-local environment documented below.
 
 ## Run
 
@@ -21,6 +22,8 @@ From the repository root:
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\ml\historical-weekly-volume\scripts\Invoke-BaselineEvaluation.ps1
 powershell -ExecutionPolicy Bypass -File .\ml\historical-weekly-volume\tests\Run-Tests.ps1
+powershell -ExecutionPolicy Bypass -File .\ml\historical-weekly-volume\scripts\Invoke-ModelTraining.ps1
+powershell -ExecutionPolicy Bypass -File .\ml\historical-weekly-volume\tests\Run-ModelTests.ps1
 ```
 
 The default connection is local integrated security with
@@ -56,3 +59,36 @@ SCADA data is used.
 
 The baseline selected for comparison is chosen with validation MAE only. Test
 metrics are reported after that selection and are not used to choose a baseline.
+
+## Offline model training
+
+The training stage evaluates five predefined Ridge alpha values. Its scaler is
+fit only on the training prefix for fixed validation and refit only on each
+available historical prefix for expanding-window validation. A validation-only
+selection lock is written before the test rows are materialized. The selected
+candidate is then refit once on train plus validation and evaluated once on the
+untouched test period.
+
+In the initial PowerShell-only stage, Random Forest and Gradient Boosting were
+unavailable because Python packages were not yet installed. That stage did not
+substitute a handwritten tree implementation. The separately versioned final
+Python comparison below uses only the dependencies explicitly authorized for
+that controlled round. A model file is saved only if all artifact gates pass.
+
+## Final controlled Python comparison
+
+Python 3.12 is installed outside `PATH`. The final bounded comparison uses a
+project-local, ignored `.venv` and versions its complete dependency set in
+`requirements-python.lock`:
+
+```powershell
+& 'C:\Users\User\AppData\Local\Programs\Python\Python312\python.exe' -m venv .\ml\historical-weekly-volume\.venv
+.\ml\historical-weekly-volume\.venv\Scripts\python.exe -m pip install -r .\ml\historical-weekly-volume\requirements-python.lock
+.\ml\historical-weekly-volume\.venv\Scripts\python.exe .\ml\historical-weekly-volume\python\train_models.py
+.\ml\historical-weekly-volume\.venv\Scripts\python.exe -m unittest discover -s .\ml\historical-weekly-volume\python\tests -v
+```
+
+The Python selection stage evaluates only train and validation. It writes a
+selection proof before any candidate test evaluation. If no candidate passes
+the locked validation, expanding-window, and overfitting gates, the test remains
+unread for evaluation and no model artifact is produced.

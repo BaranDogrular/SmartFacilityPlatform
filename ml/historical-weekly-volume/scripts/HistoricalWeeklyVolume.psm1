@@ -240,6 +240,259 @@ function Get-TargetStatistics {
     }
 }
 
+function ConvertTo-InvariantDouble {
+    param([Parameter(Mandatory = $true)]$Value)
+
+    if ($Value -is [double] -or $Value -is [float] -or $Value -is [decimal] -or
+        $Value -is [int] -or $Value -is [long]) {
+        return [double]$Value
+    }
+
+    return [double]::Parse(
+        [string]$Value,
+        [System.Globalization.NumberStyles]::Float,
+        $script:InvariantCulture)
+}
+
+function Get-ModelFeatureNames {
+    @(
+        'lag_1', 'lag_2', 'lag_4', 'lag_13', 'lag_52',
+        'rolling_mean_4', 'rolling_median_4', 'rolling_std_4',
+        'rolling_mean_13', 'rolling_median_13', 'rolling_std_13',
+        'rolling_mean_26', 'rolling_median_26', 'rolling_std_26',
+        'iso_week', 'iso_week_sin', 'iso_week_cos'
+    )
+}
+
+function Solve-LinearSystem {
+    param(
+        [Parameter(Mandatory = $true)][double[,]]$Matrix,
+        [Parameter(Mandatory = $true)][double[]]$Vector
+    )
+
+    $size = $Vector.Count
+    $augmented = New-Object 'double[,]' $size, ($size + 1)
+    for ($row = 0; $row -lt $size; $row++) {
+        for ($column = 0; $column -lt $size; $column++) {
+            $augmented[$row,$column] = $Matrix[$row,$column]
+        }
+        $augmented[$row,$size] = $Vector[$row]
+    }
+
+    for ($pivotColumn = 0; $pivotColumn -lt $size; $pivotColumn++) {
+        $pivotRow = $pivotColumn
+        $pivotValue = $augmented[$pivotRow,$pivotColumn]
+        $pivotMagnitude = [Math]::Abs($pivotValue)
+        for ($candidateRow = $pivotColumn + 1; $candidateRow -lt $size; $candidateRow++) {
+            $candidateValue = $augmented[$candidateRow,$pivotColumn]
+            $candidateMagnitude = [Math]::Abs($candidateValue)
+            if ($candidateMagnitude -gt $pivotMagnitude) {
+                $pivotRow = $candidateRow
+                $pivotMagnitude = $candidateMagnitude
+            }
+        }
+
+        if ($pivotMagnitude -lt 1e-12) {
+            throw "Ridge linear system is numerically singular at column $pivotColumn."
+        }
+
+        if ($pivotRow -ne $pivotColumn) {
+            for ($column = $pivotColumn; $column -le $size; $column++) {
+                $temporary = $augmented[$pivotColumn,$column]
+                $augmented[$pivotColumn,$column] = $augmented[$pivotRow,$column]
+                $augmented[$pivotRow,$column] = $temporary
+            }
+        }
+
+        $pivot = $augmented[$pivotColumn,$pivotColumn]
+        for ($column = $pivotColumn; $column -le $size; $column++) {
+            $augmented[$pivotColumn,$column] /= $pivot
+        }
+
+        for ($row = 0; $row -lt $size; $row++) {
+            if ($row -eq $pivotColumn) { continue }
+            $factor = $augmented[$row,$pivotColumn]
+            if ([Math]::Abs($factor) -lt 1e-20) { continue }
+            for ($column = $pivotColumn; $column -le $size; $column++) {
+                $augmented[$row,$column] -= $factor * $augmented[$pivotColumn,$column]
+            }
+        }
+    }
+
+    $solution = New-Object double[] $size
+    for ($row = 0; $row -lt $size; $row++) {
+        $solution[$row] = $augmented[$row,$size]
+    }
+    return $solution
+}
+
+function Fit-RidgeRegression {
+    param(
+        [Parameter(Mandatory = $true)][object[]]$Rows,
+        [Parameter(Mandatory = $true)][double]$Alpha,
+        [string[]]$FeatureNames = @(Get-ModelFeatureNames)
+    )
+
+    if ($Rows.Count -lt 2) {
+        throw 'Ridge training requires at least two rows.'
+    }
+    if ($Alpha -le 0.0) {
+        throw 'Ridge alpha must be greater than zero.'
+    }
+
+    $featureCount = $FeatureNames.Count
+    $means = New-Object double[] $featureCount
+    $scales = New-Object double[] $featureCount
+    $targetMean = 0.0
+
+    foreach ($row in $Rows) {
+        $targetMean += ConvertTo-InvariantDouble $row.actual
+        for ($featureIndex = 0; $featureIndex -lt $featureCount; $featureIndex++) {
+            $property = $row.PSObject.Properties[$FeatureNames[$featureIndex]]
+            if ($null -eq $property) {
+                throw "Missing feature '$($FeatureNames[$featureIndex])'."
+            }
+            $value = ConvertTo-InvariantDouble $property.Value
+            if ([double]::IsNaN($value) -or [double]::IsInfinity($value)) {
+                throw "Non-finite feature '$($FeatureNames[$featureIndex])'."
+            }
+            $means[$featureIndex] += $value
+        }
+    }
+    $targetMean /= $Rows.Count
+    for ($featureIndex = 0; $featureIndex -lt $featureCount; $featureIndex++) {
+        $means[$featureIndex] /= $Rows.Count
+    }
+
+    foreach ($row in $Rows) {
+        for ($featureIndex = 0; $featureIndex -lt $featureCount; $featureIndex++) {
+            $value = ConvertTo-InvariantDouble $row.PSObject.Properties[$FeatureNames[$featureIndex]].Value
+            $scales[$featureIndex] += [Math]::Pow($value - $means[$featureIndex], 2)
+        }
+    }
+    for ($featureIndex = 0; $featureIndex -lt $featureCount; $featureIndex++) {
+        $scales[$featureIndex] = [Math]::Sqrt($scales[$featureIndex] / $Rows.Count)
+        if ($scales[$featureIndex] -lt 1e-12) {
+            $scales[$featureIndex] = 1.0
+        }
+    }
+
+    $normalMatrix = New-Object 'double[,]' $featureCount, $featureCount
+    $normalVector = New-Object double[] $featureCount
+    foreach ($row in $Rows) {
+        $standardized = New-Object double[] $featureCount
+        for ($featureIndex = 0; $featureIndex -lt $featureCount; $featureIndex++) {
+            $value = ConvertTo-InvariantDouble $row.PSObject.Properties[$FeatureNames[$featureIndex]].Value
+            $standardized[$featureIndex] = ($value - $means[$featureIndex]) / $scales[$featureIndex]
+        }
+        $centeredTarget = (ConvertTo-InvariantDouble $row.actual) - $targetMean
+        for ($left = 0; $left -lt $featureCount; $left++) {
+            $normalVector[$left] += $standardized[$left] * $centeredTarget
+            for ($right = 0; $right -lt $featureCount; $right++) {
+                $normalMatrix[$left,$right] += $standardized[$left] * $standardized[$right]
+            }
+        }
+    }
+    for ($featureIndex = 0; $featureIndex -lt $featureCount; $featureIndex++) {
+        $normalMatrix[$featureIndex,$featureIndex] += $Alpha
+    }
+
+    $coefficients = Solve-LinearSystem -Matrix $normalMatrix -Vector $normalVector
+    [pscustomobject][ordered]@{
+        model_type = 'ridge_regression'
+        implementation_version = 'deterministic-ridge/v1'
+        alpha = $Alpha
+        feature_names = @($FeatureNames)
+        feature_means = @($means)
+        feature_scales = @($scales)
+        standardized_coefficients = @($coefficients)
+        intercept = $targetMean
+        scaler_fit_row_count = $Rows.Count
+        training_row_count = $Rows.Count
+    }
+}
+
+function Get-RidgePredictions {
+    param(
+        [Parameter(Mandatory = $true)]$Model,
+        [Parameter(Mandatory = $true)][object[]]$Rows
+    )
+
+    $predictions = New-Object double[] $Rows.Count
+    for ($rowIndex = 0; $rowIndex -lt $Rows.Count; $rowIndex++) {
+        $prediction = [double]$Model.intercept
+        for ($featureIndex = 0; $featureIndex -lt $Model.feature_names.Count; $featureIndex++) {
+            $featureName = [string]$Model.feature_names[$featureIndex]
+            $value = ConvertTo-InvariantDouble $Rows[$rowIndex].PSObject.Properties[$featureName].Value
+            $prediction += [double]$Model.standardized_coefficients[$featureIndex] *
+                (($value - [double]$Model.feature_means[$featureIndex]) / [double]$Model.feature_scales[$featureIndex])
+        }
+        if ([double]::IsNaN($prediction) -or [double]::IsInfinity($prediction)) {
+            throw "Model produced a non-finite prediction at row $rowIndex."
+        }
+        $predictions[$rowIndex] = $prediction
+    }
+    return $predictions
+}
+
+function Get-MetricsFromPredictions {
+    param(
+        [Parameter(Mandatory = $true)][object[]]$Rows,
+        [Parameter(Mandatory = $true)][double[]]$Predictions
+    )
+
+    if ($Rows.Count -ne $Predictions.Count) {
+        throw 'Rows and predictions must have identical lengths.'
+    }
+    $metricRows = New-Object System.Collections.Generic.List[object]
+    for ($index = 0; $index -lt $Rows.Count; $index++) {
+        $metricRows.Add([pscustomobject]@{
+            actual = ConvertTo-InvariantDouble $Rows[$index].actual
+            prediction = $Predictions[$index]
+        })
+    }
+    return Get-ForecastMetrics -Rows $metricRows.ToArray() -PredictionProperty prediction
+}
+
+function Get-ExpandingRidgeEvaluation {
+    param(
+        [Parameter(Mandatory = $true)][object[]]$InitialTrainRows,
+        [Parameter(Mandatory = $true)][object[]]$ValidationRows,
+        [Parameter(Mandatory = $true)][double]$Alpha,
+        [string[]]$FeatureNames = @(Get-ModelFeatureNames)
+    )
+
+    $history = New-Object System.Collections.Generic.List[object]
+    foreach ($row in $InitialTrainRows) { $history.Add($row) }
+    $predictions = New-Object double[] $ValidationRows.Count
+    for ($index = 0; $index -lt $ValidationRows.Count; $index++) {
+        $model = Fit-RidgeRegression -Rows $history.ToArray() -Alpha $Alpha -FeatureNames $FeatureNames
+        $predictions[$index] = @(Get-RidgePredictions -Model $model -Rows @($ValidationRows[$index]))[0]
+        $history.Add($ValidationRows[$index])
+    }
+    [pscustomobject][ordered]@{
+        metrics = Get-MetricsFromPredictions -Rows $ValidationRows -Predictions $predictions
+        predictions = @($predictions)
+    }
+}
+
+function Select-RidgeCandidate {
+    param(
+        [Parameter(Mandatory = $true)][object[]]$CandidateResults,
+        [double]$MaeTieTolerance = 1.0
+    )
+
+    if ($CandidateResults.Count -eq 0) {
+        throw 'At least one candidate result is required.'
+    }
+    $bestMae = ($CandidateResults | Measure-Object validation_mae -Minimum).Minimum
+    $nearBest = @($CandidateResults | Where-Object {
+        [double]$_.validation_mae -le [double]$bestMae + $MaeTieTolerance
+    })
+    # Within one record of MAE, prefer stronger regularization to reduce variance.
+    return @($nearBest | Sort-Object @{ Expression = 'alpha'; Descending = $true })[0]
+}
+
 Export-ModuleMember -Function @(
     'Assert-ReadOnlySql',
     'Get-SampleStandardDeviation',
@@ -249,5 +502,12 @@ Export-ModuleMember -Function @(
     'Get-ForecastMetrics',
     'Get-BaselineDefinitions',
     'Get-BaselineResults',
-    'Get-TargetStatistics'
+    'Get-TargetStatistics',
+    'ConvertTo-InvariantDouble',
+    'Get-ModelFeatureNames',
+    'Fit-RidgeRegression',
+    'Get-RidgePredictions',
+    'Get-MetricsFromPredictions',
+    'Get-ExpandingRidgeEvaluation',
+    'Select-RidgeCandidate'
 )

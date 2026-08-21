@@ -1,0 +1,166 @@
+{
+  "selectionVersion": "historical-weekly-volume-python-selection/v1",
+  "generatedAt": "2026-08-21T12:42:48Z",
+  "selectionInputs": [
+    "train",
+    "validation"
+  ],
+  "testMetricsIncluded": false,
+  "testRowsMaterializedForEvaluation": false,
+  "selectionMetric": "validation_mae",
+  "selectedCandidateId": null,
+  "expandingCandidates": [
+    "enet-a0.01-l10.1",
+    "enet-a0.01-l10.5",
+    "hgb-i150-r0.03-l7-m10-reg1",
+    "rf-n200-dnull-l5"
+  ],
+  "gateAudit": [
+    {
+      "candidate_id": "enet-a0.001-l10.1",
+      "eligible": false,
+      "reasons": [
+        "validation_mae_not_better_than_baseline",
+        "expanding_window_not_evaluated",
+        "train_validation_gap_exceeds_limit"
+      ]
+    },
+    {
+      "candidate_id": "enet-a0.001-l10.5",
+      "eligible": false,
+      "reasons": [
+        "validation_mae_not_better_than_baseline",
+        "expanding_window_not_evaluated",
+        "train_validation_gap_exceeds_limit"
+      ]
+    },
+    {
+      "candidate_id": "enet-a0.01-l10.1",
+      "eligible": false,
+      "reasons": [
+        "validation_mae_not_better_than_baseline",
+        "expanding_window_mae_not_acceptable_vs_baseline",
+        "train_validation_gap_exceeds_limit"
+      ]
+    },
+    {
+      "candidate_id": "enet-a0.01-l10.5",
+      "eligible": false,
+      "reasons": [
+        "validation_mae_not_better_than_baseline",
+        "expanding_window_mae_not_acceptable_vs_baseline",
+        "train_validation_gap_exceeds_limit"
+      ]
+    },
+    {
+      "candidate_id": "enet-a0.1-l10.1",
+      "eligible": false,
+      "reasons": [
+        "validation_mae_not_better_than_baseline",
+        "expanding_window_not_evaluated",
+        "train_validation_gap_exceeds_limit"
+      ]
+    },
+    {
+      "candidate_id": "enet-a0.1-l10.5",
+      "eligible": false,
+      "reasons": [
+        "validation_mae_not_better_than_baseline",
+        "expanding_window_not_evaluated",
+        "train_validation_gap_exceeds_limit"
+      ]
+    },
+    {
+      "candidate_id": "rf-n100-d3-l5",
+      "eligible": false,
+      "reasons": [
+        "validation_mae_not_better_than_baseline",
+        "expanding_window_not_evaluated",
+        "train_validation_gap_exceeds_limit"
+      ]
+    },
+    {
+      "candidate_id": "rf-n200-d3-l3",
+      "eligible": false,
+      "reasons": [
+        "validation_mae_not_better_than_baseline",
+        "expanding_window_not_evaluated",
+        "train_validation_gap_exceeds_limit"
+      ]
+    },
+    {
+      "candidate_id": "rf-n200-d5-l3",
+      "eligible": false,
+      "reasons": [
+        "validation_mae_not_better_than_baseline",
+        "expanding_window_not_evaluated",
+        "train_validation_gap_exceeds_limit"
+      ]
+    },
+    {
+      "candidate_id": "rf-n200-d5-l5",
+      "eligible": false,
+      "reasons": [
+        "validation_mae_not_better_than_baseline",
+        "expanding_window_not_evaluated",
+        "train_validation_gap_exceeds_limit"
+      ]
+    },
+    {
+      "candidate_id": "rf-n200-dnull-l5",
+      "eligible": false,
+      "reasons": [
+        "validation_mae_not_better_than_baseline",
+        "expanding_window_mae_not_acceptable_vs_baseline",
+        "train_validation_gap_exceeds_limit"
+      ]
+    },
+    {
+      "candidate_id": "hgb-i100-r0.05-l7-m10-reg1",
+      "eligible": false,
+      "reasons": [
+        "validation_mae_not_better_than_baseline",
+        "expanding_window_not_evaluated",
+        "train_validation_gap_exceeds_limit"
+      ]
+    },
+    {
+      "candidate_id": "hgb-i100-r0.05-l15-m10-reg1",
+      "eligible": false,
+      "reasons": [
+        "validation_mae_not_better_than_baseline",
+        "expanding_window_not_evaluated",
+        "train_validation_gap_exceeds_limit"
+      ]
+    },
+    {
+      "candidate_id": "hgb-i150-r0.03-l7-m10-reg1",
+      "eligible": false,
+      "reasons": [
+        "validation_mae_not_better_than_baseline",
+        "expanding_window_mae_not_acceptable_vs_baseline",
+        "train_validation_gap_exceeds_limit"
+      ]
+    },
+    {
+      "candidate_id": "hgb-i100-r0.05-l7-m20-reg1",
+      "eligible": false,
+      "reasons": [
+        "validation_mae_not_better_than_baseline",
+        "expanding_window_not_evaluated",
+        "train_validation_gap_exceeds_limit"
+      ]
+    },
+    {
+      "candidate_id": "hgb-i100-r0.1-l7-m10-reg5",
+      "eligible": false,
+      "reasons": [
+        "validation_mae_not_better_than_baseline",
+        "expanding_window_not_evaluated",
+        "train_validation_gap_exceeds_limit"
+      ]
+    }
+  ],
+  "featureDataSha256": "723b314c829cf29c15f5adbbeb50d66224ac7a7f9f4b20418ec8ba5fc715b11f",
+  "configSha256": "e8383e1a0fb382db9a6d03a90ec7e9fd2525f3e814e4464af4f984d7de590d31"
+}

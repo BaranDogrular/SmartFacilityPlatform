@@ -9,7 +9,7 @@ $generatedRoot = Join-Path $projectRoot 'artifacts\generated'
 $reportsRoot = Join-Path $projectRoot 'reports'
 $invariant = [System.Globalization.CultureInfo]::InvariantCulture
 
-Import-Module $modulePath -Force
+Import-Module $modulePath -Force -DisableNameChecking
 
 $script:Passed = 0
 $script:Failed = 0
