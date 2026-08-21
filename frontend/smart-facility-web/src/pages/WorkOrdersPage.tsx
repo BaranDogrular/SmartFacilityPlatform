@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react'
 import type { WorkOrderAnalyticsQuery } from '../api/analyticsTypes'
 import { ChartPanel, HorizontalBarChart, TrendLineChart } from '../components/AnalyticsCharts'
 import { DataTimestamp, EmptyState, ErrorState, InfoNote, KpiCard, LoadingState, PageHeader } from '../components/DashboardUi'
+import { HistoricalMaintenanceActivity } from '../components/HistoricalMaintenanceActivity'
 import { useWorkOrderOverview, useWorkOrderTrend } from '../hooks/useAnalytics'
 
 const emptyFilters: WorkOrderAnalyticsQuery = {}
@@ -152,6 +153,8 @@ export function WorkOrdersPage() {
       )}
 
       <InfoNote>Bu görünüm yalnız güncel WorkOrder veri kaynağını içerir; geçmiş analitik kayıtlar bu toplamlara dahil değildir.</InfoNote>
+
+      <HistoricalMaintenanceActivity />
     </div>
   )
 }

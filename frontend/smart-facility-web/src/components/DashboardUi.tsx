@@ -24,7 +24,7 @@ export function PageHeader({ eyebrow, title, description, actions }: PageHeaderP
 
 interface KpiCardProps {
   label: string
-  value: number
+  value: number | string
   note?: string
   reliability?: KpiReliability
   tone?: 'navy' | 'teal' | 'amber' | 'slate'
@@ -43,7 +43,9 @@ export function KpiCard({
         <span>{label}</span>
         {reliability ? <ReliabilityBadge reliability={reliability} compact /> : null}
       </div>
-      <strong className="kpi-card__value">{formatCount(value)}</strong>
+      <strong className="kpi-card__value">
+        {typeof value === 'number' ? formatCount(value) : value}
+      </strong>
       {note ? <p className="kpi-card__note">{note}</p> : null}
     </article>
   )
@@ -56,7 +58,7 @@ interface ReliabilityBadgeProps {
 
 export function ReliabilityBadge({ reliability, compact = false }: ReliabilityBadgeProps) {
   const isYellow = reliability === 'Yellow'
-  const label = isYellow ? 'Veri kalitesi notu' : 'Doğrulanmış metrik'
+  const label = isYellow ? 'YELLOW · Veri kalitesi notu' : 'GREEN · Doğrulanmış metrik'
   const detail = isYellow
     ? 'Bu gösterge kaynak veri kapsamı veya eşleştirme kalitesi nedeniyle dikkatle yorumlanmalıdır.'
     : 'Bu gösterge doğrulanmış production veri sözleşmesini kullanır.'

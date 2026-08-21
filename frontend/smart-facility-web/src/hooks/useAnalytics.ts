@@ -1,15 +1,21 @@
 import { useQuery } from '@tanstack/react-query'
 import {
+  getAssetMaintenanceActivityPareto,
   getAssetOverview,
+  getHistoricalMaintenanceActivity,
   getImportQualityOverview,
+  getScadaClearanceInterval,
   getScadaOverview,
   getScadaTrend,
   getWorkOrderOverview,
   getWorkOrderTrend,
 } from '../api/analyticsClient'
 import type {
+  AssetMaintenanceActivityParetoQuery,
   AssetOverviewQuery,
+  HistoricalMaintenanceActivityQuery,
   ScadaAnalyticsQuery,
+  ScadaClearanceIntervalQuery,
   WorkOrderAnalyticsQuery,
 } from '../api/analyticsTypes'
 
@@ -17,6 +23,14 @@ export const useAssetOverview = (query: AssetOverviewQuery = {}) =>
   useQuery({
     queryKey: ['analytics', 'assets', 'overview', query],
     queryFn: () => getAssetOverview(query),
+  })
+
+export const useAssetMaintenanceActivityPareto = (
+  query: AssetMaintenanceActivityParetoQuery = {},
+) =>
+  useQuery({
+    queryKey: ['analytics', 'assets', 'maintenance-activity-pareto', query],
+    queryFn: () => getAssetMaintenanceActivityPareto(query),
   })
 
 export const useWorkOrderOverview = (query: WorkOrderAnalyticsQuery = {}) =>
@@ -31,6 +45,14 @@ export const useWorkOrderTrend = (query: WorkOrderAnalyticsQuery = {}) =>
     queryFn: () => getWorkOrderTrend(query),
   })
 
+export const useHistoricalMaintenanceActivity = (
+  query: HistoricalMaintenanceActivityQuery = {},
+) =>
+  useQuery({
+    queryKey: ['analytics', 'historical-work-orders', 'activity', query],
+    queryFn: () => getHistoricalMaintenanceActivity(query),
+  })
+
 export const useScadaOverview = (query: ScadaAnalyticsQuery = {}) =>
   useQuery({
     queryKey: ['analytics', 'scada', 'overview', query],
@@ -41,6 +63,12 @@ export const useScadaTrend = (query: ScadaAnalyticsQuery = {}) =>
   useQuery({
     queryKey: ['analytics', 'scada', 'trend', query],
     queryFn: () => getScadaTrend(query),
+  })
+
+export const useScadaClearanceInterval = (query: ScadaClearanceIntervalQuery = {}) =>
+  useQuery({
+    queryKey: ['analytics', 'scada', 'clearance-interval', query],
+    queryFn: () => getScadaClearanceInterval(query),
   })
 
 export const useImportQualityOverview = () =>

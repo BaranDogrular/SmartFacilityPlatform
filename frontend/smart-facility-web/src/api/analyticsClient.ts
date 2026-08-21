@@ -1,9 +1,15 @@
 import axios from 'axios'
 import type {
+  AssetMaintenanceActivityParetoQuery,
+  AssetMaintenanceActivityParetoResponse,
   AssetOverviewQuery,
   AssetOverviewResponse,
+  HistoricalMaintenanceActivityQuery,
+  HistoricalMaintenanceActivityResponse,
   ImportQualityOverviewResponse,
   ScadaAnalyticsQuery,
+  ScadaClearanceIntervalQuery,
+  ScadaClearanceIntervalResponse,
   ScadaOverviewResponse,
   ScadaTrendResponse,
   WorkOrderAnalyticsQuery,
@@ -91,17 +97,39 @@ async function get<T>(path: string, query: QueryParameters = {}): Promise<T> {
 export const getAssetOverview = (query: AssetOverviewQuery = {}) =>
   get<AssetOverviewResponse>('/api/analytics/assets/overview', query as QueryParameters)
 
+export const getAssetMaintenanceActivityPareto = (
+  query: AssetMaintenanceActivityParetoQuery = {},
+) =>
+  get<AssetMaintenanceActivityParetoResponse>(
+    '/api/analytics/assets/maintenance-activity-pareto',
+    query as QueryParameters,
+  )
+
 export const getWorkOrderOverview = (query: WorkOrderAnalyticsQuery = {}) =>
   get<WorkOrderOverviewResponse>('/api/analytics/work-orders/overview', query as QueryParameters)
 
 export const getWorkOrderTrend = (query: WorkOrderAnalyticsQuery = {}) =>
   get<WorkOrderTrendResponse>('/api/analytics/work-orders/trend', query as QueryParameters)
 
+export const getHistoricalMaintenanceActivity = (
+  query: HistoricalMaintenanceActivityQuery = {},
+) =>
+  get<HistoricalMaintenanceActivityResponse>(
+    '/api/analytics/historical-work-orders/activity',
+    query as QueryParameters,
+  )
+
 export const getScadaOverview = (query: ScadaAnalyticsQuery = {}) =>
   get<ScadaOverviewResponse>('/api/analytics/scada/overview', query as QueryParameters)
 
 export const getScadaTrend = (query: ScadaAnalyticsQuery = {}) =>
   get<ScadaTrendResponse>('/api/analytics/scada/trend', query as QueryParameters)
+
+export const getScadaClearanceInterval = (query: ScadaClearanceIntervalQuery = {}) =>
+  get<ScadaClearanceIntervalResponse>(
+    '/api/analytics/scada/clearance-interval',
+    query as QueryParameters,
+  )
 
 export const getImportQualityOverview = () =>
   get<ImportQualityOverviewResponse>('/api/analytics/import-quality/overview')

@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react'
 import type { ScadaAnalyticsQuery } from '../api/analyticsTypes'
 import { ChartPanel, HorizontalBarChart, TrendLineChart } from '../components/AnalyticsCharts'
 import { DataTimestamp, EmptyState, ErrorState, InfoNote, KpiCard, LoadingState, PageHeader } from '../components/DashboardUi'
+import { ScadaClearanceInterval } from '../components/ScadaClearanceInterval'
 import { useScadaOverview, useScadaTrend } from '../hooks/useAnalytics'
 import { formatCount } from '../utils/format'
 
@@ -126,6 +127,8 @@ export function ScadaPage() {
           </div>
         </>
       )}
+
+      <ScadaClearanceInterval query={filters} />
 
       <InfoNote>Alarm kaydı, kaynak sistemdeki satır/occurrence sayısını temsil eder; benzersiz fiziksel olay iddiası taşımaz.</InfoNote>
     </div>

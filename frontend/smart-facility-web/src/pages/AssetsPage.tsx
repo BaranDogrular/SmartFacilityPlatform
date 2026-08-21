@@ -1,10 +1,10 @@
 import { ChartPanel, HorizontalBarChart } from '../components/AnalyticsCharts'
-import { DataTimestamp, EmptyState, ErrorState, InfoNote, KpiCard, LoadingState, PageHeader, ReliabilityBadge } from '../components/DashboardUi'
+import { AssetMaintenanceActivityPareto } from '../components/AssetMaintenanceActivityPareto'
+import { DataTimestamp, EmptyState, ErrorState, InfoNote, KpiCard, LoadingState, PageHeader } from '../components/DashboardUi'
 import { useAssetOverview } from '../hooks/useAnalytics'
-import { formatCount } from '../utils/format'
 
 export function AssetsPage() {
-  const query = useAssetOverview({ top: 10 })
+  const query = useAssetOverview()
 
   if (query.isPending) {
     return <LoadingState label="Varlık analitiği yükleniyor" />
@@ -48,41 +48,7 @@ export function AssetsPage() {
         <HorizontalBarChart data={data.countByLocation.map((item) => ({ label: item.name, count: item.count }))} maxItems={15} />
       </ChartPanel>
 
-      <section className="table-panel">
-        <header className="chart-panel__header">
-          <div>
-            <h2>En Çok Güncel İş Emri Alan Varlıklar</h2>
-            <p>Yalnız current WorkOrder ilişkileri üzerinden sıralanır.</p>
-          </div>
-          <ReliabilityBadge reliability={data.topAssetsReliability} />
-        </header>
-        {data.topAssetsByWorkOrderCount.length === 0 ? (
-          <EmptyState />
-        ) : (
-          <div className="table-responsive">
-            <table className="analytics-table">
-              <thead>
-                <tr>
-                  <th scope="col">Sıra</th>
-                  <th scope="col">Varlık Kodu</th>
-                  <th scope="col">Varlık</th>
-                  <th scope="col" className="text-end">İş Emri</th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.topAssetsByWorkOrderCount.map((item, index) => (
-                  <tr key={item.assetId}>
-                    <td>{index + 1}</td>
-                    <td><span className="code-chip">{item.assetCode}</span></td>
-                    <td>{item.assetName}</td>
-                    <td className="text-end"><strong>{formatCount(item.workOrderCount)}</strong></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </section>
+      <AssetMaintenanceActivityPareto />
 
       <InfoNote>“İş Emri Olmayan Varlık” metriği varlık sağlığı değerlendirmesi değildir.</InfoNote>
     </div>

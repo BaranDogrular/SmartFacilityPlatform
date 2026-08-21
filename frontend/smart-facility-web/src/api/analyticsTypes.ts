@@ -67,6 +67,23 @@ export interface AssetOverviewResponse {
   metadata: SnapshotAnalyticsMetadata
 }
 
+export interface AssetMaintenanceActivityParetoItem {
+  assetId: number
+  assetCode: string
+  assetName: string
+  currentWorkOrderCount: number
+  sharePercent: number
+  cumulativeSharePercent: number
+}
+
+export interface AssetMaintenanceActivityParetoResponse {
+  totalCurrentWorkOrders: number
+  assetsWithCurrentWorkOrders: number
+  appliedTop: number
+  topAssets: AssetMaintenanceActivityParetoItem[]
+  metadata: DateRangeMetadata
+}
+
 export interface WorkOrderOverviewResponse {
   totalWorkOrders: number
   byDiscipline: CategoryCount[]
@@ -83,6 +100,14 @@ export interface WorkOrderOverviewResponse {
 export interface WorkOrderTrendResponse {
   grain: TimeGrain
   points: TrendPoint[]
+  metadata: DateRangeMetadata
+}
+
+export interface HistoricalMaintenanceActivityResponse {
+  grain: TimeGrain
+  trend: TrendPoint[]
+  byDiscipline: CategoryCount[]
+  appliedDiscipline: string | null
   metadata: DateRangeMetadata
 }
 
@@ -104,6 +129,25 @@ export interface ScadaTrendResponse {
   grain: TimeGrain
   points: TrendPoint[]
   quality: QualitySummary
+  metadata: DateRangeMetadata
+}
+
+export interface ScadaClearanceIntervalAppliedFilters {
+  sourceSheet: string | null
+  alarmType: string | null
+  interventionLevel: string | null
+  section: string | null
+  locationRaw: string | null
+}
+
+export interface ScadaClearanceIntervalResponse {
+  totalMatchedOccurrences: number
+  eligibleOccurrences: number
+  excludedOccurrences: number
+  eligibilityPercent: number | null
+  medianMinutes: number | null
+  p90Minutes: number | null
+  appliedFilters: ScadaClearanceIntervalAppliedFilters
   metadata: DateRangeMetadata
 }
 
@@ -135,6 +179,12 @@ export interface AssetOverviewQuery {
   top?: number
 }
 
+export interface AssetMaintenanceActivityParetoQuery {
+  dateFrom?: string
+  dateTo?: string
+  top?: number
+}
+
 export interface WorkOrderAnalyticsQuery {
   dateFrom?: string
   dateTo?: string
@@ -158,3 +208,11 @@ export interface ScadaAnalyticsQuery {
   locationRaw?: string
   grain?: TimeGrain
 }
+
+export interface HistoricalMaintenanceActivityQuery {
+  dateFrom?: string
+  dateTo?: string
+  discipline?: string
+}
+
+export type ScadaClearanceIntervalQuery = Omit<ScadaAnalyticsQuery, 'grain'>
