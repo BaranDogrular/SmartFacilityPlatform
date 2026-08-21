@@ -1,0 +1,55 @@
+{
+  "problem": "next-complete-week-historical-work-order-record-volume",
+  "sourceDataset": "analytics.HistoricalWorkOrders",
+  "extractionVersion": "historical-weekly-volume/v1",
+  "eventTimeColumn": "ReportedDateTime",
+  "timezoneAssumption": "ReportedDateTime is treated as source-local wall-clock time; no timezone conversion is applied.",
+  "firstCompleteWeekStart": "2022-05-23",
+  "lastCompleteWeekStart": "2026-07-27",
+  "extractionCutoffExclusive": "2026-08-03T00:00:00",
+  "expected": {
+    "totalSourceRows": 167143,
+    "includedSourceRows": 167142,
+    "weeklyBuckets": 219,
+    "zeroWeeks": 2
+  },
+  "features": [
+    "lag_1",
+    "lag_2",
+    "lag_4",
+    "lag_13",
+    "lag_52",
+    "rolling_mean_4",
+    "rolling_median_4",
+    "rolling_std_4",
+    "rolling_mean_13",
+    "rolling_median_13",
+    "rolling_std_13",
+    "rolling_mean_26",
+    "rolling_median_26",
+    "rolling_std_26",
+    "iso_year",
+    "iso_week",
+    "iso_week_sin",
+    "iso_week_cos"
+  ],
+  "splits": {
+    "train": {
+      "start": "2022-05-23",
+      "endInclusive": "2024-12-29"
+    },
+    "validation": {
+      "start": "2024-12-30",
+      "endInclusive": "2025-06-29"
+    },
+    "test": {
+      "start": "2025-06-30",
+      "endInclusive": "2026-08-02"
+    }
+  },
+  "baselines": [
+    "previous_week_naive",
+    "moving_average_4",
+    "seasonal_naive_52"
+  ]
+}

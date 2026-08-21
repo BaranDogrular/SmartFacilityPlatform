@@ -1,0 +1,20 @@
+﻿{
+    "sourceDataset":  "analytics.HistoricalWorkOrders",
+    "extractionVersion":  "historical-weekly-volume/v1",
+    "queryVersion":  "historical-weekly-volume/v1",
+    "querySha256":  "218d367bc732121310585bd89a2a80b1d956227d249a39ae77d670065bcb4567",
+    "extractionCutoffExclusive":  "2026-08-03T00:00:00",
+    "sourceEventDateTimeMin":  "2022-05-18T00:00:00",
+    "sourceEventDateTimeMax":  "2026-08-02T00:00:00",
+    "firstCompleteWeekStart":  "2022-05-23",
+    "lastCompleteWeekEndInclusive":  "2026-08-02",
+    "weeklyBucketCount":  219,
+    "sourceRowCount":  167142,
+    "totalSourceRowCount":  167143,
+    "zeroWeekCount":  2,
+    "generatedAt":  "2026-08-21T10:36:39Z",
+    "generatedAtUtc":  "2026-08-21T10:36:39Z",
+    "timezoneAssumption":  "ReportedDateTime is treated as source-local wall-clock time; no timezone conversion is applied.",
+    "weeklyDataSha256":  "d85809efe4164ed3aff665539af314d513d3ea80a2212a798c1d8a0f0c1688fc",
+    "featureDataSha256":  "723b314c829cf29c15f5adbbeb50d66224ac7a7f9f4b20418ec8ba5fc715b11f"
+}

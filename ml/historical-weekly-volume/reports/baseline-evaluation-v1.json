@@ -1,0 +1,573 @@
+﻿{
+    "reportVersion":  "historical-weekly-volume-baselines/v1",
+    "generatedAtUtc":  "2026-08-21T10:36:39Z",
+    "datasetManifest":  {
+                            "sourceDataset":  "analytics.HistoricalWorkOrders",
+                            "extractionVersion":  "historical-weekly-volume/v1",
+                            "queryVersion":  "historical-weekly-volume/v1",
+                            "querySha256":  "218d367bc732121310585bd89a2a80b1d956227d249a39ae77d670065bcb4567",
+                            "extractionCutoffExclusive":  "2026-08-03T00:00:00",
+                            "sourceEventDateTimeMin":  "2022-05-18T00:00:00",
+                            "sourceEventDateTimeMax":  "2026-08-02T00:00:00",
+                            "firstCompleteWeekStart":  "2022-05-23",
+                            "lastCompleteWeekEndInclusive":  "2026-08-02",
+                            "weeklyBucketCount":  219,
+                            "sourceRowCount":  167142,
+                            "totalSourceRowCount":  167143,
+                            "zeroWeekCount":  2,
+                            "generatedAt":  "2026-08-21T10:36:39Z",
+                            "generatedAtUtc":  "2026-08-21T10:36:39Z",
+                            "timezoneAssumption":  "ReportedDateTime is treated as source-local wall-clock time; no timezone conversion is applied.",
+                            "weeklyDataSha256":  "d85809efe4164ed3aff665539af314d513d3ea80a2212a798c1d8a0f0c1688fc",
+                            "featureDataSha256":  "723b314c829cf29c15f5adbbeb50d66224ac7a7f9f4b20418ec8ba5fc715b11f"
+                        },
+    "featureDataset":  {
+                           "supervisedRowCount":  167,
+                           "warmupWeeks":  52,
+                           "features":  [
+                                            "lag_1",
+                                            "lag_2",
+                                            "lag_4",
+                                            "lag_13",
+                                            "lag_52",
+                                            "rolling_mean_4",
+                                            "rolling_median_4",
+                                            "rolling_std_4",
+                                            "rolling_mean_13",
+                                            "rolling_median_13",
+                                            "rolling_std_13",
+                                            "rolling_mean_26",
+                                            "rolling_median_26",
+                                            "rolling_std_26",
+                                            "iso_year",
+                                            "iso_week",
+                                            "iso_week_sin",
+                                            "iso_week_cos"
+                                        ]
+                       },
+    "temporalSplits":  [
+                           {
+                               "split":  "train",
+                               "calendar_bucket_count":  136,
+                               "evaluable_supervised_row_count":  84,
+                               "target":  {
+                                              "mean":  560.48809523809518,
+                                              "std":  289.17195843185783,
+                                              "min":  124,
+                                              "max":  1432
+                                          }
+                           },
+                           {
+                               "split":  "validation",
+                               "calendar_bucket_count":  26,
+                               "evaluable_supervised_row_count":  26,
+                               "target":  {
+                                              "mean":  1172.8461538461538,
+                                              "std":  216.49160580635774,
+                                              "min":  706,
+                                              "max":  1502
+                                          }
+                           },
+                           {
+                               "split":  "test",
+                               "calendar_bucket_count":  57,
+                               "evaluable_supervised_row_count":  57,
+                               "target":  {
+                                              "mean":  1036.3333333333333,
+                                              "std":  179.66658936300126,
+                                              "min":  586,
+                                              "max":  1434
+                                          }
+                           }
+                       ],
+    "baselineSelectedUsingValidationOnly":  "moving_average_4",
+    "validation":  [
+                       {
+                           "baseline":  "previous_week_naive",
+                           "prediction_property":  "lag_1",
+                           "metrics":  {
+                                           "row_count":  26,
+                                           "mae":  154.69230769230768,
+                                           "wape_percent":  13.189479897684791,
+                                           "rmse":  199.16711189736739,
+                                           "mean_signed_error":  7,
+                                           "median_absolute_error":  115.5
+                                       },
+                           "worst_weeks":  [
+                                               {
+                                                   "week":  "2025-04-07",
+                                                   "actual":  1209,
+                                                   "prediction":  706,
+                                                   "absolute_error":  503
+                                               },
+                                               {
+                                                   "week":  "2025-03-31",
+                                                   "actual":  706,
+                                                   "prediction":  1094,
+                                                   "absolute_error":  388
+                                               },
+                                               {
+                                                   "week":  "2025-03-24",
+                                                   "actual":  1094,
+                                                   "prediction":  1418,
+                                                   "absolute_error":  324
+                                               },
+                                               {
+                                                   "week":  "2025-01-06",
+                                                   "actual":  1482,
+                                                   "prediction":  1172,
+                                                   "absolute_error":  310
+                                               },
+                                               {
+                                                   "week":  "2025-06-02",
+                                                   "actual":  769,
+                                                   "prediction":  1076,
+                                                   "absolute_error":  307
+                                               },
+                                               {
+                                                   "week":  "2025-02-10",
+                                                   "actual":  1229,
+                                                   "prediction":  1502,
+                                                   "absolute_error":  273
+                                               },
+                                               {
+                                                   "week":  "2025-04-21",
+                                                   "actual":  893,
+                                                   "prediction":  1101,
+                                                   "absolute_error":  208
+                                               },
+                                               {
+                                                   "week":  "2025-02-03",
+                                                   "actual":  1502,
+                                                   "prediction":  1304,
+                                                   "absolute_error":  198
+                                               },
+                                               {
+                                                   "week":  "2025-06-23",
+                                                   "actual":  1141,
+                                                   "prediction":  979,
+                                                   "absolute_error":  162
+                                               },
+                                               {
+                                                   "week":  "2025-05-05",
+                                                   "actual":  1161,
+                                                   "prediction":  1008,
+                                                   "absolute_error":  153
+                                               }
+                                           ]
+                       },
+                       {
+                           "baseline":  "moving_average_4",
+                           "prediction_property":  "rolling_mean_4",
+                           "metrics":  {
+                                           "row_count":  26,
+                                           "mae":  118.47115384615384,
+                                           "wape_percent":  10.101167442775628,
+                                           "rmse":  176.13734124474919,
+                                           "mean_signed_error":  34.16346153846154,
+                                           "median_absolute_error":  72.875
+                                       },
+                           "worst_weeks":  [
+                                               {
+                                                   "week":  "2025-03-31",
+                                                   "actual":  706,
+                                                   "prediction":  1312.5,
+                                                   "absolute_error":  606.5
+                                               },
+                                               {
+                                                   "week":  "2025-06-02",
+                                                   "actual":  769,
+                                                   "prediction":  1111.75,
+                                                   "absolute_error":  342.75
+                                               },
+                                               {
+                                                   "week":  "2025-03-24",
+                                                   "actual":  1094,
+                                                   "prediction":  1385.25,
+                                                   "absolute_error":  291.25
+                                               },
+                                               {
+                                                   "week":  "2025-06-23",
+                                                   "actual":  1141,
+                                                   "prediction":  921.75,
+                                                   "absolute_error":  219.25
+                                               },
+                                               {
+                                                   "week":  "2024-12-30",
+                                                   "actual":  1172,
+                                                   "prediction":  1345.75,
+                                                   "absolute_error":  173.75
+                                               },
+                                               {
+                                                   "week":  "2025-01-06",
+                                                   "actual":  1482,
+                                                   "prediction":  1315,
+                                                   "absolute_error":  167
+                                               },
+                                               {
+                                                   "week":  "2025-02-10",
+                                                   "actual":  1229,
+                                                   "prediction":  1381,
+                                                   "absolute_error":  152
+                                               },
+                                               {
+                                                   "week":  "2025-06-09",
+                                                   "actual":  863,
+                                                   "prediction":  1013.75,
+                                                   "absolute_error":  150.75
+                                               },
+                                               {
+                                                   "week":  "2025-04-21",
+                                                   "actual":  893,
+                                                   "prediction":  1027.5,
+                                                   "absolute_error":  134.5
+                                               },
+                                               {
+                                                   "week":  "2025-02-03",
+                                                   "actual":  1502,
+                                                   "prediction":  1376,
+                                                   "absolute_error":  126
+                                               }
+                                           ]
+                       },
+                       {
+                           "baseline":  "seasonal_naive_52",
+                           "prediction_property":  "lag_52",
+                           "metrics":  {
+                                           "row_count":  26,
+                                           "mae":  794.69230769230774,
+                                           "wape_percent":  67.757591657375215,
+                                           "rmse":  820.8390172912666,
+                                           "mean_signed_error":  -794.69230769230774,
+                                           "median_absolute_error":  761.5
+                                       },
+                           "worst_weeks":  [
+                                               {
+                                                   "week":  "2025-01-06",
+                                                   "actual":  1482,
+                                                   "prediction":  394,
+                                                   "absolute_error":  1088
+                                               },
+                                               {
+                                                   "week":  "2025-04-07",
+                                                   "actual":  1209,
+                                                   "prediction":  124,
+                                                   "absolute_error":  1085
+                                               },
+                                               {
+                                                   "week":  "2025-02-24",
+                                                   "actual":  1385,
+                                                   "prediction":  328,
+                                                   "absolute_error":  1057
+                                               },
+                                               {
+                                                   "week":  "2025-02-03",
+                                                   "actual":  1502,
+                                                   "prediction":  458,
+                                                   "absolute_error":  1044
+                                               },
+                                               {
+                                                   "week":  "2025-03-03",
+                                                   "actual":  1388,
+                                                   "prediction":  382,
+                                                   "absolute_error":  1006
+                                               },
+                                               {
+                                                   "week":  "2025-02-17",
+                                                   "actual":  1336,
+                                                   "prediction":  336,
+                                                   "absolute_error":  1000
+                                               },
+                                               {
+                                                   "week":  "2025-03-17",
+                                                   "actual":  1418,
+                                                   "prediction":  433,
+                                                   "absolute_error":  985
+                                               },
+                                               {
+                                                   "week":  "2025-03-10",
+                                                   "actual":  1350,
+                                                   "prediction":  379,
+                                                   "absolute_error":  971
+                                               },
+                                               {
+                                                   "week":  "2025-01-13",
+                                                   "actual":  1431,
+                                                   "prediction":  475,
+                                                   "absolute_error":  956
+                                               },
+                                               {
+                                                   "week":  "2025-01-27",
+                                                   "actual":  1304,
+                                                   "prediction":  401,
+                                                   "absolute_error":  903
+                                               }
+                                           ]
+                       }
+                   ],
+    "test":  [
+                 {
+                     "baseline":  "previous_week_naive",
+                     "prediction_property":  "lag_1",
+                     "metrics":  {
+                                     "row_count":  57,
+                                     "mae":  164.75438596491227,
+                                     "wape_percent":  15.89781788017809,
+                                     "rmse":  209.94757073169566,
+                                     "mean_signed_error":  2.263157894736842,
+                                     "median_absolute_error":  141
+                                 },
+                     "worst_weeks":  [
+                                         {
+                                             "week":  "2026-06-01",
+                                             "actual":  1228,
+                                             "prediction":  586,
+                                             "absolute_error":  642
+                                         },
+                                         {
+                                             "week":  "2026-05-25",
+                                             "actual":  586,
+                                             "prediction":  1045,
+                                             "absolute_error":  459
+                                         },
+                                         {
+                                             "week":  "2026-03-02",
+                                             "actual":  1426,
+                                             "prediction":  975,
+                                             "absolute_error":  451
+                                         },
+                                         {
+                                             "week":  "2026-01-05",
+                                             "actual":  1224,
+                                             "prediction":  819,
+                                             "absolute_error":  405
+                                         },
+                                         {
+                                             "week":  "2026-03-16",
+                                             "actual":  893,
+                                             "prediction":  1269,
+                                             "absolute_error":  376
+                                         },
+                                         {
+                                             "week":  "2026-07-13",
+                                             "actual":  938,
+                                             "prediction":  1310,
+                                             "absolute_error":  372
+                                         },
+                                         {
+                                             "week":  "2026-05-04",
+                                             "actual":  1374,
+                                             "prediction":  1041,
+                                             "absolute_error":  333
+                                         },
+                                         {
+                                             "week":  "2026-02-09",
+                                             "actual":  921,
+                                             "prediction":  1213,
+                                             "absolute_error":  292
+                                         },
+                                         {
+                                             "week":  "2026-03-23",
+                                             "actual":  1152,
+                                             "prediction":  893,
+                                             "absolute_error":  259
+                                         },
+                                         {
+                                             "week":  "2026-07-20",
+                                             "actual":  1186,
+                                             "prediction":  938,
+                                             "absolute_error":  248
+                                         }
+                                     ]
+                 },
+                 {
+                     "baseline":  "moving_average_4",
+                     "prediction_property":  "rolling_mean_4",
+                     "metrics":  {
+                                     "row_count":  57,
+                                     "mae":  120.96491228070175,
+                                     "wape_percent":  11.672394237443077,
+                                     "rmse":  163.47596260881045,
+                                     "mean_signed_error":  -3.4912280701754388,
+                                     "median_absolute_error":  96.75
+                                 },
+                     "worst_weeks":  [
+                                         {
+                                             "week":  "2026-05-25",
+                                             "actual":  586,
+                                             "prediction":  1184,
+                                             "absolute_error":  598
+                                         },
+                                         {
+                                             "week":  "2026-03-02",
+                                             "actual":  1426,
+                                             "prediction":  1052.75,
+                                             "absolute_error":  373.25
+                                         },
+                                         {
+                                             "week":  "2026-04-13",
+                                             "actual":  1434,
+                                             "prediction":  1114.25,
+                                             "absolute_error":  319.75
+                                         },
+                                         {
+                                             "week":  "2026-03-16",
+                                             "actual":  893,
+                                             "prediction":  1193,
+                                             "absolute_error":  300
+                                         },
+                                         {
+                                             "week":  "2026-06-08",
+                                             "actual":  1332,
+                                             "prediction":  1033.75,
+                                             "absolute_error":  298.25
+                                         },
+                                         {
+                                             "week":  "2025-08-25",
+                                             "actual":  642,
+                                             "prediction":  912.75,
+                                             "absolute_error":  270.75
+                                         },
+                                         {
+                                             "week":  "2026-01-05",
+                                             "actual":  1224,
+                                             "prediction":  975,
+                                             "absolute_error":  249
+                                         },
+                                         {
+                                             "week":  "2026-07-13",
+                                             "actual":  938,
+                                             "prediction":  1182.25,
+                                             "absolute_error":  244.25
+                                         },
+                                         {
+                                             "week":  "2026-04-27",
+                                             "actual":  1041,
+                                             "prediction":  1272.75,
+                                             "absolute_error":  231.75
+                                         },
+                                         {
+                                             "week":  "2026-06-15",
+                                             "actual":  1272,
+                                             "prediction":  1047.75,
+                                             "absolute_error":  224.25
+                                         }
+                                     ]
+                 },
+                 {
+                     "baseline":  "seasonal_naive_52",
+                     "prediction_property":  "lag_52",
+                     "metrics":  {
+                                     "row_count":  57,
+                                     "mae":  289.19298245614033,
+                                     "wape_percent":  27.90540197389582,
+                                     "rmse":  341.09719765136452,
+                                     "mean_signed_error":  -46.877192982456137,
+                                     "median_absolute_error":  289
+                                 },
+                     "worst_weeks":  [
+                                         {
+                                             "week":  "2025-07-07",
+                                             "actual":  1093,
+                                             "prediction":  370,
+                                             "absolute_error":  723
+                                         },
+                                         {
+                                             "week":  "2025-07-28",
+                                             "actual":  995,
+                                             "prediction":  335,
+                                             "absolute_error":  660
+                                         },
+                                         {
+                                             "week":  "2025-07-14",
+                                             "actual":  913,
+                                             "prediction":  283,
+                                             "absolute_error":  630
+                                         },
+                                         {
+                                             "week":  "2025-06-30",
+                                             "actual":  967,
+                                             "prediction":  375,
+                                             "absolute_error":  592
+                                         },
+                                         {
+                                             "week":  "2025-07-21",
+                                             "actual":  948,
+                                             "prediction":  393,
+                                             "absolute_error":  555
+                                         },
+                                         {
+                                             "week":  "2026-03-16",
+                                             "actual":  893,
+                                             "prediction":  1418,
+                                             "absolute_error":  525
+                                         },
+                                         {
+                                             "week":  "2026-03-30",
+                                             "actual":  1204,
+                                             "prediction":  706,
+                                             "absolute_error":  498
+                                         },
+                                         {
+                                             "week":  "2026-05-25",
+                                             "actual":  586,
+                                             "prediction":  1076,
+                                             "absolute_error":  490
+                                         },
+                                         {
+                                             "week":  "2025-08-11",
+                                             "actual":  964,
+                                             "prediction":  487,
+                                             "absolute_error":  477
+                                         },
+                                         {
+                                             "week":  "2026-06-08",
+                                             "actual":  1332,
+                                             "prediction":  863,
+                                             "absolute_error":  469
+                                         }
+                                     ]
+                 }
+             ],
+    "expandingWindowCheck":  [
+                                 {
+                                     "baseline":  "previous_week_naive",
+                                     "max_absolute_prediction_difference":  0
+                                 },
+                                 {
+                                     "baseline":  "moving_average_4",
+                                     "max_absolute_prediction_difference":  0
+                                 },
+                                 {
+                                     "baseline":  "seasonal_naive_52",
+                                     "max_absolute_prediction_difference":  0
+                                 }
+                             ],
+    "driftAndError":  {
+                          "trainTargetMean":  560.48809523809518,
+                          "validationTargetMean":  1172.8461538461538,
+                          "testTargetMean":  1036.3333333333333,
+                          "validationVsTrainTargetMeanPercent":  109.25442731266739,
+                          "testVsValidationTargetMeanPercent":  -11.639448197459611,
+                          "validationZeroTargetCount":  0,
+                          "testZeroTargetCount":  0,
+                          "zeroWeeksInFullCalendarSeries":  2,
+                          "metricDeltas":  [
+                                               {
+                                                   "baseline":  "previous_week_naive",
+                                                   "test_minus_validation_mae":  10.062078272604595,
+                                                   "test_minus_validation_wape_points":  2.7083379824932994
+                                               },
+                                               {
+                                                   "baseline":  "moving_average_4",
+                                                   "test_minus_validation_mae":  2.4937584345479138,
+                                                   "test_minus_validation_wape_points":  1.5712267946674494
+                                               },
+                                               {
+                                                   "baseline":  "seasonal_naive_52",
+                                                   "test_minus_validation_mae":  -505.49932523616741,
+                                                   "test_minus_validation_wape_points":  -39.852189683479395
+                                               }
+                                           ]
+                      }
+}

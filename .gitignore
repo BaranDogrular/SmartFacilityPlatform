@@ -37,3 +37,6 @@ Thumbs.db
 # Test and coverage output
 coverage/
 TestResults/
+
+# Offline ML generated datasets (reproducible from read-only extraction)
+ml/**/artifacts/generated/
