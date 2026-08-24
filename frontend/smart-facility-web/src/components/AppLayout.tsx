@@ -44,8 +44,8 @@ export function AppLayout() {
           ))}
         </nav>
         <div className="sidebar-footer">
-          <span className="status-dot" aria-hidden="true" />
-          Sistem bağlantısı aktif
+          <span className="sidebar-footer__accent" aria-hidden="true" />
+          Teknik operasyon platformu
         </div>
       </aside>
 
@@ -72,7 +72,7 @@ export function AppLayout() {
             <span />
           </button>
           <div className="topbar__title">
-            <span className="topbar__context">Gürsan Teknik Hizmetler</span>
+            <span className="topbar__context">Gürsan Teknik Hizmetler A.Ş.</span>
             <strong>{titles[location.pathname] ?? 'Analytics'}</strong>
           </div>
           <div className="topbar__status">

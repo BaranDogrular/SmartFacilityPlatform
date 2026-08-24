@@ -321,6 +321,11 @@ test('API client returns typed response data and converts validation errors', as
 
 test('general dashboard renders production-contract KPI values without unsupported terminology', () => {
   const html = renderPage(OverviewPage)
+  assert.match(html, /Bakım ve Güvenilirlik Operasyon Özeti/)
+  assert.match(html, /Operasyon Özeti/)
+  assert.match(html, /Bakım Aktivitesi Yoğunluğu/)
+  assert.match(html, /Mevcut İş Emri Disiplinleri/)
+  assert.match(html, /İkincil Operasyon Durumu/)
   assert.match(html, /5\.404/)
   assert.match(html, /54\.823/)
   assert.match(html, /1\.950/)

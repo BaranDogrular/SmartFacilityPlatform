@@ -55,7 +55,15 @@ export function ChartPanel({ title, subtitle, reliability, children }: ChartPane
 
 const palette = ['#176b73', '#237f7a', '#315c78', '#607686', '#8a6b36', '#456f68']
 
-export function HorizontalBarChart({ data, maxItems = 12 }: { data: ChartDatum[]; maxItems?: number }) {
+export function HorizontalBarChart({
+  data,
+  maxItems = 12,
+  compact = false,
+}: {
+  data: ChartDatum[]
+  maxItems?: number
+  compact?: boolean
+}) {
   if (data.length === 0) {
     return <EmptyState />
   }
@@ -93,7 +101,7 @@ export function HorizontalBarChart({ data, maxItems = 12 }: { data: ChartDatum[]
     <>
       <div
         className="chart-canvas"
-        style={{ height: `${Math.max(230, visible.length * 30)}px` }}
+        style={{ height: `${Math.max(compact ? 180 : 230, visible.length * (compact ? 27 : 30))}px` }}
         role="img"
         aria-label={`${visible.length} kategorili yatay çubuk grafik`}
       >

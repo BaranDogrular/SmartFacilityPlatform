@@ -35,7 +35,7 @@ export function ScadaClearanceInterval({ query }: { query: ScadaClearanceInterva
         <EmptyState message="Seçilen filtrelerle clearance aralığı hesaplanabilecek occurrence bulunamadı." />
       ) : (
         <>
-          <section className="kpi-grid kpi-grid--quality" aria-label="SCADA clearance interval göstergeleri">
+          <section className="kpi-grid kpi-grid--quality kpi-grid--clearance" aria-label="SCADA clearance interval göstergeleri">
             <KpiCard
               label="Median Clearance"
               value={data.medianMinutes === null ? 'Hesaplanamadı' : `${formatDecimal(data.medianMinutes)} dk`}
