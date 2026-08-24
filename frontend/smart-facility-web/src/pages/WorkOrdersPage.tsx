@@ -62,11 +62,12 @@ export function WorkOrdersPage() {
     <div className="page-stack">
       <PageHeader
         eyebrow="Operasyonel iş yükü"
-        title="Güncel iş emri görünümü"
-        description="Disiplin, iş tipi, durum ve kategori dağılımları ile aylık hareket."
+        title="Mevcut İş Emirleri"
+        description="Current WorkOrder kaynağındaki disiplin, iş tipi, durum ve kategori dağılımları ile aylık hareket."
         actions={<DataTimestamp value={data.metadata.dataAsOf} />}
       />
 
+      <section className="dataset-section dataset-section--current" aria-label="Mevcut iş emri veri seti">
       <form className="filter-panel" onSubmit={applyFilters} aria-label="İş emri filtreleri">
         <div className="filter-grid">
           <label>
@@ -112,7 +113,7 @@ export function WorkOrdersPage() {
         </div>
         {filterError ? <p className="filter-error" role="alert">{filterError}</p> : null}
         <div className="filter-actions">
-          <button className="btn btn-primary" type="submit">Filtreleri uygula</button>
+          <button className="btn btn-primary" type="submit">Uygula</button>
           <button className="btn btn-outline-secondary" type="button" onClick={resetFilters}>Temizle</button>
         </div>
       </form>
@@ -153,6 +154,7 @@ export function WorkOrdersPage() {
       )}
 
       <InfoNote>Bu görünüm yalnız güncel WorkOrder veri kaynağını içerir; geçmiş analitik kayıtlar bu toplamlara dahil değildir.</InfoNote>
+      </section>
 
       <HistoricalMaintenanceActivity />
     </div>

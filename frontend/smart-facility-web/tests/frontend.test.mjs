@@ -383,7 +383,7 @@ test('work-order filters and reset control are present with exact raw options', 
   assert.match(html, /value="İŞ TESLİM EDİLDİ"/)
   assert.match(html, />Temizle</)
   assert.match(html, /yalnız güncel WorkOrder veri kaynağını içerir/)
-  assert.match(html, /Historical İş Emri Aktivitesi/)
+  assert.match(html, /Geçmiş İş Emri Aktivitesi/)
   assert.match(html, /name="historicalDateFrom"/)
   assert.match(html, /name="historicalDateTo"/)
   assert.match(html, /name="historicalDiscipline"/)
@@ -407,7 +407,7 @@ test('historical activity keeps filters visible and renders an empty state witho
     },
   })
 
-  assert.match(html, /Historical İş Emri Aktivitesi/)
+  assert.match(html, /Geçmiş İş Emri Aktivitesi/)
   assert.match(html, /Seçilen historical filtrelerle eşleşen kayıt bulunamadı/)
   assert.match(html, />Temizle</)
   assert.doesNotMatch(html, /Historical.*54\.823/s)

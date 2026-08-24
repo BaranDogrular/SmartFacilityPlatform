@@ -53,7 +53,7 @@ export function ChartPanel({ title, subtitle, reliability, children }: ChartPane
   )
 }
 
-const palette = ['#155e75', '#0f766e', '#2563eb', '#64748b', '#d97706', '#7c3aed']
+const palette = ['#176b73', '#237f7a', '#315c78', '#607686', '#8a6b36', '#456f68']
 
 export function HorizontalBarChart({ data, maxItems = 12 }: { data: ChartDatum[]; maxItems?: number }) {
   if (data.length === 0) {
@@ -77,12 +77,14 @@ export function HorizontalBarChart({ data, maxItems = 12 }: { data: ChartDatum[]
     scales: {
       x: {
         beginAtZero: true,
-        grid: { color: '#e8edf3' },
-        ticks: { callback: (value) => formatCount(Number(value)) },
+        border: { display: false },
+        grid: { color: '#e7ecef' },
+        ticks: { color: '#677684', font: { size: 10 }, callback: (value) => formatCount(Number(value)) },
       },
       y: {
+        border: { display: false },
         grid: { display: false },
-        ticks: { autoSkip: false },
+        ticks: { autoSkip: false, color: '#445563', font: { size: 10, weight: 600 } },
       },
     },
   }
@@ -91,7 +93,7 @@ export function HorizontalBarChart({ data, maxItems = 12 }: { data: ChartDatum[]
     <>
       <div
         className="chart-canvas"
-        style={{ height: `${Math.max(260, visible.length * 34)}px` }}
+        style={{ height: `${Math.max(230, visible.length * 30)}px` }}
         role="img"
         aria-label={`${visible.length} kategorili yatay çubuk grafik`}
       >
@@ -103,8 +105,9 @@ export function HorizontalBarChart({ data, maxItems = 12 }: { data: ChartDatum[]
               {
                 data: visible.map((item) => item.count),
                 backgroundColor: visible.map((_, index) => palette[index % palette.length]),
-                borderRadius: 5,
+                borderRadius: 3,
                 borderSkipped: false,
+                maxBarThickness: 20,
               },
             ],
           }}
@@ -140,11 +143,16 @@ export function TrendLineChart({ points }: { points: TrendPoint[] }) {
       },
     },
     scales: {
-      x: { grid: { display: false } },
+      x: {
+        border: { display: false },
+        grid: { display: false },
+        ticks: { color: '#677684', font: { size: 10 } },
+      },
       y: {
         beginAtZero: true,
-        grid: { color: '#e8edf3' },
-        ticks: { callback: (value) => formatCount(Number(value)) },
+        border: { display: false },
+        grid: { color: '#e7ecef' },
+        ticks: { color: '#677684', font: { size: 10 }, callback: (value) => formatCount(Number(value)) },
       },
     },
   }
@@ -158,11 +166,11 @@ export function TrendLineChart({ points }: { points: TrendPoint[] }) {
           datasets: [
             {
               data: points.map((point) => point.count),
-              borderColor: '#155e75',
-              backgroundColor: 'rgba(21, 94, 117, 0.12)',
-              pointBackgroundColor: '#155e75',
-              pointRadius: 3,
-              pointHoverRadius: 5,
+              borderColor: '#176b73',
+              backgroundColor: 'rgba(23, 107, 115, 0.09)',
+              pointBackgroundColor: '#176b73',
+              pointRadius: 2,
+              pointHoverRadius: 4,
               borderWidth: 2,
               tension: 0.25,
               fill: true,

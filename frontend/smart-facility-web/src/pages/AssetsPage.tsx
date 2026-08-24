@@ -24,8 +24,8 @@ export function AssetsPage() {
     <div className="page-stack">
       <PageHeader
         eyebrow="Varlık portföyü"
-        title="Varlık görünümü"
-        description="Operasyonel envanter dağılımı ve güncel iş emri ilişkisi."
+        title="Varlık portföyü"
+        description="Operasyonel envanter dağılımı ve mevcut iş emri aktivitesi."
         actions={<DataTimestamp value={data.metadata.dataAsOf} />}
       />
 

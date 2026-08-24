@@ -39,11 +39,11 @@ export function OverviewPage() {
     importQuality.data.importErrorCount
 
   return (
-    <div className="page-stack">
+    <div className="page-stack page-stack--overview">
       <PageHeader
         eyebrow="Operasyon özeti"
-        title="Tesis performansına tek bakış"
-        description="Varlık, güncel iş emri, SCADA alarm kaydı ve import denetim metrikleri production analytics API üzerinden gösterilir."
+        title="Teknik operasyon özeti"
+        description="Varlık, mevcut iş emri, SCADA alarm kaydı ve import denetim göstergelerinin bütüncül görünümü."
         actions={<DataTimestamp value={assets.data.metadata.dataAsOf} />}
       />
 

@@ -21,7 +21,7 @@ export function ScadaClearanceInterval({ query }: { query: ScadaClearanceInterva
   const data = clearanceQuery.data
 
   return (
-    <section className="analytics-section" aria-labelledby="scada-clearance-title">
+    <section className="analytics-section analytics-section--scada" aria-labelledby="scada-clearance-title">
       <header className="analytics-section__header">
         <div>
           <p className="page-eyebrow">Quality-eligible occurrence metriği</p>

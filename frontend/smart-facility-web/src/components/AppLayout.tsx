@@ -25,11 +25,9 @@ export function AppLayout() {
     <div className="app-shell">
       <aside className={`sidebar${sidebarOpen ? ' sidebar--open' : ''}`} aria-label="Ana navigasyon">
         <div className="brand">
-          <span className="brand__mark" aria-hidden="true">SF</span>
-          <div>
-            <strong>Smart Facility</strong>
-            <span>Karar Destek Platformu</span>
-          </div>
+          <strong className="brand__name">GÜRSAN</strong>
+          <span className="brand__company">TEKNİK HİZMETLER A.Ş.</span>
+          <span className="brand__product">Bakım &amp; Güvenilirlik</span>
         </div>
         <nav className="sidebar-nav">
           {navigation.map((item) => (
@@ -47,7 +45,7 @@ export function AppLayout() {
         </nav>
         <div className="sidebar-footer">
           <span className="status-dot" aria-hidden="true" />
-          Production analytics API
+          Sistem bağlantısı aktif
         </div>
       </aside>
 
@@ -73,13 +71,13 @@ export function AppLayout() {
             <span />
             <span />
           </button>
-          <div>
-            <span className="topbar__context">Bakım ve güvenilirlik</span>
+          <div className="topbar__title">
+            <span className="topbar__context">Gürsan Teknik Hizmetler</span>
             <strong>{titles[location.pathname] ?? 'Analytics'}</strong>
           </div>
           <div className="topbar__status">
-            <span className="status-dot" aria-hidden="true" />
-            Canlı veri sözleşmesi
+            <span className="topbar__status-label">Teknik operasyon</span>
+            <strong>Karar destek görünümü</strong>
           </div>
         </header>
         <main className="main-content">

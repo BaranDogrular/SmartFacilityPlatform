@@ -21,8 +21,8 @@ export function DataQualityPage() {
   const statusCount = (status: string) => data.batchesByStatus.find((item) => item.category === status)?.count ?? 0
 
   return (
-    <div className="page-stack">
-      <PageHeader eyebrow="Ingestion denetimi" title="Veri kalitesi ve import geçmişi" description="Import batch, source lineage ve fingerprint kapsamının audit görünümü." actions={<DataTimestamp value={data.metadata.dataAsOf} />} />
+    <div className="page-stack page-stack--audit">
+      <PageHeader eyebrow="Import denetimi" title="Veri Kalitesi ve Import Geçmişi" description="Import batch, source lineage ve fingerprint kapsamının teknik denetim görünümü." actions={<DataTimestamp value={data.metadata.dataAsOf} />} />
 
       <section className="kpi-grid kpi-grid--quality" aria-label="Import kalite göstergeleri">
         <KpiCard label="Toplam Import Batch" value={data.totalBatches} reliability={data.metadata.reliability} />

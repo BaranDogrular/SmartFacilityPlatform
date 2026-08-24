@@ -61,8 +61,8 @@ export function ScadaPage() {
     <div className="page-stack">
       <PageHeader
         eyebrow="SCADA kaynak kayıtları"
-        title="Alarm kaydı görünümü"
-        description="Kaynak occurrence dağılımları ve güvenilir timestamp tabanlı aylık trend."
+        title="SCADA Operasyon Görünümü"
+        description="Kaynak occurrence dağılımları ve güvenilir timestamp tabanlı aylık eğilim."
         actions={<DataTimestamp value={data.metadata.dataAsOf} />}
       />
 
@@ -86,7 +86,7 @@ export function ScadaPage() {
         </div>
         {filterError ? <p className="filter-error" role="alert">{filterError}</p> : null}
         <div className="filter-actions">
-          <button className="btn btn-primary" type="submit">Filtreleri uygula</button>
+          <button className="btn btn-primary" type="submit">Uygula</button>
           <button className="btn btn-outline-secondary" type="button" onClick={resetFilters}>Temizle</button>
         </div>
       </form>

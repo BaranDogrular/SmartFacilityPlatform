@@ -35,11 +35,11 @@ export function HistoricalMaintenanceActivity() {
   const data = activityQuery.data
 
   return (
-    <section className="analytics-section" aria-labelledby="historical-activity-title">
+    <section className="analytics-section analytics-section--historical" aria-labelledby="historical-activity-title">
       <header className="analytics-section__header">
         <div>
           <p className="page-eyebrow">Ayrı historical dataset</p>
-          <h2 id="historical-activity-title">Historical İş Emri Aktivitesi</h2>
+          <h2 id="historical-activity-title">Geçmiş İş Emri Aktivitesi</h2>
           <p>Historical kayıt trendi ve raw Discipline dağılımı; current WorkOrder verisi dahil değildir.</p>
         </div>
         {data ? <ReliabilityBadge reliability={data.metadata.reliability} /> : null}
