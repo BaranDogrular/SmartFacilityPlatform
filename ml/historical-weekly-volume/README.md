@@ -10,10 +10,9 @@ It does not train a complex model, serve production inference, use current
 
 ## Runtime
 
-The repository host has Windows PowerShell 5.1 and the SQL Server
-`Invoke-Sqlcmd` command. The extraction/baseline stages use those existing
-dependencies. Python 3.12 is installed outside `PATH`; the final controlled
-comparison uses the project-local environment documented below.
+The extraction/baseline stages require Windows PowerShell and the SQL Server
+`Invoke-Sqlcmd` command. The final controlled comparison requires Python 3.12
+and uses the project-local environment documented below.
 
 ## Run
 
@@ -77,12 +76,14 @@ that controlled round. A model file is saved only if all artifact gates pass.
 
 ## Final controlled Python comparison
 
-Python 3.12 is installed outside `PATH`. The final bounded comparison uses a
-project-local, ignored `.venv` and versions its complete dependency set in
-`requirements-python.lock`:
+The final bounded comparison uses a project-local, ignored `.venv` and versions
+its complete dependency set in `requirements-python.lock`. If Python is not on
+`PATH`, set `SMARTFACILITY_PYTHON` to the local Python 3.12 executable without
+committing that machine-specific path:
 
 ```powershell
-& 'C:\Users\User\AppData\Local\Programs\Python\Python312\python.exe' -m venv .\ml\historical-weekly-volume\.venv
+$env:SMARTFACILITY_PYTHON = '<path to Python 3.12 executable>'
+& $env:SMARTFACILITY_PYTHON -m venv .\ml\historical-weekly-volume\.venv
 .\ml\historical-weekly-volume\.venv\Scripts\python.exe -m pip install -r .\ml\historical-weekly-volume\requirements-python.lock
 .\ml\historical-weekly-volume\.venv\Scripts\python.exe .\ml\historical-weekly-volume\python\train_models.py
 .\ml\historical-weekly-volume\.venv\Scripts\python.exe -m unittest discover -s .\ml\historical-weekly-volume\python\tests -v
