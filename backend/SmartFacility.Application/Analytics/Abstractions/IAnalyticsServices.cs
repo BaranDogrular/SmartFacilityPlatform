@@ -11,6 +11,10 @@ public interface IAssetAnalyticsService
     Task<AssetMaintenanceActivityParetoResponse> GetMaintenanceActivityParetoAsync(
         AssetMaintenanceActivityParetoQuery query,
         CancellationToken cancellationToken = default);
+
+    Task<InspectionPriorityResponse> GetInspectionPriorityAsync(
+        InspectionPriorityQuery query,
+        CancellationToken cancellationToken = default);
 }
 
 public interface IWorkOrderAnalyticsService

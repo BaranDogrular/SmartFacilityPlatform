@@ -83,6 +83,16 @@ React page/filter
 
 Analytics sorguları `AsNoTracking`, server-side filtering/grouping ve async cancellation kullanır. SCADA clearance percentile hesabı parameterized SQL Server sorgusunda yapılır. API DML veya import endpoint'i yayınlamaz.
 
+### Inspection Priority v1
+
+`GET /api/analytics/assets/inspection-priority`, canonical `core.WorkOrders` ve `core.Assets` üzerinde read-only çalışır. Default analysis date canonical dataset'in maksimum `ReportedDateTime` günüdür; `asOf` ile deterministik cutoff verilebilir. Future rows cutoff dışında kalır.
+
+Query, yalnız son 90 günlük veya source-state açık (`RawStatusCode=A`) linked WorkOrder kayıtlarını SQL tarafında `AssetId` bazında conditional aggregate eder. Sonuçta en fazla asset sayısı kadar aggregate materialize edilir; WorkOrder satırları memory'ye alınmaz ve asset başına query çalıştırılmaz. Metadata coverage hesabı cutoff'a kadar olan linked/unlinked canonical kayıtları ayrı gösterir.
+
+Bounded score component'leri: last30 `30/21`, pozitif activity delta `20/8`, open workload `25/4`, last90 recurrence `15/50`, last7 `10/7`. Her component kendi cap'inde doyar; toplam 0–100 aralığındadır. `HIGH >= 50`, `MEDIUM >= 25`, diğerleri `LOW` olur. Tie order: score, open count ve last30 descending; asset code ve asset id ascending.
+
+Bu sonuç ML, predictive maintenance, failure probability, risk probability veya asset health değildir. SCADA, legacy `HistoricalWorkOrders`, unmatched raw asset code, all-time recurrence, NLP, cost ve invented criticality V1 score'a dahil değildir.
+
 ## Reliability semantics
 
 - Green: İlgili record-count/trend veri sözleşmesi doğrulanmıştır; asset reliability değildir.
@@ -91,6 +101,7 @@ Analytics sorguları `AsNoTracking`, server-side filtering/grouping ve async can
 - Clearance interval: Quality-eligible source occurrence için `ClearedAt - ReceivedAt` dağılımıdır; MTTR/repair duration değildir.
 - SCADA occurrence: Source row'dur; benzersiz fiziksel alarm değildir.
 - WorkOrder activity: Canonical record activity/volume'dür; açık workload veya failure prediction değildir.
+- Inspection Priority: Yakın dönem WorkOrder aktivitesine dayalı açıklanabilir inceleme sırasıdır; failure probability veya asset health değildir.
 
 ## Frontend sınırı
 
@@ -99,6 +110,7 @@ React uygulamasının route'ları:
 - `/`
 - `/assets`
 - `/work-orders`
+- `/inspection-priority`
 - `/scada`
 - `/data-quality`
 

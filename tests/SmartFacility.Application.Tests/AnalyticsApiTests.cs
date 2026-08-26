@@ -19,6 +19,7 @@ public sealed class AnalyticsApiTests(AnalyticsApiFactory factory) :
     [InlineData("/api/analytics/import-quality/overview")]
     [InlineData("/api/analytics/assets/overview")]
     [InlineData("/api/analytics/assets/maintenance-activity-pareto")]
+    [InlineData("/api/analytics/assets/inspection-priority")]
     [InlineData("/api/analytics/work-orders/overview")]
     [InlineData("/api/analytics/work-orders/trend")]
     [InlineData("/api/analytics/work-orders/activity")]
@@ -39,6 +40,8 @@ public sealed class AnalyticsApiTests(AnalyticsApiFactory factory) :
     [InlineData("/api/analytics/assets/overview?top=101")]
     [InlineData("/api/analytics/assets/maintenance-activity-pareto?top=0")]
     [InlineData("/api/analytics/assets/maintenance-activity-pareto?top=101")]
+    [InlineData("/api/analytics/assets/inspection-priority?top=0")]
+    [InlineData("/api/analytics/assets/inspection-priority?top=101")]
     [InlineData("/api/analytics/assets/maintenance-activity-pareto?dateFrom=2026-02-01&dateTo=2026-01-01")]
     [InlineData("/api/analytics/work-orders/overview?dateFrom=2026-02-01&dateTo=2026-01-01")]
     [InlineData("/api/analytics/work-orders/activity?dateFrom=2026-02-01&dateTo=2026-01-01")]
@@ -102,6 +105,21 @@ public sealed class AnalyticsApiTests(AnalyticsApiFactory factory) :
     }
 
     [Fact]
+    public async Task Inspection_priority_contract_serializes_level_and_metadata()
+    {
+        using var response = await _client.GetAsync(
+            "/api/analytics/assets/inspection-priority?top=5&asOf=2026-08-25");
+        using var document = JsonDocument.Parse(await response.Content.ReadAsStreamAsync());
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal("2026-08-25", document.RootElement.GetProperty("metadata").GetProperty("asOf").GetString());
+        Assert.Equal(5, document.RootElement.GetProperty("metadata").GetProperty("appliedTop").GetInt32());
+        Assert.Equal(
+            "LOW",
+            document.RootElement.GetProperty("items")[0].GetProperty("priorityLevel").GetString());
+    }
+
+    [Fact]
     public async Task Swagger_document_contains_all_analytics_routes()
     {
         var swagger = await _client.GetStringAsync("/swagger/v1/swagger.json");
@@ -110,6 +128,10 @@ public sealed class AnalyticsApiTests(AnalyticsApiFactory factory) :
         Assert.Contains("/api/analytics/assets/overview", swagger, StringComparison.Ordinal);
         Assert.Contains(
             "/api/analytics/assets/maintenance-activity-pareto",
+            swagger,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "/api/analytics/assets/inspection-priority",
             swagger,
             StringComparison.Ordinal);
         Assert.Contains("/api/analytics/work-orders/overview", swagger, StringComparison.Ordinal);
@@ -191,6 +213,37 @@ internal sealed class FakeAnalyticsServices :
                 "core.WorkOrders + core.Assets",
                 "ReportedDateTime",
                 KpiReliability.Yellow)));
+
+    public Task<InspectionPriorityResponse> GetInspectionPriorityAsync(
+        InspectionPriorityQuery query,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult(new InspectionPriorityResponse(
+            new InspectionPriorityMetadataDto(
+                query.AsOf,
+                null,
+                0,
+                0,
+                0,
+                1,
+                query.Top ?? 10,
+                "core.WorkOrders + core.Assets",
+                "inspection-priority/v1",
+                []),
+            [
+                new InspectionPriorityItemDto(
+                    1,
+                    "A-1",
+                    "Asset",
+                    10,
+                    InspectionPriorityLevel.Low,
+                    0,
+                    1,
+                    0,
+                    1,
+                    0,
+                    1,
+                    ["Son 30 günde 1 iş emri"])
+            ]));
 
     public Task<WorkOrderOverviewResponse> GetOverviewAsync(
         WorkOrderAnalyticsQuery query,

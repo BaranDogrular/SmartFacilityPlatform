@@ -18,6 +18,12 @@ public sealed record AssetMaintenanceActivityParetoQuery
     public int? Top { get; init; }
 }
 
+public sealed record InspectionPriorityQuery
+{
+    public int? Top { get; init; }
+    public DateOnly? AsOf { get; init; }
+}
+
 public sealed record WorkOrderAnalyticsQuery
 {
     public DateOnly? DateFrom { get; init; }

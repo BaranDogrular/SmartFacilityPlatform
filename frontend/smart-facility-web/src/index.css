@@ -361,6 +361,10 @@ select:focus-visible {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
+.kpi-grid--five {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
 .kpi-grid--one {
   grid-template-columns: minmax(220px, 320px);
 }
@@ -845,6 +849,10 @@ select:focus-visible {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
+.filter-grid--inspection-priority {
+  grid-template-columns: repeat(2, minmax(180px, 280px));
+}
+
 .filter-grid label {
   display: grid;
   gap: 5px;
@@ -961,6 +969,122 @@ select:focus-visible {
 .pareto-table-wrap + .info-note,
 .analytics-section > .info-note {
   margin-top: 0;
+}
+
+.inspection-priority-panel {
+  display: grid;
+  gap: 12px;
+}
+
+.inspection-priority-panel__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.inspection-priority-panel__header h2 {
+  margin: 0;
+  color: var(--navy-900);
+  font-family: var(--font-heading);
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+
+.inspection-priority-panel__header p {
+  margin: 4px 0 0;
+  color: var(--slate-500);
+  font-size: 0.67rem;
+  line-height: 1.45;
+}
+
+.inspection-table-wrap {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  border: 1px solid #e1e7ea;
+  border-radius: 6px;
+  overscroll-behavior-inline: contain;
+}
+
+.inspection-priority-table {
+  min-width: 1180px;
+}
+
+.inspection-rank,
+.inspection-score {
+  color: var(--navy-900);
+  font-family: var(--font-heading);
+  font-weight: 700;
+}
+
+.inspection-asset {
+  min-width: 180px;
+}
+
+.inspection-asset strong,
+.inspection-asset span {
+  display: block;
+}
+
+.inspection-asset strong {
+  color: var(--navy-900);
+  font-size: 0.72rem;
+}
+
+.inspection-asset span {
+  max-width: 250px;
+  margin-top: 3px;
+  color: var(--slate-500);
+  font-size: 0.63rem;
+  line-height: 1.35;
+}
+
+.priority-badge {
+  display: inline-flex;
+  min-height: 23px;
+  align-items: center;
+  padding: 3px 7px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  font-size: 0.59rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.priority-badge--high {
+  border-color: #ddc38d;
+  color: #654812;
+  background: #fff7e3;
+}
+
+.priority-badge--medium {
+  border-color: #b8ccd7;
+  color: #284c5e;
+  background: #f0f6f8;
+}
+
+.priority-badge--low {
+  border-color: #d5dcdf;
+  color: #58666d;
+  background: #f6f8f8;
+}
+
+.inspection-reasons {
+  min-width: 270px;
+}
+
+.inspection-reasons ul {
+  display: grid;
+  gap: 3px;
+  margin: 0;
+  padding-left: 15px;
+}
+
+.inspection-reasons li {
+  color: var(--slate-500);
+  font-size: 0.63rem;
+  line-height: 1.35;
 }
 
 .code-chip {
@@ -1080,7 +1204,8 @@ select:focus-visible {
 
 @media (max-width: 1280px) {
   .kpi-grid,
-  .kpi-grid--quality {
+  .kpi-grid--quality,
+  .kpi-grid--five {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
@@ -1123,7 +1248,8 @@ select:focus-visible {
   .dashboard-grid--two { grid-template-columns: 1fr; }
   .overview-status-grid { grid-template-columns: 1fr; }
   .filter-grid,
-  .filter-grid--three { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .filter-grid--three,
+  .filter-grid--inspection-priority { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 @media (max-width: 680px) {
@@ -1136,9 +1262,11 @@ select:focus-visible {
   .kpi-grid,
   .kpi-grid--three,
   .kpi-grid--quality,
+  .kpi-grid--five,
   .kpi-grid--one { grid-template-columns: 1fr; }
   .filter-grid,
-  .filter-grid--three { grid-template-columns: 1fr; }
+  .filter-grid--three,
+  .filter-grid--inspection-priority { grid-template-columns: 1fr; }
   .filter-actions { justify-content: stretch; }
   .filter-actions .btn { flex: 1; }
   .chart-panel,
@@ -1148,6 +1276,7 @@ select:focus-visible {
   .dataset-section--current { padding: 13px; }
   .chart-panel__header { flex-direction: column; }
   .analytics-section__header { flex-direction: column; }
+  .inspection-priority-panel__header { flex-direction: column; }
   .chart-canvas--line { height: 260px; }
   .operations-panel__metrics { grid-template-columns: 1fr; }
   .operational-metric,

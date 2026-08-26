@@ -3,6 +3,7 @@ using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using SmartFacility.Application.Analytics.Abstractions;
 using SmartFacility.Application.Analytics.Models;
+using SmartFacility.Application.Analytics.Services;
 using SmartFacility.Domain;
 using SmartFacility.Domain.Entities;
 using SmartFacility.Infrastructure.Persistence;
@@ -258,6 +259,137 @@ public sealed class EfAnalyticsQueryService(SmartFacilityDbContext dbContext) :
                     "Counts represent canonical work-order record activity.",
                     "High activity does not indicate asset health, failure rate, or failure propensity."
                 ]));
+    }
+
+    public async Task<InspectionPriorityResponse> GetInspectionPriorityAsync(
+        InspectionPriorityQuery query,
+        CancellationToken cancellationToken = default)
+    {
+        var appliedTop = query.Top ?? 10;
+        var canonicalWorkOrders = _dbContext.WorkOrders
+            .AsNoTracking()
+            .Where(item => item.IsInCanonicalSnapshot && item.ReportedDateTime.HasValue);
+        var latestSourceDateTime = query.AsOf.HasValue
+            ? null
+            : await canonicalWorkOrders.MaxAsync(
+                item => (DateTime?)item.ReportedDateTime,
+                cancellationToken);
+        var asOf = query.AsOf
+            ?? (latestSourceDateTime.HasValue
+                ? DateOnly.FromDateTime(latestSourceDateTime.Value)
+                : null);
+
+        if (!asOf.HasValue)
+        {
+            return new InspectionPriorityResponse(
+                CreateInspectionPriorityMetadata(null, null, 0, 0, 0, appliedTop),
+                []);
+        }
+
+        var exclusiveEnd = asOf.Value.AddDays(1).ToDateTime(TimeOnly.MinValue);
+        var last7Start = exclusiveEnd.AddDays(-7);
+        var last30Start = exclusiveEnd.AddDays(-30);
+        var previous30Start = exclusiveEnd.AddDays(-60);
+        var last90Start = exclusiveEnd.AddDays(-90);
+        var workOrdersThroughCutoff = canonicalWorkOrders
+            .Where(item => item.ReportedDateTime < exclusiveEnd);
+
+        var coverage = await workOrdersThroughCutoff
+            .GroupBy(_ => 1)
+            .Select(group => new InspectionPriorityCoverageProjection(
+                group.LongCount(item => item.AssetId.HasValue),
+                group.LongCount(item => !item.AssetId.HasValue)))
+            .SingleOrDefaultAsync(cancellationToken)
+            ?? new InspectionPriorityCoverageProjection(0, 0);
+
+        var signalCounts = await workOrdersThroughCutoff
+            .Where(workOrder => workOrder.AssetId.HasValue)
+            .Where(workOrder =>
+                workOrder.ReportedDateTime >= last90Start
+                || workOrder.RawStatusCode == WorkOrderSourceState.Open)
+            .GroupBy(workOrder => workOrder.AssetId!.Value)
+            .Select(grouped => new InspectionPriorityCountProjection(
+                    grouped.Key,
+                    grouped.LongCount(item => item.ReportedDateTime >= last7Start),
+                    grouped.LongCount(item => item.ReportedDateTime >= last30Start),
+                    grouped.LongCount(item =>
+                        item.ReportedDateTime >= previous30Start
+                        && item.ReportedDateTime < last30Start),
+                    grouped.LongCount(item => item.ReportedDateTime >= last90Start),
+                    grouped.LongCount(item =>
+                        item.RawStatusCode == WorkOrderSourceState.Open)))
+            .ToListAsync(cancellationToken);
+        var signalAssetIds = signalCounts.Select(item => item.AssetId).ToArray();
+        var signalAssets = await _dbContext.Assets
+            .AsNoTracking()
+            .Where(asset => signalAssetIds.Contains(asset.Id))
+            .Select(asset => new { asset.Id, asset.AssetCode, asset.Name })
+            .ToDictionaryAsync(asset => asset.Id, cancellationToken);
+        var signalRows = signalCounts
+            .Where(item => signalAssets.ContainsKey(item.AssetId))
+            .Select(item =>
+            {
+                var asset = signalAssets[item.AssetId];
+                return new InspectionPrioritySignalProjection(
+                    asset.Id,
+                    asset.AssetCode,
+                    asset.Name,
+                    item.Last7Count,
+                    item.Last30Count,
+                    item.Previous30Count,
+                    item.Last90Count,
+                    item.OpenCount);
+            })
+            .ToArray();
+
+        var rankedItems = signalRows
+            .Select(item =>
+            {
+                var result = InspectionPriorityScoring.Calculate(new InspectionPrioritySignals(
+                    item.Last7Count,
+                    item.Last30Count,
+                    item.Previous30Count,
+                    item.Last90Count,
+                    item.OpenCount));
+                return new InspectionPriorityItemDto(
+                    item.AssetId,
+                    item.AssetCode,
+                    item.AssetName,
+                    result.Score,
+                    result.Level,
+                    item.Last7Count,
+                    item.Last30Count,
+                    item.Previous30Count,
+                    item.Last90Count,
+                    item.OpenCount,
+                    result.ActivityChange,
+                    result.Reasons);
+            })
+            .OrderByDescending(item => item.PriorityScore)
+            .ThenByDescending(item => item.OpenCount)
+            .ThenByDescending(item => item.Last30Count)
+            .ThenBy(item => item.AssetCode, StringComparer.Ordinal)
+            .ThenBy(item => item.AssetId)
+            .Take(appliedTop)
+            .ToArray();
+
+        var analysisWindow = new InspectionPriorityAnalysisWindowDto(
+            asOf.Value.AddDays(-6),
+            asOf.Value.AddDays(-29),
+            asOf.Value.AddDays(-59),
+            asOf.Value.AddDays(-30),
+            asOf.Value.AddDays(-89),
+            asOf.Value);
+
+        return new InspectionPriorityResponse(
+            CreateInspectionPriorityMetadata(
+                asOf,
+                analysisWindow,
+                coverage.EligibleWorkOrders,
+                coverage.ExcludedUnlinkedWorkOrders,
+                signalRows.LongLength,
+                appliedTop),
+            rankedItems);
     }
 
     public async Task<WorkOrderOverviewResponse> GetOverviewAsync(
@@ -913,6 +1045,34 @@ public sealed class EfAnalyticsQueryService(SmartFacilityDbContext dbContext) :
                 decimals,
                 MidpointRounding.AwayFromZero);
 
+    private static InspectionPriorityMetadataDto CreateInspectionPriorityMetadata(
+        DateOnly? asOf,
+        InspectionPriorityAnalysisWindowDto? analysisWindow,
+        long eligibleWorkOrders,
+        long excludedUnlinkedWorkOrders,
+        long totalAssetsEvaluated,
+        int appliedTop)
+    {
+        var coverageDenominator = eligibleWorkOrders + excludedUnlinkedWorkOrders;
+        return new InspectionPriorityMetadataDto(
+            asOf,
+            analysisWindow,
+            eligibleWorkOrders,
+            excludedUnlinkedWorkOrders,
+            CalculatePercent(eligibleWorkOrders, coverageDenominator, 4),
+            totalAssetsEvaluated,
+            appliedTop,
+            "core.WorkOrders + core.Assets",
+            InspectionPriorityScoring.Version,
+            [
+                "Inspection Priority is explainable WorkOrder-activity decision support; it is not failure probability or an asset health score.",
+                "Only canonical WorkOrders with a resolved AssetId and ReportedDateTime on or before AsOf contribute to asset scores.",
+                "Unlinked WorkOrders are disclosed in coverage metadata and are not mapped through raw asset codes.",
+                "Assets are evaluated when they have activity in the last 90 days or an open source-state WorkOrder.",
+                "The legacy HistoricalWorkOrders snapshot and SCADA records are not queried."
+            ]);
+    }
+
     private static string? NormalizeOptionalFilter(string? value) =>
         string.IsNullOrWhiteSpace(value) ? null : value;
 
@@ -1014,6 +1174,28 @@ public sealed class EfAnalyticsQueryService(SmartFacilityDbContext dbContext) :
         long ValidRecordCount,
         DateTime? ActualMinDate,
         DateTime? ActualMaxDate);
+
+    private sealed record InspectionPriorityCoverageProjection(
+        long EligibleWorkOrders,
+        long ExcludedUnlinkedWorkOrders);
+
+    private sealed record InspectionPrioritySignalProjection(
+        long AssetId,
+        string AssetCode,
+        string AssetName,
+        long Last7Count,
+        long Last30Count,
+        long Previous30Count,
+        long Last90Count,
+        long OpenCount);
+
+    private sealed record InspectionPriorityCountProjection(
+        long AssetId,
+        long Last7Count,
+        long Last30Count,
+        long Previous30Count,
+        long Last90Count,
+        long OpenCount);
 
     private sealed class ScadaClearanceStatisticsProjection
     {

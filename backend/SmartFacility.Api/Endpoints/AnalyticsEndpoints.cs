@@ -29,6 +29,12 @@ public static class AnalyticsEndpoints
             .Produces<AssetMaintenanceActivityParetoResponse>()
             .ProducesValidationProblem();
 
+        group.MapGet("/assets/inspection-priority", GetInspectionPriorityAsync)
+            .WithName("GetInspectionPriority")
+            .WithSummary("Returns explainable WorkOrder-activity-based asset inspection priority.")
+            .Produces<InspectionPriorityResponse>()
+            .ProducesValidationProblem();
+
         group.MapGet("/work-orders/overview", GetWorkOrderOverviewAsync)
             .WithName("GetWorkOrderOverview")
             .WithSummary("Returns canonical WorkOrder totals and source-state aggregations.")
@@ -101,6 +107,22 @@ public static class AnalyticsEndpoints
 
         return TypedResults.Ok(
             await service.GetMaintenanceActivityParetoAsync(query, cancellationToken));
+    }
+
+    private static async Task<Results<Ok<InspectionPriorityResponse>, ValidationProblem>>
+        GetInspectionPriorityAsync(
+            [AsParameters] InspectionPriorityQuery query,
+            IAssetAnalyticsService service,
+            CancellationToken cancellationToken)
+    {
+        var errors = AnalyticsQueryValidation.Validate(query);
+        if (errors.Count > 0)
+        {
+            return TypedResults.ValidationProblem(errors);
+        }
+
+        return TypedResults.Ok(
+            await service.GetInspectionPriorityAsync(query, cancellationToken));
     }
 
     private static async Task<Results<Ok<WorkOrderOverviewResponse>, ValidationProblem>> GetWorkOrderOverviewAsync(
@@ -222,6 +244,25 @@ internal static class AnalyticsQueryValidation
         if (query.Top.HasValue && query.Top is < 1 or > 100)
         {
             errors["top"] = ["Top must be between 1 and 100."];
+        }
+
+        return errors;
+    }
+
+    public static Dictionary<string, string[]> Validate(InspectionPriorityQuery query)
+    {
+        var errors = new Dictionary<string, string[]>(StringComparer.Ordinal);
+
+        if (query.Top.HasValue && query.Top is < 1 or > 100)
+        {
+            errors["top"] = ["Top must be between 1 and 100."];
+        }
+
+        if (query.AsOf.HasValue
+            && (query.AsOf < DateOnly.MinValue.AddDays(89)
+                || query.AsOf == DateOnly.MaxValue))
+        {
+            errors["asOf"] = ["AsOf must allow a complete 90-day analysis window."];
         }
 
         return errors;

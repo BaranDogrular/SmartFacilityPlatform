@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace SmartFacility.Application.Analytics.Models;
 
 public sealed record AssetWorkOrderCountDto(
@@ -31,6 +33,56 @@ public sealed record AssetMaintenanceActivityParetoResponse(
     int AppliedTop,
     IReadOnlyList<AssetMaintenanceActivityParetoItemDto> TopAssets,
     DateRangeMetadataDto Metadata);
+
+public enum InspectionPriorityLevel
+{
+    [JsonStringEnumMemberName("HIGH")]
+    High,
+
+    [JsonStringEnumMemberName("MEDIUM")]
+    Medium,
+
+    [JsonStringEnumMemberName("LOW")]
+    Low
+}
+
+public sealed record InspectionPriorityAnalysisWindowDto(
+    DateOnly Last7From,
+    DateOnly Last30From,
+    DateOnly Previous30From,
+    DateOnly Previous30To,
+    DateOnly Last90From,
+    DateOnly Through);
+
+public sealed record InspectionPriorityMetadataDto(
+    DateOnly? AsOf,
+    InspectionPriorityAnalysisWindowDto? AnalysisWindow,
+    long EligibleWorkOrders,
+    long ExcludedUnlinkedWorkOrders,
+    decimal CoveragePercent,
+    long TotalAssetsEvaluated,
+    int AppliedTop,
+    string SourceDataset,
+    string ScoringVersion,
+    IReadOnlyList<string> Notes);
+
+public sealed record InspectionPriorityItemDto(
+    long AssetId,
+    string AssetCode,
+    string AssetName,
+    decimal PriorityScore,
+    InspectionPriorityLevel PriorityLevel,
+    long Last7Count,
+    long Last30Count,
+    long Previous30Count,
+    long Last90Count,
+    long OpenCount,
+    long ActivityChange,
+    IReadOnlyList<string> Reasons);
+
+public sealed record InspectionPriorityResponse(
+    InspectionPriorityMetadataDto Metadata,
+    IReadOnlyList<InspectionPriorityItemDto> Items);
 
 public sealed record WorkOrderOverviewResponse(
     long TotalWorkOrders,

@@ -4,7 +4,7 @@
 
 **Yaklaşım:** Reliability-aware Maintenance Decision Support System
 
-SmartFacilityPlatform; tesis yönetimi kaynaklarından alınan Excel verilerini doğrulayan, ham veri lineage ve import audit geçmişiyle SQL Server'a aktaran, güncel ve historical veri kümelerini ayrı anlamlarla analiz eden ve sonuçları REST API ile React arayüzünde sunan bir karar destek sistemidir. Sistem yalnızca bir dashboard değildir.
+SmartFacilityPlatform; tesis yönetimi kaynaklarından alınan Excel verilerini doğrulayan, ham veri lineage ve import audit geçmişiyle SQL Server'a aktaran, canonical operasyon verisini analiz eden ve sonuçları REST API ile React arayüzünde sunan bir karar destek sistemidir. Sistem yalnızca bir dashboard değildir.
 
 ```text
 Source data / Excel
@@ -29,12 +29,13 @@ Mimari ayrıntılar için [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), release 
 - Aynı fingerprint'in eşzamanlı importlarında SQL Server transaction-owned application lock
 - Building, Location ve AssetGroup oluşturulmasında dimension concurrency koruması
 - Core entity, raw lineage ve row audit kaydını birlikte yöneten satır transaction'ı
-- Current `WorkOrder`, ayrı `HistoricalWorkOrder`, asset ve SCADA analytics
+- Canonical total `WorkOrder`, asset ve SCADA analytics
 - Asset Maintenance Activity Pareto
-- Historical monthly activity trend ve raw Discipline dağılımı
+- Canonical monthly WorkOrder activity trend ve raw Discipline dağılımı
+- Açıklanabilir Inspection Priority v1
 - Quality-eligible SCADA Clearance Interval median/P90 analitiği
 - Import/data-quality analytics
-- Dashboard, Assets, WorkOrders, SCADA ve Data Quality ekranları
+- Dashboard, Assets, WorkOrders, İnceleme Önceliği, SCADA ve Data Quality ekranları
 - Tarih, Discipline, status ve SourceSheet filtreleri
 - Loading, error, empty/no-match ve retry durumları
 - Green/Yellow reliability badge'leri ve güvenli semantik açıklamalar
@@ -45,11 +46,12 @@ Import pipeline uygulama katmanında ve DI container içinde kullanılabilir. Me
 
 Bu ayrımlar ürün sözleşmesinin parçasıdır:
 
-- Current `WorkOrder` ve `HistoricalWorkOrder` ayrı veri kümeleridir; toplamları birleştirilmez.
+- `core.WorkOrders` canonical total source dataset'idir; legacy `HistoricalWorkOrders` business analytics'e dahil edilmez.
 - `WorkOrderNumber` global unique business identity değildir.
 - SCADA clearance interval, MTTR veya repair duration değildir.
 - SCADA kayıt sayıları source row/occurrence sayılarıdır; benzersiz fiziksel alarm iddiası taşımaz.
 - Maintenance activity Pareto, asset health, failure probability veya failure rate değildir.
+- Inspection Priority, WorkOrder aktivitesine dayalı inceleme sıralamasıdır; failure probability, predictive maintenance veya asset health score değildir.
 - Green reliability etiketi asset reliability anlamına gelmez; ilgili veri sözleşmesinin doğrulanmış olduğunu belirtir.
 - Historical weekly forecasting, failure prediction veya predictive maintenance değildir.
 
@@ -162,6 +164,7 @@ Mevcut HTTP yüzeyinin tamamı `GET /api/analytics` altındadır:
 | `/api/analytics/import-quality/overview` | Import batch, lineage, error ve fingerprint audit özeti |
 | `/api/analytics/assets/overview` | Asset envanteri ve canonical WorkOrder ilişkisi |
 | `/api/analytics/assets/maintenance-activity-pareto` | Asset bazında canonical WorkOrder aktivite yoğunluğu |
+| `/api/analytics/assets/inspection-priority` | Yakın dönem WorkOrder aktivitesine dayalı açıklanabilir inceleme önceliği |
 | `/api/analytics/work-orders/overview` | Canonical toplam/açık/kapalı/diğer ve dağılımlar |
 | `/api/analytics/work-orders/trend` | Canonical WorkOrder aylık trendi |
 | `/api/analytics/work-orders/activity` | Canonical WorkOrder tarih ve Discipline aktivitesi |
@@ -225,12 +228,29 @@ Representative local production-mode measurements on the current acceptance data
 - Asset Pareto default median: yaklaşık 78 ms
 - Historical Activity default median: yaklaşık 296 ms
 - SCADA Clearance default median: yaklaşık 120 ms
+- Inspection Priority default median: yaklaşık 300 ms
 
 Bunlar SLA değildir; donanım, SQL Server, veri hacmi ve eşzamanlı yükle birlikte değişir.
 
 Canonical modelde `core.WorkOrders` toplam kaynak dataset'ini temsil eder. Açık durum `RawStatusCode=A`, kapalı durum `RawStatusCode=K` ile hesaplanır; workflow `Status` alanı bu sınıflandırmayı belirlemez. `analytics.HistoricalWorkOrders` yalnız legacy dated snapshot/audit lineage olarak korunur ve business analytics tarafından sorgulanmaz.
 
 25.08.2026 canonical export acceptance baseline'ı yaklaşık 171.136 WorkOrders, 75 açık, 171.054 kapalı ve 7 diğer kayıttır. Bu sayılar hard-coded product contract değildir.
+
+## Inspection Priority v1
+
+Inspection Priority v1, ML veya failure prediction değildir. Yakın dönem canonical WorkOrder aktivitesinden açıklanabilir bir bakım inceleme sırası üretir. Default `asOf`, canonical dataset'teki en son `ReportedDateTime` günüdür; explicit `asOf` aynı veriyle deterministik yeniden üretim sağlar.
+
+Score 0–100 aralığındadır ve beş bounded component kullanır:
+
+- Son 30 gün aktivitesi: 30 puan, 21 kayıtta cap
+- Önceki 30 güne göre pozitif aktivite değişimi: 20 puan, +8 kayıtta cap
+- `RawStatusCode=A` açık iş yükü: 25 puan, 4 kayıtta cap
+- Son 90 gün recurrence: 15 puan, 50 kayıtta cap
+- Son 7 gün aktivitesi: 10 puan, 7 kayıtta cap
+
+`HIGH >= 50`, `MEDIUM >= 25`, diğer sonuçlar `LOW` olarak sunulur. HIGH, yalnız “öncelikli inceleme önerilir” anlamındadır; arıza olasılığı değildir. Sıralama `PriorityScore DESC`, `OpenCount DESC`, `Last30Count DESC`, `AssetCode ASC`, `AssetId ASC` şeklindedir.
+
+Yalnız `AssetId` bağlı WorkOrder kayıtları score'a katılır. Unlinked kayıtlar raw code ile zorla eşlenmez ve response coverage metadata'sında açıklanır. V1 SCADA, legacy HistoricalWorkOrders, all-time recurrence, NLP, maliyet veya manuel criticality kullanmaz.
 
 ## Offline ML sonucu
 
@@ -262,7 +282,7 @@ Bu sonuç ana ürünün başarısız olduğu anlamına gelmez. Import, data qual
 
 ## Future roadmap — v1.0 kapsamında değil
 
-1. Early warning / inspection priority
+1. Approved asset criticality ve inspection workflow integration
 2. Similar historical cases / suggested past actions
 3. Predictive maintenance ML feasibility round 2
 

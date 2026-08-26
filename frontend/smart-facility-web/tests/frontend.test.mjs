@@ -18,6 +18,7 @@ const dashboardUi = await vite.ssrLoadModule('/src/components/DashboardUi.tsx')
 const { OverviewPage } = await vite.ssrLoadModule('/src/pages/OverviewPage.tsx')
 const { AssetsPage } = await vite.ssrLoadModule('/src/pages/AssetsPage.tsx')
 const { WorkOrdersPage } = await vite.ssrLoadModule('/src/pages/WorkOrdersPage.tsx')
+const { InspectionPriorityPage } = await vite.ssrLoadModule('/src/pages/InspectionPriorityPage.tsx')
 const { ScadaPage } = await vite.ssrLoadModule('/src/pages/ScadaPage.tsx')
 
 const snapshotMetadata = {
@@ -86,6 +87,72 @@ const assetPareto = {
     matchedRecordCount: 171136,
     validRecordCount: 171136,
   },
+}
+
+const inspectionPriority = {
+  metadata: {
+    asOf: '2026-08-25',
+    analysisWindow: {
+      last7From: '2026-08-19',
+      last30From: '2026-07-27',
+      previous30From: '2026-06-27',
+      previous30To: '2026-07-26',
+      last90From: '2026-05-28',
+      through: '2026-08-25',
+    },
+    eligibleWorkOrders: 162590,
+    excludedUnlinkedWorkOrders: 8546,
+    coveragePercent: 95.0063,
+    totalAssetsEvaluated: 417,
+    appliedTop: 10,
+    sourceDataset: 'core.WorkOrders + core.Assets',
+    scoringVersion: 'inspection-priority/v1',
+    notes: [],
+  },
+  items: [
+    {
+      assetId: 1,
+      assetCode: 'ASSET-HIGH',
+      assetName: 'High activity asset',
+      priorityScore: 82.5,
+      priorityLevel: 'HIGH',
+      last7Count: 8,
+      last30Count: 20,
+      previous30Count: 4,
+      last90Count: 55,
+      openCount: 2,
+      activityChange: 16,
+      reasons: ['Son 30 günde 20 iş emri', '2 açık iş emri bulunuyor'],
+    },
+    {
+      assetId: 2,
+      assetCode: 'ASSET-MEDIUM',
+      assetName: 'Medium activity asset',
+      priorityScore: 35,
+      priorityLevel: 'MEDIUM',
+      last7Count: 2,
+      last30Count: 5,
+      previous30Count: 3,
+      last90Count: 10,
+      openCount: 0,
+      activityChange: 2,
+      reasons: ['Önceki 30 güne göre aktivite 2 kayıt arttı'],
+    },
+    {
+      assetId: 3,
+      assetCode: 'ASSET-LOW',
+      assetName: 'Low activity asset',
+      priorityScore: 8.25,
+      priorityLevel: 'LOW',
+      last7Count: 0,
+      last30Count: 1,
+      previous30Count: 1,
+      last90Count: 2,
+      openCount: 0,
+      activityChange: 0,
+      reasons: ['Son 30 günde 1 iş emri'],
+    },
+  ],
 }
 
 const workOrders = {
@@ -208,6 +275,10 @@ function createQueryClient(overrides = {}) {
     ['analytics', 'assets', 'maintenance-activity-pareto', { top: 10 }],
     overrides.assetPareto ?? assetPareto,
   )
+  client.setQueryData(
+    ['analytics', 'assets', 'inspection-priority', { top: 10 }],
+    overrides.inspectionPriority ?? inspectionPriority,
+  )
   client.setQueryData(['analytics', 'work-orders', 'overview', {}], workOrders)
   client.setQueryData(['analytics', 'work-orders', 'trend', { grain: 'Month' }], workOrderTrend)
   client.setQueryData(
@@ -268,6 +339,7 @@ test('new analytics clients call the accepted backend routes with serialized que
 
   try {
     await analytics.getAssetMaintenanceActivityPareto({ dateFrom: '2025-01-01', top: 5 })
+    await analytics.getInspectionPriority({ asOf: '2026-08-25', top: 25 })
     await analytics.getWorkOrderActivity({ dateTo: '2025-12-31', discipline: 'MEKANİK' })
     await analytics.getScadaClearanceInterval({ sourceSheet: 'MEKANİK', alarmType: 'SOĞUTMA' })
   } finally {
@@ -278,6 +350,10 @@ test('new analytics clients call the accepted backend routes with serialized que
     {
       url: '/api/analytics/assets/maintenance-activity-pareto',
       params: { dateFrom: '2025-01-01', top: 5 },
+    },
+    {
+      url: '/api/analytics/assets/inspection-priority',
+      params: { asOf: '2026-08-25', top: 25 },
     },
     {
       url: '/api/analytics/work-orders/activity',
@@ -383,6 +459,68 @@ test('asset Pareto renders a scoped empty state', () => {
 
   assert.match(html, /iş emri aktivitesi bulunan asset yok/)
   assert.match(html, /YELLOW · Veri kalitesi notu/)
+})
+
+test('inspection priority renders ranked signals, reasons, coverage and safe semantics', () => {
+  const html = renderPage(InspectionPriorityPage)
+
+  assert.match(html, /İnceleme Önceliği/)
+  assert.match(html, /ASSET-HIGH/)
+  assert.match(html, /ASSET-MEDIUM/)
+  assert.match(html, /ASSET-LOW/)
+  assert.match(html, /HIGH · Öncelikli inceleme/)
+  assert.match(html, /MEDIUM · Yakın izleme/)
+  assert.match(html, /LOW · Düşük öncelik/)
+  assert.match(html, /82,5/)
+  assert.match(html, /Son 30 günde 20 iş emri/)
+  assert.match(html, /2 açık iş emri bulunuyor/)
+  assert.match(html, /162\.590/)
+  assert.match(html, /8\.546/)
+  assert.match(html, /95,01%/)
+  assert.match(html, /arıza olasılığı veya varlık sağlık skoru değildir/)
+  assert.match(html, /inspection-table-wrap/)
+  assert.doesNotMatch(html, /failure probability|predictive failure|arıza riski %/i)
+})
+
+test('inspection priority renders scoped empty, loading, error and retry states', () => {
+  const emptyHtml = renderPage(InspectionPriorityPage, {
+    inspectionPriority: {
+      ...inspectionPriority,
+      metadata: { ...inspectionPriority.metadata, totalAssetsEvaluated: 0 },
+      items: [],
+    },
+  })
+  assert.match(emptyHtml, /son 90 gün aktivitesi veya açık iş yükü bulunan bağlı varlık yok/)
+
+  const pendingClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  const pendingHtml = renderToStaticMarkup(
+    React.createElement(
+      QueryClientProvider,
+      { client: pendingClient },
+      React.createElement(InspectionPriorityPage),
+    ),
+  )
+  assert.match(pendingHtml, /İnceleme önceliği hesaplanıyor/)
+
+  const errorClient = new QueryClient({
+    defaultOptions: {
+      queries: { retry: false, retryOnMount: false, refetchOnMount: false, staleTime: Infinity },
+    },
+  })
+  const errorQuery = errorClient.getQueryCache().build(errorClient, {
+    queryKey: ['analytics', 'assets', 'inspection-priority', { top: 10 }],
+    queryFn: async () => inspectionPriority,
+  })
+  errorQuery.setState({ ...errorQuery.state, status: 'error', fetchStatus: 'idle', error: new Error('Priority servisi kullanılamıyor') })
+  const errorHtml = renderToStaticMarkup(
+    React.createElement(
+      QueryClientProvider,
+      { client: errorClient },
+      React.createElement(InspectionPriorityPage),
+    ),
+  )
+  assert.match(errorHtml, /Priority servisi kullanılamıyor/)
+  assert.match(errorHtml, /Yeniden dene/)
 })
 
 test('work-order filters and reset control are present with exact raw options', () => {

@@ -4,6 +4,8 @@ import type {
   AssetMaintenanceActivityParetoResponse,
   AssetOverviewQuery,
   AssetOverviewResponse,
+  InspectionPriorityQuery,
+  InspectionPriorityResponse,
   WorkOrderActivityQuery,
   WorkOrderActivityResponse,
   ImportQualityOverviewResponse,
@@ -102,6 +104,12 @@ export const getAssetMaintenanceActivityPareto = (
 ) =>
   get<AssetMaintenanceActivityParetoResponse>(
     '/api/analytics/assets/maintenance-activity-pareto',
+    query as QueryParameters,
+  )
+
+export const getInspectionPriority = (query: InspectionPriorityQuery = {}) =>
+  get<InspectionPriorityResponse>(
+    '/api/analytics/assets/inspection-priority',
     query as QueryParameters,
   )
 

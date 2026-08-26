@@ -84,6 +84,50 @@ export interface AssetMaintenanceActivityParetoResponse {
   metadata: DateRangeMetadata
 }
 
+export type InspectionPriorityLevel = 'HIGH' | 'MEDIUM' | 'LOW'
+
+export interface InspectionPriorityAnalysisWindow {
+  last7From: string
+  last30From: string
+  previous30From: string
+  previous30To: string
+  last90From: string
+  through: string
+}
+
+export interface InspectionPriorityMetadata {
+  asOf: string | null
+  analysisWindow: InspectionPriorityAnalysisWindow | null
+  eligibleWorkOrders: number
+  excludedUnlinkedWorkOrders: number
+  coveragePercent: number
+  totalAssetsEvaluated: number
+  appliedTop: number
+  sourceDataset: string
+  scoringVersion: string
+  notes: string[]
+}
+
+export interface InspectionPriorityItem {
+  assetId: number
+  assetCode: string
+  assetName: string
+  priorityScore: number
+  priorityLevel: InspectionPriorityLevel
+  last7Count: number
+  last30Count: number
+  previous30Count: number
+  last90Count: number
+  openCount: number
+  activityChange: number
+  reasons: string[]
+}
+
+export interface InspectionPriorityResponse {
+  metadata: InspectionPriorityMetadata
+  items: InspectionPriorityItem[]
+}
+
 export interface WorkOrderOverviewResponse {
   totalWorkOrders: number
   openWorkOrders: number
@@ -188,6 +232,11 @@ export interface AssetMaintenanceActivityParetoQuery {
   dateFrom?: string
   dateTo?: string
   top?: number
+}
+
+export interface InspectionPriorityQuery {
+  top?: number
+  asOf?: string
 }
 
 export interface WorkOrderAnalyticsQuery {

@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import {
   getAssetMaintenanceActivityPareto,
   getAssetOverview,
+  getInspectionPriority,
   getWorkOrderActivity,
   getImportQualityOverview,
   getScadaClearanceInterval,
@@ -13,6 +14,7 @@ import {
 import type {
   AssetMaintenanceActivityParetoQuery,
   AssetOverviewQuery,
+  InspectionPriorityQuery,
   WorkOrderActivityQuery,
   ScadaAnalyticsQuery,
   ScadaClearanceIntervalQuery,
@@ -31,6 +33,12 @@ export const useAssetMaintenanceActivityPareto = (
   useQuery({
     queryKey: ['analytics', 'assets', 'maintenance-activity-pareto', query],
     queryFn: () => getAssetMaintenanceActivityPareto(query),
+  })
+
+export const useInspectionPriority = (query: InspectionPriorityQuery = {}) =>
+  useQuery({
+    queryKey: ['analytics', 'assets', 'inspection-priority', query],
+    queryFn: () => getInspectionPriority(query),
   })
 
 export const useWorkOrderOverview = (query: WorkOrderAnalyticsQuery = {}) =>
