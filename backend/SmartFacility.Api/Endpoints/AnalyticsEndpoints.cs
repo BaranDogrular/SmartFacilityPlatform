@@ -19,32 +19,32 @@ public static class AnalyticsEndpoints
 
         group.MapGet("/assets/overview", GetAssetOverviewAsync)
             .WithName("GetAssetOverview")
-            .WithSummary("Returns asset snapshot and current work-order presence metrics.")
+            .WithSummary("Returns asset snapshot and canonical work-order presence metrics.")
             .Produces<AssetOverviewResponse>()
             .ProducesValidationProblem();
 
         group.MapGet("/assets/maintenance-activity-pareto", GetAssetMaintenanceActivityParetoAsync)
             .WithName("GetAssetMaintenanceActivityPareto")
-            .WithSummary("Returns the concentration of current work-order records by asset.")
+            .WithSummary("Returns the concentration of canonical work-order records by asset.")
             .Produces<AssetMaintenanceActivityParetoResponse>()
             .ProducesValidationProblem();
 
         group.MapGet("/work-orders/overview", GetWorkOrderOverviewAsync)
             .WithName("GetWorkOrderOverview")
-            .WithSummary("Returns current WorkOrder aggregations without historical data.")
+            .WithSummary("Returns canonical WorkOrder totals and source-state aggregations.")
             .Produces<WorkOrderOverviewResponse>()
             .ProducesValidationProblem();
 
         group.MapGet("/work-orders/trend", GetWorkOrderTrendAsync)
             .WithName("GetWorkOrderTrend")
-            .WithSummary("Returns the monthly current WorkOrder trend.")
+            .WithSummary("Returns the monthly canonical WorkOrder trend.")
             .Produces<WorkOrderTrendResponse>()
             .ProducesValidationProblem();
 
-        group.MapGet("/historical-work-orders/activity", GetHistoricalMaintenanceActivityAsync)
-            .WithName("GetHistoricalMaintenanceActivity")
-            .WithSummary("Returns historical-only monthly record activity and raw discipline counts.")
-            .Produces<HistoricalMaintenanceActivityResponse>()
+        group.MapGet("/work-orders/activity", GetWorkOrderActivityAsync)
+            .WithName("GetWorkOrderActivity")
+            .WithSummary("Returns dated activity from the canonical WorkOrder dataset.")
+            .Produces<WorkOrderActivityResponse>()
             .ProducesValidationProblem();
 
         group.MapGet("/scada/overview", GetScadaOverviewAsync)
@@ -131,10 +131,10 @@ public static class AnalyticsEndpoints
         return TypedResults.Ok(await service.GetTrendAsync(query, cancellationToken));
     }
 
-    private static async Task<Results<Ok<HistoricalMaintenanceActivityResponse>, ValidationProblem>>
-        GetHistoricalMaintenanceActivityAsync(
-            [AsParameters] HistoricalMaintenanceActivityQuery query,
-            IHistoricalWorkOrderAnalyticsService service,
+    private static async Task<Results<Ok<WorkOrderActivityResponse>, ValidationProblem>>
+        GetWorkOrderActivityAsync(
+            [AsParameters] WorkOrderActivityQuery query,
+            IWorkOrderActivityService service,
             CancellationToken cancellationToken)
     {
         var errors = AnalyticsQueryValidation.Validate(query);
@@ -227,7 +227,7 @@ internal static class AnalyticsQueryValidation
         return errors;
     }
 
-    public static Dictionary<string, string[]> Validate(HistoricalMaintenanceActivityQuery query) =>
+    public static Dictionary<string, string[]> Validate(WorkOrderActivityQuery query) =>
         ValidateDateRange(query.DateFrom, query.DateTo, "dateFrom", "dateTo");
 
     public static Dictionary<string, string[]> Validate(ScadaAnalyticsQuery query)

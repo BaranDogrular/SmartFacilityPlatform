@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import {
   getAssetMaintenanceActivityPareto,
   getAssetOverview,
-  getHistoricalMaintenanceActivity,
+  getWorkOrderActivity,
   getImportQualityOverview,
   getScadaClearanceInterval,
   getScadaOverview,
@@ -13,7 +13,7 @@ import {
 import type {
   AssetMaintenanceActivityParetoQuery,
   AssetOverviewQuery,
-  HistoricalMaintenanceActivityQuery,
+  WorkOrderActivityQuery,
   ScadaAnalyticsQuery,
   ScadaClearanceIntervalQuery,
   WorkOrderAnalyticsQuery,
@@ -45,12 +45,12 @@ export const useWorkOrderTrend = (query: WorkOrderAnalyticsQuery = {}) =>
     queryFn: () => getWorkOrderTrend(query),
   })
 
-export const useHistoricalMaintenanceActivity = (
-  query: HistoricalMaintenanceActivityQuery = {},
+export const useWorkOrderActivity = (
+  query: WorkOrderActivityQuery = {},
 ) =>
   useQuery({
-    queryKey: ['analytics', 'historical-work-orders', 'activity', query],
-    queryFn: () => getHistoricalMaintenanceActivity(query),
+    queryKey: ['analytics', 'work-orders', 'activity', query],
+    queryFn: () => getWorkOrderActivity(query),
   })
 
 export const useScadaOverview = (query: ScadaAnalyticsQuery = {}) =>

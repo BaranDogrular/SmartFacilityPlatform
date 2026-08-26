@@ -13,7 +13,7 @@ Controlled import caller
   -> IImportService / ExcelImportService
   -> ClosedXML workbook reader
   -> validation + fingerprint + processors
-  -> EF Core row transaction + SQL Server application locks
+  -> generic row transaction veya canonical WorkOrder snapshot transaction
   -> SQL Server: ingestion / core / analytics schemas
 
 Browser
@@ -37,11 +37,11 @@ Başlangıçta DbContext oluşturulur fakat `Migrate`, `EnsureCreated` veya impo
 
 | Schema | Sorumluluk | Örnek tablolar |
 |---|---|---|
-| `core` | Güncel operasyonel entity'ler ve SCADA occurrence kayıtları | `Assets`, `WorkOrders`, `ScadaAlarmEvents` |
-| `analytics` | Ayrı historical analytics dataset'i | `HistoricalWorkOrders` |
+| `core` | Canonical operasyonel entity'ler ve SCADA occurrence kayıtları | `Assets`, `WorkOrders`, `ScadaAlarmEvents` |
+| `analytics` | Legacy dated snapshot (business analytics kaynağı değil) | `HistoricalWorkOrders` |
 | `ingestion` | Import audit, raw lineage ve error geçmişi | `ImportBatches`, `ImportSourceRecords`, `ImportErrors` |
 
-`HistoricalWorkOrders`, current `WorkOrders` tablosunun archive görünümü veya otomatik birleşeni değildir. Analytics servisleri iki dataset'i ayrı sorgular.
+`WorkOrders`, toplam canonical source dataset'idir. Açık/kapalı ayrımı sırasıyla `RawStatusCode=A/K` ile yapılır; workflow `Status` ayrı semantiktir. `HistoricalWorkOrders` physical olarak audit/lineage için korunur, union edilmez ve business analytics tarafından sorgulanmaz.
 
 ## Import flow
 
@@ -58,10 +58,12 @@ Başlangıçta DbContext oluşturulur fakat `Migrate`, `EnsureCreated` veya impo
 
 Structural validation failure core data başlamadan oluşur; daha önce yaratılmış batch audit kaydı `Failed` olur. Audit geçmişi ve raw lineage otomatik olarak silinmez.
 
+WorkOrder profili özel canonical snapshot yoluna yönlendirilir. Tüm workbook önce memory+database preflight'tan geçer; versioned teknik identity `WorkOrderNumber + ReportedDateTime + AssetCode` üzerinden hesaplanır. Bu candidate kalıcı business unique key sayılmaz ve `WorkOrderNumber` üzerinde unique constraint yoktur. SQL Server import-level application lock ve tek serializable transaction içinde eşleşen satırlar güncellenir, yeni satırlar eklenir, kaynakta artık bulunmayan eski sürümler silinmeden inactive tutulur. Core snapshot, source records ve batch terminal durumu birlikte commit/rollback olur. Çözülemeyen asset/location ilişkileri placeholder üretmez; raw anahtarlar korunur ve nullable FK kullanılır.
+
 ## Fingerprint ve duplicate sınırı
 
 - Raw row fingerprint source type, source sheet ve normalized cell değerlerinden SHA-256 ile hesaplanır.
-- Historical WorkOrder ve belirli SCADA kaynakları versioned idempotency fingerprint kullanır.
+- Canonical WorkOrder, Historical WorkOrder ve belirli SCADA kaynakları versioned idempotency fingerprint kullanır.
 - Algorithm identity fingerprint ile birlikte duplicate kapsamının parçasıdır; legacy row fingerprint kayıtları ayrı davranışı korur.
 - Correlation key duplicate identity değildir.
 - `WorkOrderNumber` global unique business identity değildir; database mapping yalnız non-unique index taşır.
@@ -85,10 +87,10 @@ Analytics sorguları `AsNoTracking`, server-side filtering/grouping ve async can
 
 - Green: İlgili record-count/trend veri sözleşmesi doğrulanmıştır; asset reliability değildir.
 - Yellow: Kaynak kapsamı, eşleştirme veya timestamp kalitesi nedeniyle yorum uyarısı gerekir.
-- Pareto: Current WorkOrder kayıt yoğunluğudur; asset health/failure rate değildir.
+- Pareto: Canonical WorkOrder kayıt yoğunluğudur; asset health/failure rate değildir.
 - Clearance interval: Quality-eligible source occurrence için `ClearedAt - ReceivedAt` dağılımıdır; MTTR/repair duration değildir.
 - SCADA occurrence: Source row'dur; benzersiz fiziksel alarm değildir.
-- Historical activity/forecasting: Record activity/volume'dür; current WorkOrder veya failure prediction değildir.
+- WorkOrder activity: Canonical record activity/volume'dür; açık workload veya failure prediction değildir.
 
 ## Frontend sınırı
 

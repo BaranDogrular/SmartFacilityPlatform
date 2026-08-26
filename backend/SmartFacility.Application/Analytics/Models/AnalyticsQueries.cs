@@ -44,7 +44,7 @@ public sealed record ScadaAnalyticsQuery
     public TimeGrain? Grain { get; init; }
 }
 
-public sealed record HistoricalMaintenanceActivityQuery
+public sealed record WorkOrderActivityQuery
 {
     public DateOnly? DateFrom { get; init; }
     public DateOnly? DateTo { get; init; }

@@ -6,6 +6,7 @@ public sealed class WorkOrder
     public string WorkOrderNumber { get; set; } = string.Empty;
     public DateTime? ReportedDateTime { get; set; }
     public long? AssetId { get; set; }
+    public string? AssetCodeRaw { get; set; }
     public string? Description { get; set; }
     public string? Discipline { get; set; }
     public string? RequestedByName { get; set; }
@@ -16,16 +17,22 @@ public sealed class WorkOrder
     public string? FailureReason { get; set; }
     public long? BuildingId { get; set; }
     public long? LocationId { get; set; }
+    public string? LocationNameRaw { get; set; }
     public string? ResponseDurationRaw { get; set; }
     public string? DowntimeRaw { get; set; }
     public string? MaintenanceDurationRaw { get; set; }
     public string? TotalCostRaw { get; set; }
     public string? ServiceCostRaw { get; set; }
     public string? RawStatusCode { get; set; }
+    public string? CanonicalIdentityFingerprint { get; set; }
+    public string? SourceRowFingerprint { get; set; }
+    public bool IsInCanonicalSnapshot { get; set; } = true;
+    public long? LastSeenImportBatchId { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset UpdatedAt { get; set; }
 
     public Asset? Asset { get; set; }
     public Building? Building { get; set; }
     public Location? Location { get; set; }
+    public ImportBatch? LastSeenImportBatch { get; set; }
 }

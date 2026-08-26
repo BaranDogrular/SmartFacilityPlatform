@@ -9,7 +9,6 @@ public sealed class ImportFingerprintProviderTests
 {
     [Theory]
     [InlineData(ImportSourceTypes.Asset)]
-    [InlineData(ImportSourceTypes.WorkOrder)]
     [InlineData(ImportSourceTypes.ScadaAlarm)]
     public async Task Legacy_sources_keep_RowFingerprint_for_duplicate_detection(string sourceType)
     {
@@ -86,5 +85,35 @@ public sealed class ImportFingerprintProviderTests
         Assert.Equal(
             ScadaOutageIdempotencyFingerprintCalculator.Algorithm,
             provider.GetIdempotencyAlgorithm(ImportSourceTypes.ScadaOutage, row.SheetName));
+    }
+
+    [Fact]
+    public void WorkOrder_uses_versioned_candidate_identity_and_not_number_alone()
+    {
+        var first = RawRowFactory.Row(
+            "İş Emirleri",
+            2,
+            RawRowFactory.Text("D", "WO-1"),
+            RawRowFactory.DateTimeCell("E", new DateTime(2026, 8, 25)),
+            RawRowFactory.TimeCell("F", new TimeSpan(10, 0, 0)),
+            RawRowFactory.Text("G", "ASSET-1"));
+        var second = first with
+        {
+            RowNumber = 3,
+            Cells = new Dictionary<string, RawExcelCell>(first.Cells, StringComparer.OrdinalIgnoreCase)
+            {
+                ["F"] = RawRowFactory.TimeCell("F", new TimeSpan(11, 0, 0))
+            }
+        };
+        var provider = new ImportFingerprintProvider();
+
+        var firstFingerprint = provider.Calculate(ImportSourceTypes.WorkOrder, first);
+        var secondFingerprint = provider.Calculate(ImportSourceTypes.WorkOrder, second);
+
+        Assert.Equal(CanonicalWorkOrderIdentityCalculator.Algorithm, firstFingerprint.FingerprintAlgorithm);
+        Assert.NotEqual(firstFingerprint.IdempotencyFingerprint, secondFingerprint.IdempotencyFingerprint);
+        Assert.Equal(
+            CanonicalWorkOrderIdentityCalculator.Algorithm,
+            provider.GetIdempotencyAlgorithm(ImportSourceTypes.WorkOrder, first.SheetName));
     }
 }

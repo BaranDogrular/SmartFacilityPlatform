@@ -25,14 +25,14 @@ export function AssetsPage() {
       <PageHeader
         eyebrow="Varlık portföyü"
         title="Varlık portföyü"
-        description="Operasyonel envanter dağılımı ve mevcut iş emri aktivitesi."
+        description="Operasyonel envanter dağılımı ve canonical iş emri aktivitesi."
         actions={<DataTimestamp value={data.metadata.dataAsOf} />}
       />
 
       <section className="kpi-grid kpi-grid--three" aria-label="Varlık göstergeleri">
         <KpiCard label="Toplam Varlık" value={data.totalAssetCount} reliability={data.metadata.reliability} />
-        <KpiCard label="İş Emri Olan Varlık" value={data.assetsWithCurrentWorkOrders} reliability={data.metadata.reliability} tone="teal" />
-        <KpiCard label="İş Emri Olmayan Varlık" value={data.assetsWithoutCurrentWorkOrders} reliability={data.metadata.reliability} tone="slate" />
+        <KpiCard label="İş Emri Olan Varlık" value={data.assetsWithWorkOrders} reliability={data.metadata.reliability} tone="teal" />
+        <KpiCard label="İş Emri Olmayan Varlık" value={data.assetsWithoutWorkOrders} reliability={data.metadata.reliability} tone="slate" />
       </section>
 
       <div className="dashboard-grid dashboard-grid--two">

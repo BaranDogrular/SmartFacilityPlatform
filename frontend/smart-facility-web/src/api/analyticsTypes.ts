@@ -60,8 +60,8 @@ export interface AssetOverviewResponse {
   countByBuilding: DimensionCount[]
   countByLocation: DimensionCount[]
   countByAssetGroup: DimensionCount[]
-  assetsWithCurrentWorkOrders: number
-  assetsWithoutCurrentWorkOrders: number
+  assetsWithWorkOrders: number
+  assetsWithoutWorkOrders: number
   topAssetsByWorkOrderCount: AssetWorkOrderCount[]
   topAssetsReliability: KpiReliability
   metadata: SnapshotAnalyticsMetadata
@@ -71,14 +71,14 @@ export interface AssetMaintenanceActivityParetoItem {
   assetId: number
   assetCode: string
   assetName: string
-  currentWorkOrderCount: number
+  workOrderCount: number
   sharePercent: number
   cumulativeSharePercent: number
 }
 
 export interface AssetMaintenanceActivityParetoResponse {
-  totalCurrentWorkOrders: number
-  assetsWithCurrentWorkOrders: number
+  totalWorkOrders: number
+  assetsWithWorkOrders: number
   appliedTop: number
   topAssets: AssetMaintenanceActivityParetoItem[]
   metadata: DateRangeMetadata
@@ -86,8 +86,13 @@ export interface AssetMaintenanceActivityParetoResponse {
 
 export interface WorkOrderOverviewResponse {
   totalWorkOrders: number
+  openWorkOrders: number
+  closedWorkOrders: number
+  otherWorkOrders: number
+  last30DaysWorkOrders: number
   byDiscipline: CategoryCount[]
   byWorkType: CategoryCount[]
+  byRawStatusCode: CategoryCount[]
   byStatus: CategoryCount[]
   byFailureType: CategoryCount[]
   byBuilding: DimensionCount[]
@@ -103,7 +108,7 @@ export interface WorkOrderTrendResponse {
   metadata: DateRangeMetadata
 }
 
-export interface HistoricalMaintenanceActivityResponse {
+export interface WorkOrderActivityResponse {
   grain: TimeGrain
   trend: TrendPoint[]
   byDiscipline: CategoryCount[]
@@ -209,7 +214,7 @@ export interface ScadaAnalyticsQuery {
   grain?: TimeGrain
 }
 
-export interface HistoricalMaintenanceActivityQuery {
+export interface WorkOrderActivityQuery {
   dateFrom?: string
   dateTo?: string
   discipline?: string

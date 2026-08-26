@@ -7,6 +7,11 @@ public sealed class ImportFingerprintProvider : IImportFingerprintProvider
 {
     public string? GetIdempotencyAlgorithm(string sourceType, string sourceSheet)
     {
+        if (IsWorkOrder(sourceType))
+        {
+            return CanonicalWorkOrderIdentityCalculator.Algorithm;
+        }
+
         if (IsHistoricalWorkOrder(sourceType))
         {
             return HistoricalWorkOrderIdempotencyFingerprintCalculator.Algorithm;
@@ -35,6 +40,14 @@ public sealed class ImportFingerprintProvider : IImportFingerprintProvider
     public ImportRowFingerprints Calculate(string sourceType, RawExcelRow row)
     {
         var rowFingerprint = RowFingerprintCalculator.Calculate(sourceType, row);
+        if (IsWorkOrder(sourceType))
+        {
+            return new ImportRowFingerprints(
+                rowFingerprint,
+                CanonicalWorkOrderIdentityCalculator.Calculate(row),
+                CanonicalWorkOrderIdentityCalculator.Algorithm);
+        }
+
         if (IsHistoricalWorkOrder(sourceType))
         {
             return new ImportRowFingerprints(
@@ -79,6 +92,12 @@ public sealed class ImportFingerprintProvider : IImportFingerprintProvider
         string.Equals(
             sourceType,
             ImportSourceTypes.HistoricalWorkOrder,
+            StringComparison.OrdinalIgnoreCase);
+
+    private static bool IsWorkOrder(string sourceType) =>
+        string.Equals(
+            sourceType,
+            ImportSourceTypes.WorkOrder,
             StringComparison.OrdinalIgnoreCase);
 
     private static bool IsScadaOutage(string sourceType) =>

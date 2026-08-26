@@ -11,7 +11,8 @@ public sealed class ExcelImportService(
     IImportProfileCatalog profileCatalog,
     IImportFingerprintProvider fingerprintProvider,
     IEnumerable<IImportRowProcessor> processors,
-    ILogger<ExcelImportService> logger) : IImportService
+    ILogger<ExcelImportService> logger,
+    ICanonicalWorkOrderImportService? canonicalWorkOrderImportService = null) : IImportService
 {
     private readonly IReadOnlyDictionary<string, IImportRowProcessor> _processors = processors
         .ToDictionary(processor => processor.ProfileKey, StringComparer.OrdinalIgnoreCase);
@@ -23,6 +24,17 @@ public sealed class ExcelImportService(
         ArgumentNullException.ThrowIfNull(request);
         ArgumentException.ThrowIfNullOrWhiteSpace(request.ProfileKey);
         ArgumentException.ThrowIfNullOrWhiteSpace(request.FilePath);
+
+        if (string.Equals(
+                request.ProfileKey,
+                Profiles.ImportProfileKeys.WorkOrder,
+                StringComparison.OrdinalIgnoreCase)
+            && canonicalWorkOrderImportService is not null)
+        {
+            return await canonicalWorkOrderImportService.ImportAsync(
+                request.FilePath,
+                cancellationToken);
+        }
 
         var profile = profileCatalog.GetRequired(request.ProfileKey);
         var processor = _processors.GetValueOrDefault(profile.Key)

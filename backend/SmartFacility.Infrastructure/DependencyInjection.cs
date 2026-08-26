@@ -48,7 +48,7 @@ public static class DependencyInjection
             provider.GetRequiredService<EfAnalyticsQueryService>());
         services.AddScoped<IWorkOrderAnalyticsService>(provider =>
             provider.GetRequiredService<EfAnalyticsQueryService>());
-        services.AddScoped<IHistoricalWorkOrderAnalyticsService>(provider =>
+        services.AddScoped<IWorkOrderActivityService>(provider =>
             provider.GetRequiredService<EfAnalyticsQueryService>());
         services.AddScoped<IScadaAnalyticsService>(provider =>
             provider.GetRequiredService<EfAnalyticsQueryService>());
@@ -78,6 +78,8 @@ public static class DependencyInjection
         services.AddScoped<IImportIdempotencyLock, SqlServerImportIdempotencyLock>();
         services.AddScoped<IImportDimensionLock, SqlServerImportDimensionLock>();
         services.AddScoped<IImportDataStore, EfImportDataStore>();
+        services.AddScoped<ICanonicalWorkOrderSnapshotStore, EfCanonicalWorkOrderSnapshotStore>();
+        services.AddScoped<ICanonicalWorkOrderImportService, CanonicalWorkOrderImportService>();
         services.AddScoped<IImportRowProcessor, AssetImportProcessor>();
         services.AddScoped<IImportRowProcessor, WorkOrderImportProcessor>();
         services.AddScoped<IImportRowProcessor, HistoricalWorkOrderImportProcessor>();

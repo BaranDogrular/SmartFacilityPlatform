@@ -83,16 +83,16 @@ export function OverviewPage() {
         </header>
         <div className="kpi-grid overview-kpi-strip" aria-label="Genel performans göstergeleri">
           <KpiCard
-            label="Mevcut İş Emirleri"
+            label="Toplam İş Emri"
             value={workOrders.data.totalWorkOrders}
-            note="Yalnız current WorkOrder kaynağı"
+            note={`${formatCount(workOrders.data.openWorkOrders)} açık iş emri`}
             reliability={workOrders.data.metadata.reliability}
             tone="teal"
           />
           <KpiCard
             label="Operasyonel Varlıklar"
             value={assets.data.totalAssetCount}
-            note={`${formatCount(assets.data.assetsWithCurrentWorkOrders)} varlıkta current aktivite`}
+            note={`${formatCount(assets.data.assetsWithWorkOrders)} varlıkta iş emri aktivitesi`}
             reliability={assets.data.metadata.reliability}
             tone="navy"
           />
@@ -119,13 +119,13 @@ export function OverviewPage() {
             <p className="page-eyebrow">Bakım aktivitesi</p>
             <h2 id="primary-analytics-title">Ana Operasyon Analitiği</h2>
           </div>
-          <p>Current WorkOrder kapsamındaki yoğunluk ve disiplin dağılımı.</p>
+          <p>Canonical WorkOrder kapsamındaki yoğunluk ve disiplin dağılımı.</p>
         </header>
 
         <div className="dashboard-grid dashboard-grid--two overview-primary-grid">
           <ChartPanel
             title="Bakım Aktivitesi Yoğunluğu"
-            subtitle="Current iş emri sayısına göre öne çıkan varlıklar"
+            subtitle="Canonical iş emri sayısına göre öne çıkan varlıklar"
             reliability={assets.data.topAssetsReliability}
           >
             <HorizontalBarChart
@@ -137,13 +137,13 @@ export function OverviewPage() {
               compact
             />
             <div className="quality-summary">
-              <span>Current kaydı olan varlık <strong>{formatCount(assets.data.assetsWithCurrentWorkOrders)}</strong></span>
+              <span>İş emri kaydı olan varlık <strong>{formatCount(assets.data.assetsWithWorkOrders)}</strong></span>
             </div>
           </ChartPanel>
 
           <ChartPanel
-            title="Mevcut İş Emri Disiplinleri"
-            subtitle="Current WorkOrder kayıtlarının raw disiplin dağılımı"
+            title="İş Emri Disiplinleri"
+            subtitle="Canonical WorkOrder kayıtlarının raw disiplin dağılımı"
             reliability={workOrders.data.metadata.reliability}
           >
             <HorizontalBarChart
@@ -152,7 +152,7 @@ export function OverviewPage() {
               compact
             />
             <div className="quality-summary">
-              <span>Toplam current kayıt <strong>{formatCount(workOrders.data.totalWorkOrders)}</strong></span>
+              <span>Toplam canonical kayıt <strong>{formatCount(workOrders.data.totalWorkOrders)}</strong></span>
             </div>
           </ChartPanel>
         </div>
@@ -203,7 +203,7 @@ export function OverviewPage() {
       </section>
 
       <InfoNote>
-        Geçmiş İş Emri Aktivitesi current toplamlarla birleştirilmez ve İş Emirleri ekranında ayrı dataset olarak sunulur.
+        İş emri toplamları ve tarihsel aktivite aynı canonical WorkOrder dataset'inden üretilir.
         Yüksek asset aktivitesi, asset sağlığı veya arıza olasılığı anlamına gelmez.
       </InfoNote>
     </div>

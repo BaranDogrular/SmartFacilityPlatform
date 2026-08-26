@@ -4,8 +4,8 @@ import type {
   AssetMaintenanceActivityParetoResponse,
   AssetOverviewQuery,
   AssetOverviewResponse,
-  HistoricalMaintenanceActivityQuery,
-  HistoricalMaintenanceActivityResponse,
+  WorkOrderActivityQuery,
+  WorkOrderActivityResponse,
   ImportQualityOverviewResponse,
   ScadaAnalyticsQuery,
   ScadaClearanceIntervalQuery,
@@ -111,11 +111,11 @@ export const getWorkOrderOverview = (query: WorkOrderAnalyticsQuery = {}) =>
 export const getWorkOrderTrend = (query: WorkOrderAnalyticsQuery = {}) =>
   get<WorkOrderTrendResponse>('/api/analytics/work-orders/trend', query as QueryParameters)
 
-export const getHistoricalMaintenanceActivity = (
-  query: HistoricalMaintenanceActivityQuery = {},
+export const getWorkOrderActivity = (
+  query: WorkOrderActivityQuery = {},
 ) =>
-  get<HistoricalMaintenanceActivityResponse>(
-    '/api/analytics/historical-work-orders/activity',
+  get<WorkOrderActivityResponse>(
+    '/api/analytics/work-orders/activity',
     query as QueryParameters,
   )
 

@@ -11,8 +11,8 @@ public sealed record AssetOverviewResponse(
     IReadOnlyList<DimensionCountDto> CountByBuilding,
     IReadOnlyList<DimensionCountDto> CountByLocation,
     IReadOnlyList<DimensionCountDto> CountByAssetGroup,
-    long AssetsWithCurrentWorkOrders,
-    long AssetsWithoutCurrentWorkOrders,
+    long AssetsWithWorkOrders,
+    long AssetsWithoutWorkOrders,
     IReadOnlyList<AssetWorkOrderCountDto> TopAssetsByWorkOrderCount,
     KpiReliability TopAssetsReliability,
     SnapshotAnalyticsMetadataDto Metadata);
@@ -21,21 +21,26 @@ public sealed record AssetMaintenanceActivityParetoItemDto(
     long AssetId,
     string AssetCode,
     string AssetName,
-    long CurrentWorkOrderCount,
+    long WorkOrderCount,
     decimal SharePercent,
     decimal CumulativeSharePercent);
 
 public sealed record AssetMaintenanceActivityParetoResponse(
-    long TotalCurrentWorkOrders,
-    long AssetsWithCurrentWorkOrders,
+    long TotalWorkOrders,
+    long AssetsWithWorkOrders,
     int AppliedTop,
     IReadOnlyList<AssetMaintenanceActivityParetoItemDto> TopAssets,
     DateRangeMetadataDto Metadata);
 
 public sealed record WorkOrderOverviewResponse(
     long TotalWorkOrders,
+    long OpenWorkOrders,
+    long ClosedWorkOrders,
+    long OtherWorkOrders,
+    long Last30DaysWorkOrders,
     IReadOnlyList<CategoryCountDto> ByDiscipline,
     IReadOnlyList<CategoryCountDto> ByWorkType,
+    IReadOnlyList<CategoryCountDto> ByRawStatusCode,
     IReadOnlyList<CategoryCountDto> ByStatus,
     IReadOnlyList<CategoryCountDto> ByFailureType,
     IReadOnlyList<DimensionCountDto> ByBuilding,
@@ -49,7 +54,7 @@ public sealed record WorkOrderTrendResponse(
     IReadOnlyList<TrendPointDto> Points,
     DateRangeMetadataDto Metadata);
 
-public sealed record HistoricalMaintenanceActivityResponse(
+public sealed record WorkOrderActivityResponse(
     TimeGrain Grain,
     IReadOnlyList<TrendPointDto> Trend,
     IReadOnlyList<CategoryCountDto> ByDiscipline,

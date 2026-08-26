@@ -2,7 +2,7 @@ import { useState, type FormEvent } from 'react'
 import type { WorkOrderAnalyticsQuery } from '../api/analyticsTypes'
 import { ChartPanel, HorizontalBarChart, TrendLineChart } from '../components/AnalyticsCharts'
 import { DataTimestamp, EmptyState, ErrorState, InfoNote, KpiCard, LoadingState, PageHeader } from '../components/DashboardUi'
-import { HistoricalMaintenanceActivity } from '../components/HistoricalMaintenanceActivity'
+import { WorkOrderActivity } from '../components/WorkOrderActivity'
 import { useWorkOrderOverview, useWorkOrderTrend } from '../hooks/useAnalytics'
 
 const emptyFilters: WorkOrderAnalyticsQuery = {}
@@ -61,13 +61,13 @@ export function WorkOrdersPage() {
   return (
     <div className="page-stack">
       <PageHeader
-        eyebrow="Operasyonel iş yükü"
-        title="Mevcut İş Emirleri"
-        description="Current WorkOrder kaynağındaki disiplin, iş tipi, durum ve kategori dağılımları ile aylık hareket."
+        eyebrow="Canonical iş emri verisi"
+        title="İş Emirleri"
+        description="Toplam kaynak dataset'indeki açık, kapalı ve diğer source durumları ile workflow dağılımları."
         actions={<DataTimestamp value={data.metadata.dataAsOf} />}
       />
 
-      <section className="dataset-section dataset-section--current" aria-label="Mevcut iş emri veri seti">
+      <section className="dataset-section" aria-label="Canonical iş emri veri seti">
       <form className="filter-panel" onSubmit={applyFilters} aria-label="İş emri filtreleri">
         <div className="filter-grid">
           <label>
@@ -100,7 +100,7 @@ export function WorkOrdersPage() {
             </select>
           </label>
           <label>
-            <span>Durum</span>
+            <span>Workflow statüsü</span>
             <select
               className="form-select"
               value={draft.status ?? ''}
@@ -122,8 +122,11 @@ export function WorkOrdersPage() {
         <EmptyState />
       ) : (
         <>
-          <section className="kpi-grid kpi-grid--one" aria-label="İş emri göstergeleri">
-            <KpiCard label="Toplam Güncel İş Emri" value={data.totalWorkOrders} reliability={data.metadata.reliability} tone="teal" />
+          <section className="kpi-grid" aria-label="İş emri göstergeleri">
+            <KpiCard label="Toplam İş Emri" value={data.totalWorkOrders} reliability={data.metadata.reliability} tone="teal" />
+            <KpiCard label="Açık İş Emri" value={data.openWorkOrders} note="Source durum kodu: A" reliability={data.metadata.reliability} tone="amber" />
+            <KpiCard label="Kapalı İş Emri" value={data.closedWorkOrders} note="Source durum kodu: K" reliability={data.metadata.reliability} tone="navy" />
+            <KpiCard label="Son 30 Gün Aktivitesi" value={data.last30DaysWorkOrders} note="Durumdan bağımsız kayıt aktivitesi" reliability={data.metadata.reliability} tone="slate" />
           </section>
 
           <ChartPanel title="Aylık İş Emri Trendi" subtitle="ReportedDateTime alanına göre" reliability={trend.data.metadata.reliability}>
@@ -137,7 +140,10 @@ export function WorkOrdersPage() {
             <ChartPanel title="İş Tipi Dağılımı" reliability={data.metadata.reliability}>
               <HorizontalBarChart data={data.byWorkType.map((item) => ({ label: item.category, count: item.count }))} />
             </ChartPanel>
-            <ChartPanel title="Durum Dağılımı" reliability={data.metadata.reliability}>
+            <ChartPanel title="İş Emri Source Durumu" subtitle="A: Açık, K: Kapalı, diğer kodlar ayrı" reliability={data.metadata.reliability}>
+              <HorizontalBarChart data={data.byRawStatusCode.map((item) => ({ label: item.category, count: item.count }))} />
+            </ChartPanel>
+            <ChartPanel title="Workflow Statü Dağılımı" subtitle="Source açık/kapalı durumundan farklıdır" reliability={data.metadata.reliability}>
               <HorizontalBarChart data={data.byStatus.map((item) => ({ label: item.category, count: item.count }))} />
             </ChartPanel>
             <ChartPanel title="Arıza / İş Kategorisi" reliability={data.metadata.reliability}>
@@ -153,10 +159,13 @@ export function WorkOrdersPage() {
         </>
       )}
 
-      <InfoNote>Bu görünüm yalnız güncel WorkOrder veri kaynağını içerir; geçmiş analitik kayıtlar bu toplamlara dahil değildir.</InfoNote>
+      <InfoNote>
+        Açık ve kapalı sayıları source <span className="code-chip">RawStatusCode</span> alanından hesaplanır.
+        Workflow statüsü bu sayımları belirlemez. Diğer durumlar: {data.otherWorkOrders}.
+      </InfoNote>
       </section>
 
-      <HistoricalMaintenanceActivity />
+      <WorkOrderActivity />
     </div>
   )
 }

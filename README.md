@@ -160,11 +160,11 @@ Mevcut HTTP yüzeyinin tamamı `GET /api/analytics` altındadır:
 | Endpoint | Anlam |
 |---|---|
 | `/api/analytics/import-quality/overview` | Import batch, lineage, error ve fingerprint audit özeti |
-| `/api/analytics/assets/overview` | Asset envanteri ve current WorkOrder ilişkisi |
-| `/api/analytics/assets/maintenance-activity-pareto` | Asset bazında current WorkOrder aktivite yoğunluğu |
-| `/api/analytics/work-orders/overview` | Yalnız current WorkOrder aggregations |
-| `/api/analytics/work-orders/trend` | Yalnız current WorkOrder aylık trendi |
-| `/api/analytics/historical-work-orders/activity` | Yalnız HistoricalWorkOrder trend ve Discipline dağılımı |
+| `/api/analytics/assets/overview` | Asset envanteri ve canonical WorkOrder ilişkisi |
+| `/api/analytics/assets/maintenance-activity-pareto` | Asset bazında canonical WorkOrder aktivite yoğunluğu |
+| `/api/analytics/work-orders/overview` | Canonical toplam/açık/kapalı/diğer ve dağılımlar |
+| `/api/analytics/work-orders/trend` | Canonical WorkOrder aylık trendi |
+| `/api/analytics/work-orders/activity` | Canonical WorkOrder tarih ve Discipline aktivitesi |
 | `/api/analytics/scada/overview` | SCADA source-occurrence ve timestamp kalite özeti |
 | `/api/analytics/scada/trend` | Geçerli ReceivedAt kayıtlarıyla aylık occurrence trendi |
 | `/api/analytics/scada/clearance-interval` | Quality-eligible occurrence subset'i için clearance median/P90 |
@@ -228,7 +228,9 @@ Representative local production-mode measurements on the current acceptance data
 
 Bunlar SLA değildir; donanım, SQL Server, veri hacmi ve eşzamanlı yükle birlikte değişir.
 
-Son acceptance sırasında gözlenen referans veri büyüklükleri: 5.404 Assets, 54.823 current WorkOrders, 167.143 HistoricalWorkOrders ve 1.950 ScadaAlarmEvents. Bu sayılar product contract veya sabit seed değildir.
+Canonical modelde `core.WorkOrders` toplam kaynak dataset'ini temsil eder. Açık durum `RawStatusCode=A`, kapalı durum `RawStatusCode=K` ile hesaplanır; workflow `Status` alanı bu sınıflandırmayı belirlemez. `analytics.HistoricalWorkOrders` yalnız legacy dated snapshot/audit lineage olarak korunur ve business analytics tarafından sorgulanmaz.
+
+25.08.2026 canonical export acceptance baseline'ı yaklaşık 171.136 WorkOrders, 75 açık, 171.054 kapalı ve 7 diğer kayıttır. Bu sayılar hard-coded product contract değildir.
 
 ## Offline ML sonucu
 

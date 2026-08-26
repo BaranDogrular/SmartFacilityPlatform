@@ -43,8 +43,8 @@ public sealed class AnalyticsQueryServiceTests
         Assert.Equal(2, Assert.Single(response.CountByBuilding).Count);
         Assert.Equal(2, Assert.Single(response.CountByLocation).Count);
         Assert.Equal(2, Assert.Single(response.CountByAssetGroup).Count);
-        Assert.Equal(1, response.AssetsWithCurrentWorkOrders);
-        Assert.Equal(1, response.AssetsWithoutCurrentWorkOrders);
+        Assert.Equal(1, response.AssetsWithWorkOrders);
+        Assert.Equal(1, response.AssetsWithoutWorkOrders);
         Assert.Equal("A-1", Assert.Single(response.TopAssetsByWorkOrderCount).AssetCode);
         Assert.Equal(KpiReliability.Yellow, response.TopAssetsReliability);
     }
@@ -86,22 +86,22 @@ public sealed class AnalyticsQueryServiceTests
                 Top = 2
             });
 
-        Assert.Equal(6, response.TotalCurrentWorkOrders);
-        Assert.Equal(3, response.AssetsWithCurrentWorkOrders);
+        Assert.Equal(6, response.TotalWorkOrders);
+        Assert.Equal(3, response.AssetsWithWorkOrders);
         Assert.Equal(2, response.AppliedTop);
         Assert.Collection(
             response.TopAssets,
             item =>
             {
                 Assert.Equal("A-1", item.AssetCode);
-                Assert.Equal(3, item.CurrentWorkOrderCount);
+                Assert.Equal(3, item.WorkOrderCount);
                 Assert.Equal(50m, item.SharePercent);
                 Assert.Equal(50m, item.CumulativeSharePercent);
             },
             item =>
             {
                 Assert.Equal("A-2", item.AssetCode);
-                Assert.Equal(2, item.CurrentWorkOrderCount);
+                Assert.Equal(2, item.WorkOrderCount);
                 Assert.Equal(33.3333m, item.SharePercent);
                 Assert.Equal(83.3333m, item.CumulativeSharePercent);
             });
@@ -137,8 +137,8 @@ public sealed class AnalyticsQueryServiceTests
                 DateFrom = new DateOnly(2025, 1, 1),
                 DateTo = new DateOnly(2025, 1, 31)
             });
-        Assert.Equal(0, empty.TotalCurrentWorkOrders);
-        Assert.Equal(0, empty.AssetsWithCurrentWorkOrders);
+        Assert.Equal(0, empty.TotalWorkOrders);
+        Assert.Equal(0, empty.AssetsWithWorkOrders);
         Assert.Empty(empty.TopAssets);
         Assert.Null(empty.Metadata.ActualMinDate);
     }
@@ -185,6 +185,9 @@ public sealed class AnalyticsQueryServiceTests
         });
 
         Assert.Equal(1, response.TotalWorkOrders);
+        Assert.Equal(0, response.OpenWorkOrders);
+        Assert.Equal(1, response.ClosedWorkOrders);
+        Assert.Equal(0, response.OtherWorkOrders);
         Assert.Equal("Electrical", Assert.Single(response.ByDiscipline).Category);
         Assert.Equal("Corrective", Assert.Single(response.ByWorkType).Category);
         Assert.Equal("Closed", Assert.Single(response.ByStatus).Category);
@@ -209,6 +212,31 @@ public sealed class AnalyticsQueryServiceTests
         Assert.Empty(response.ByDiscipline);
         Assert.Null(response.Metadata.ActualMinDate);
         Assert.Null(response.Metadata.ActualMaxDate);
+    }
+
+    [Fact]
+    public async Task Work_order_open_and_closed_counts_use_raw_source_state_not_workflow_status()
+    {
+        await using var database = await SqliteTestDatabase.CreateAsync();
+        var (building, location, _, asset, _) = await SeedAssetDimensionsAsync(database);
+        var sourceOpen = WorkOrder("WO-OPEN", DateTime.Today, asset, building, location);
+        sourceOpen.RawStatusCode = "A";
+        sourceOpen.Status = "Kapalı";
+        var sourceClosed = WorkOrder("WO-CLOSED", DateTime.Today, asset, building, location);
+        sourceClosed.RawStatusCode = "K";
+        sourceClosed.Status = "Açık İş Emri";
+        var other = WorkOrder("WO-OTHER", DateTime.Today, asset, building, location);
+        other.RawStatusCode = "I";
+        database.Context.WorkOrders.AddRange(sourceOpen, sourceClosed, other);
+        await database.Context.SaveChangesAsync();
+
+        var response = await new EfAnalyticsQueryService(database.Context)
+            .GetOverviewAsync(new WorkOrderAnalyticsQuery());
+
+        Assert.Equal(3, response.TotalWorkOrders);
+        Assert.Equal(1, response.OpenWorkOrders);
+        Assert.Equal(1, response.ClosedWorkOrders);
+        Assert.Equal(1, response.OtherWorkOrders);
     }
 
     [Fact]
@@ -251,25 +279,24 @@ public sealed class AnalyticsQueryServiceTests
     }
 
     [Fact]
-    public async Task Historical_activity_groups_months_and_raw_disciplines_without_current_rows()
+    public async Task Work_order_activity_uses_canonical_rows_and_excludes_legacy_snapshot()
     {
         await using var database = await SqliteTestDatabase.CreateAsync();
         var (building, location, _, asset, _) = await SeedAssetDimensionsAsync(database);
-        database.Context.WorkOrders.Add(
-            WorkOrder("CURRENT", new DateTime(2026, 1, 10), asset, building, location));
-        database.Context.HistoricalWorkOrders.AddRange(
-            Historical("H-1", new DateTime(2026, 1, 1), "Electrical"),
-            Historical("H-2", new DateTime(2026, 1, 31, 23, 59, 59), "Mechanical"),
-            Historical("H-3", new DateTime(2026, 2, 1), "Electrical"),
-            Historical("H-4", null, "Electrical"));
+        database.Context.WorkOrders.AddRange(
+            WorkOrder("W-1", new DateTime(2026, 1, 1), asset, building, location, "Electrical"),
+            WorkOrder("W-2", new DateTime(2026, 1, 31, 23, 59, 59), asset, building, location, "Mechanical"),
+            WorkOrder("W-3", new DateTime(2026, 2, 1), asset, building, location, "Electrical"));
+        database.Context.HistoricalWorkOrders.Add(
+            Historical("LEGACY", new DateTime(2026, 2, 2), "LegacyOnly"));
         await database.Context.SaveChangesAsync();
 
         var service = new EfAnalyticsQueryService(database.Context);
-        var response = await service.GetActivityAsync(new HistoricalMaintenanceActivityQuery());
+        var response = await service.GetActivityAsync(new WorkOrderActivityQuery());
 
-        Assert.Equal(4, response.Metadata.MatchedRecordCount);
+        Assert.Equal(3, response.Metadata.MatchedRecordCount);
         Assert.Equal(3, response.Metadata.ValidRecordCount);
-        Assert.Equal(1, response.Metadata.ExcludedByQualityCount);
+        Assert.Equal(0, response.Metadata.ExcludedByQualityCount);
         Assert.Collection(
             response.Trend,
             point =>
@@ -283,24 +310,26 @@ public sealed class AnalyticsQueryServiceTests
                 Assert.Equal(1, point.Count);
             });
         Assert.Contains(response.ByDiscipline, item =>
-            item.Category == "Electrical" && item.Count == 3);
+            item.Category == "Electrical" && item.Count == 2);
         Assert.Contains(response.ByDiscipline, item =>
             item.Category == "Mechanical" && item.Count == 1);
-        Assert.Equal("analytics.HistoricalWorkOrders", response.Metadata.SourceDataset);
+        Assert.DoesNotContain(response.ByDiscipline, item => item.Category == "LegacyOnly");
+        Assert.Equal("core.WorkOrders", response.Metadata.SourceDataset);
         Assert.Equal(KpiReliability.Green, response.Metadata.Reliability);
     }
 
     [Fact]
-    public async Task Historical_activity_applies_exact_filter_and_returns_empty_for_no_match()
+    public async Task Work_order_activity_applies_exact_filter_and_returns_empty_for_no_match()
     {
         await using var database = await SqliteTestDatabase.CreateAsync();
-        database.Context.HistoricalWorkOrders.AddRange(
-            Historical("H-1", new DateTime(2026, 1, 31, 23, 59, 59), "Electrical"),
-            Historical("H-2", new DateTime(2026, 2, 1), "Mechanical"));
+        var (building, location, _, asset, _) = await SeedAssetDimensionsAsync(database);
+        database.Context.WorkOrders.AddRange(
+            WorkOrder("W-1", new DateTime(2026, 1, 31, 23, 59, 59), asset, building, location, "Electrical"),
+            WorkOrder("W-2", new DateTime(2026, 2, 1), asset, building, location, "Mechanical"));
         await database.Context.SaveChangesAsync();
 
         var service = new EfAnalyticsQueryService(database.Context);
-        var filtered = await service.GetActivityAsync(new HistoricalMaintenanceActivityQuery
+        var filtered = await service.GetActivityAsync(new WorkOrderActivityQuery
         {
             DateFrom = new DateOnly(2026, 1, 31),
             DateTo = new DateOnly(2026, 1, 31),
@@ -310,7 +339,7 @@ public sealed class AnalyticsQueryServiceTests
         Assert.Equal("Electrical", filtered.AppliedDiscipline);
         Assert.Equal("Electrical", Assert.Single(filtered.ByDiscipline).Category);
 
-        var empty = await service.GetActivityAsync(new HistoricalMaintenanceActivityQuery
+        var empty = await service.GetActivityAsync(new WorkOrderActivityQuery
         {
             Discipline = "NoMatch"
         });
@@ -479,6 +508,7 @@ public sealed class AnalyticsQueryServiceTests
             Location = location,
             Description = $"Description {number}",
             Discipline = discipline,
+            RawStatusCode = "K",
             Status = "Closed",
             WorkType = "Corrective",
             FailureType = "Request",

@@ -24,25 +24,25 @@ export function AssetMaintenanceActivityPareto() {
 
   return (
     <ChartPanel
-      title="Current İş Emri Aktivitesi En Yoğun Asset'ler"
-      subtitle={`Top-${data.appliedTop} asset'in toplam current iş emri kayıtlarındaki payı`}
+      title="İş Emri Aktivitesi En Yoğun Asset'ler"
+      subtitle={`Top-${data.appliedTop} asset'in toplam canonical iş emri kayıtlarındaki payı`}
       reliability={data.metadata.reliability}
     >
       {data.topAssets.length === 0 ? (
-        <EmptyState message="Seçilen kapsamda current iş emri aktivitesi bulunan asset yok." />
+        <EmptyState message="Seçilen kapsamda iş emri aktivitesi bulunan asset yok." />
       ) : (
         <>
           <HorizontalBarChart
             data={data.topAssets.map((item) => ({
               label: item.assetCode,
-              count: item.currentWorkOrderCount,
+              count: item.workOrderCount,
             }))}
             maxItems={data.appliedTop}
           />
 
-          <div className="quality-summary" aria-label="Current iş emri aktivitesi özeti">
-            <span>Toplam current kayıt <strong>{formatCount(data.totalCurrentWorkOrders)}</strong></span>
-            <span>Current kaydı olan asset <strong>{formatCount(data.assetsWithCurrentWorkOrders)}</strong></span>
+          <div className="quality-summary" aria-label="İş emri aktivitesi özeti">
+            <span>Toplam canonical kayıt <strong>{formatCount(data.totalWorkOrders)}</strong></span>
+            <span>İş emri kaydı olan asset <strong>{formatCount(data.assetsWithWorkOrders)}</strong></span>
           </div>
 
           <div className="table-responsive pareto-table-wrap">
@@ -52,7 +52,7 @@ export function AssetMaintenanceActivityPareto() {
                   <th scope="col">Sıra</th>
                   <th scope="col">Asset kodu</th>
                   <th scope="col">Asset</th>
-                  <th scope="col" className="text-end">Current iş emri</th>
+                  <th scope="col" className="text-end">İş emri</th>
                   <th scope="col" className="text-end">Pay</th>
                   <th scope="col" className="text-end">Kümülatif pay</th>
                 </tr>
@@ -63,7 +63,7 @@ export function AssetMaintenanceActivityPareto() {
                     <td>{index + 1}</td>
                     <td><span className="code-chip">{item.assetCode}</span></td>
                     <td>{item.assetName}</td>
-                    <td className="text-end"><strong>{formatCount(item.currentWorkOrderCount)}</strong></td>
+                    <td className="text-end"><strong>{formatCount(item.workOrderCount)}</strong></td>
                     <td className="text-end">{formatPercent(item.sharePercent)}</td>
                     <td className="text-end"><strong>{formatPercent(item.cumulativeSharePercent)}</strong></td>
                   </tr>

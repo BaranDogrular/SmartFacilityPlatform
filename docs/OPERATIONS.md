@@ -61,18 +61,40 @@ ORDER BY [MigrationId];
 - [ ] Eksik migration varsa ayrıca onaylı change window, backup/rollback planı ve yetkili identity hazır.
 - [ ] `dotnet ef database update` yalnız bu ayrı, write-enabled bakım adımında çalıştırılacak; normal API startup veya smoke testin parçası değildir.
 
+### Canonical WorkOrder snapshot import
+
+Önce zorunlu, write-free preflight çalıştırılır:
+
+```powershell
+dotnet run --no-build -c Release --project .\backend\SmartFacility.Api\SmartFacility.Api.csproj -- `
+  --canonical-work-orders-preflight "C:\controlled-input\work-orders.xlsx"
+```
+
+`CanImport=true`, parse/header/identity collision sayıları sıfır ve source baseline açıklanabilir olmadan import çalıştırılmaz. Unresolved asset/location değerleri raw anahtarlarıyla korunur; placeholder dimension yaratılmaz ve nullable ilişkiler açıkça raporlanır.
+
+Onaylı write window'da aynı preflight'ı tekrar yapan atomic import:
+
+```powershell
+dotnet run --no-build -c Release --project .\backend\SmartFacility.Api\SmartFacility.Api.csproj -- `
+  --canonical-work-orders-import "C:\controlled-input\work-orders.xlsx"
+```
+
+Bu komut import-level SQL application lock ve tek snapshot transaction kullanır. Failure/cancellation core snapshot ve source records'ı rollback eder; batch failure audit'i korunur. Aynı export core duplicate üretmez. Legacy `analytics.HistoricalWorkOrders` tablosu bu prosedürde değiştirilmez.
+
 ## 5. Read-only database smoke
 
 Yetkili read-only bağlantıyla:
 
 ```sql
 SELECT COUNT_BIG(*) AS Assets FROM [core].[Assets];
-SELECT COUNT_BIG(*) AS CurrentWorkOrders FROM [core].[WorkOrders];
-SELECT COUNT_BIG(*) AS HistoricalWorkOrders FROM [analytics].[HistoricalWorkOrders];
+SELECT COUNT_BIG(*) AS CanonicalWorkOrders FROM [core].[WorkOrders] WHERE [IsInCanonicalSnapshot] = 1;
+SELECT COUNT_BIG(*) AS OpenWorkOrders FROM [core].[WorkOrders] WHERE [IsInCanonicalSnapshot] = 1 AND [RawStatusCode] = N'A';
+SELECT COUNT_BIG(*) AS ClosedWorkOrders FROM [core].[WorkOrders] WHERE [IsInCanonicalSnapshot] = 1 AND [RawStatusCode] = N'K';
+SELECT COUNT_BIG(*) AS LegacyHistoricalSnapshotRows FROM [analytics].[HistoricalWorkOrders];
 SELECT COUNT_BIG(*) AS ScadaAlarmEvents FROM [core].[ScadaAlarmEvents];
 ```
 
-Acceptance sırasında gözlenen `5.404 / 54.823 / 167.143 / 1.950` değerleri yalnız referanstır; product contract değildir. Production smoke için sayıların belirli sabite eşit olması değil, sorguların doğru hedefe read-only erişmesi ve beklenen release baseline'ıyla açıklanabilir olması gerekir.
+25.08.2026 canonical acceptance için beklenen yaklaşık baseline `5.404 Assets / 171.136 canonical WorkOrders / 75 open / 171.054 closed / 7 other / 167.143 legacy snapshot / 1.950 SCADA` değeridir. Bunlar hard-coded product contract değildir.
 
 ## 6. Stale import batch kontrolü
 
@@ -105,7 +127,7 @@ Production bağlantı bilgisi ve token/headers gerekiyorsa gateway prosedürün�
 ```text
 GET /api/analytics/assets/overview
 GET /api/analytics/assets/maintenance-activity-pareto?top=10
-GET /api/analytics/historical-work-orders/activity
+GET /api/analytics/work-orders/activity
 GET /api/analytics/scada/clearance-interval
 ```
 
@@ -113,7 +135,7 @@ GET /api/analytics/scada/clearance-interval
 - [ ] Invalid date range ve invalid Pareto Top validation response'u 400.
 - [ ] Production `/swagger` ve `/swagger/index.html` 404.
 - [ ] Browser ana route'ları açılıyor; console/network kritik hata yok.
-- [ ] Current ve Historical toplamlar birleşmiyor.
+- [ ] WorkOrder toplam/açık/kapalı değerleri canonical dataset'ten geliyor; legacy snapshot dahil değil.
 - [ ] Pareto health/failure, clearance MTTR/repair duration olarak sunulmuyor.
 - [ ] Green/Yellow reliability açıklamaları görünür.
 - [ ] No-match filtre empty state üretir; NaN/Infinity yok.
@@ -140,7 +162,7 @@ No-go koşulları:
 - TLS veya `/api` routing yok.
 - Swagger Production'da açık.
 - Ana analytics endpoint'i 5xx/timeout üretiyor.
-- Current/Historical veya Pareto/Clearance semantiği UI'da bozulmuş.
+- Canonical/source-state veya Pareto/Clearance semantiği UI'da bozulmuş.
 - Read-only smoke sırasında beklenmeyen database değişikliği var.
 
 Rollback veya incident sırasında import audit/history kayıtlarını silme. Schema/data rollback ayrı, açıkça onaylanmış prosedür gerektirir.

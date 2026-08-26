@@ -3,6 +3,7 @@ using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using SmartFacility.Application.Analytics.Abstractions;
 using SmartFacility.Application.Analytics.Models;
+using SmartFacility.Domain;
 using SmartFacility.Domain.Entities;
 using SmartFacility.Infrastructure.Persistence;
 
@@ -11,7 +12,7 @@ namespace SmartFacility.Infrastructure.Analytics;
 public sealed class EfAnalyticsQueryService(SmartFacilityDbContext dbContext) :
     IAssetAnalyticsService,
     IWorkOrderAnalyticsService,
-    IHistoricalWorkOrderAnalyticsService,
+    IWorkOrderActivityService,
     IScadaAnalyticsService,
     IImportQualityAnalyticsService
 {
@@ -125,7 +126,7 @@ public sealed class EfAnalyticsQueryService(SmartFacilityDbContext dbContext) :
             .ToListAsync(cancellationToken);
 
         var workOrders = ApplyWorkOrderDateFilters(
-            _dbContext.WorkOrders.AsNoTracking(),
+            _dbContext.WorkOrders.AsNoTracking().Where(item => item.IsInCanonicalSnapshot),
             query.WorkOrderDateFrom,
             query.WorkOrderDateTo);
         var assetIds = assets.Select(asset => asset.Id);
@@ -134,7 +135,7 @@ public sealed class EfAnalyticsQueryService(SmartFacilityDbContext dbContext) :
                 workOrder.AssetId.HasValue && assetIds.Contains(workOrder.AssetId.Value))
             .Select(workOrder => workOrder.AssetId!.Value)
             .Distinct();
-        var assetsWithCurrentWorkOrders = await workOrderAssetIds.LongCountAsync(cancellationToken);
+        var assetsWithWorkOrders = await workOrderAssetIds.LongCountAsync(cancellationToken);
 
         var topAssets = await (
                 from asset in assets
@@ -154,8 +155,8 @@ public sealed class EfAnalyticsQueryService(SmartFacilityDbContext dbContext) :
             OrderDimensionCounts(countByBuilding),
             OrderDimensionCounts(countByLocation),
             OrderDimensionCounts(countByAssetGroup),
-            assetsWithCurrentWorkOrders,
-            totalAssetCount - assetsWithCurrentWorkOrders,
+            assetsWithWorkOrders,
+            totalAssetCount - assetsWithWorkOrders,
             topAssets
                 .OrderByDescending(item => item.WorkOrderCount)
                 .ThenBy(item => item.AssetCode, StringComparer.Ordinal)
@@ -173,8 +174,8 @@ public sealed class EfAnalyticsQueryService(SmartFacilityDbContext dbContext) :
                 DateTimeOffset.UtcNow,
                 totalAssetCount,
                 [
-                    "HistoricalWorkOrders are excluded.",
-                    "Assets without current work orders must not be interpreted as healthy assets.",
+                    "Only rows in the canonical WorkOrder snapshot are included.",
+                    "Assets without work-order records must not be interpreted as healthy assets.",
                     "Top asset ranking has Yellow reliability because the distribution is highly skewed."
                 ]));
     }
@@ -185,11 +186,11 @@ public sealed class EfAnalyticsQueryService(SmartFacilityDbContext dbContext) :
     {
         var appliedTop = query.Top ?? 10;
         var workOrders = ApplyWorkOrderDateFilters(
-            _dbContext.WorkOrders.AsNoTracking(),
+            _dbContext.WorkOrders.AsNoTracking().Where(item => item.IsInCanonicalSnapshot),
             query.DateFrom,
             query.DateTo);
         var summary = await GetWorkOrderDateSummaryAsync(workOrders, cancellationToken);
-        var assetsWithCurrentWorkOrders = await workOrders
+        var assetsWithWorkOrders = await workOrders
             .Where(item => item.AssetId.HasValue)
             .Join(
                 _dbContext.Assets.AsNoTracking(),
@@ -236,7 +237,7 @@ public sealed class EfAnalyticsQueryService(SmartFacilityDbContext dbContext) :
 
         return new AssetMaintenanceActivityParetoResponse(
             summary.MatchedRecordCount,
-            assetsWithCurrentWorkOrders,
+            assetsWithWorkOrders,
             appliedTop,
             paretoItems,
             new DateRangeMetadataDto(
@@ -254,8 +255,7 @@ public sealed class EfAnalyticsQueryService(SmartFacilityDbContext dbContext) :
                 TimeZoneAssumption,
                 "asset-maintenance-activity-pareto/v1",
                 [
-                    "HistoricalWorkOrders are excluded.",
-                    "Counts represent current work-order record activity.",
+                    "Counts represent canonical work-order record activity.",
                     "High activity does not indicate asset health, failure rate, or failure propensity."
                 ]));
     }
@@ -266,6 +266,16 @@ public sealed class EfAnalyticsQueryService(SmartFacilityDbContext dbContext) :
     {
         var workOrders = ApplyWorkOrderFilters(_dbContext.WorkOrders.AsNoTracking(), query);
         var summary = await GetWorkOrderDateSummaryAsync(workOrders, cancellationToken);
+        var openWorkOrders = await workOrders.LongCountAsync(
+            item => item.RawStatusCode == WorkOrderSourceState.Open,
+            cancellationToken);
+        var closedWorkOrders = await workOrders.LongCountAsync(
+            item => item.RawStatusCode == WorkOrderSourceState.Closed,
+            cancellationToken);
+        var last30DaysStart = DateTime.Today.AddDays(-29);
+        var last30DaysWorkOrders = await workOrders.LongCountAsync(
+            item => item.ReportedDateTime >= last30DaysStart,
+            cancellationToken);
 
         var byDiscipline = await GetCategoryCountsAsync(
             workOrders.Select(item => item.Discipline),
@@ -275,6 +285,9 @@ public sealed class EfAnalyticsQueryService(SmartFacilityDbContext dbContext) :
             cancellationToken);
         var byStatus = await GetCategoryCountsAsync(
             workOrders.Select(item => item.Status),
+            cancellationToken);
+        var byRawStatusCode = await GetCategoryCountsAsync(
+            workOrders.Select(item => item.RawStatusCode),
             cancellationToken);
         var byFailureType = await GetCategoryCountsAsync(
             workOrders.Select(item => item.FailureType),
@@ -306,8 +319,13 @@ public sealed class EfAnalyticsQueryService(SmartFacilityDbContext dbContext) :
 
         return new WorkOrderOverviewResponse(
             summary.MatchedRecordCount,
+            openWorkOrders,
+            closedWorkOrders,
+            summary.MatchedRecordCount - openWorkOrders - closedWorkOrders,
+            last30DaysWorkOrders,
             byDiscipline,
             byWorkType,
+            byRawStatusCode,
             byStatus,
             byFailureType,
             OrderDimensionCounts(byBuilding),
@@ -350,17 +368,15 @@ public sealed class EfAnalyticsQueryService(SmartFacilityDbContext dbContext) :
             CreateWorkOrderMetadata(query, summary, KpiReliability.Green));
     }
 
-    public async Task<HistoricalMaintenanceActivityResponse> GetActivityAsync(
-        HistoricalMaintenanceActivityQuery query,
+    public async Task<WorkOrderActivityResponse> GetActivityAsync(
+        WorkOrderActivityQuery query,
         CancellationToken cancellationToken = default)
     {
-        var historicalWorkOrders = ApplyHistoricalWorkOrderFilters(
-            _dbContext.HistoricalWorkOrders.AsNoTracking(),
+        var workOrders = ApplyWorkOrderActivityFilters(
+            _dbContext.WorkOrders.AsNoTracking().Where(item => item.IsInCanonicalSnapshot),
             query);
-        var summary = await GetHistoricalWorkOrderDateSummaryAsync(
-            historicalWorkOrders,
-            cancellationToken);
-        var groupedPoints = await historicalWorkOrders
+        var summary = await GetWorkOrderDateSummaryAsync(workOrders, cancellationToken);
+        var groupedPoints = await workOrders
             .Where(item => item.ReportedDateTime.HasValue)
             .GroupBy(item => new
             {
@@ -373,10 +389,10 @@ public sealed class EfAnalyticsQueryService(SmartFacilityDbContext dbContext) :
                 group.LongCount()))
             .ToListAsync(cancellationToken);
         var byDiscipline = await GetCategoryCountsAsync(
-            historicalWorkOrders.Select(item => item.Discipline),
+            workOrders.Select(item => item.Discipline),
             cancellationToken);
 
-        return new HistoricalMaintenanceActivityResponse(
+        return new WorkOrderActivityResponse(
             TimeGrain.Month,
             groupedPoints
                 .OrderBy(item => item.Year)
@@ -389,22 +405,22 @@ public sealed class EfAnalyticsQueryService(SmartFacilityDbContext dbContext) :
             NormalizeOptionalFilter(query.Discipline),
             new DateRangeMetadataDto(
                 KpiReliability.Green,
-                "analytics.HistoricalWorkOrders",
+                "core.WorkOrders",
                 DateTimeOffset.UtcNow,
                 query.DateFrom,
                 query.DateTo,
                 summary.ActualMinDate,
                 summary.ActualMaxDate,
-                nameof(HistoricalWorkOrder.ReportedDateTime),
+                nameof(WorkOrder.ReportedDateTime),
                 summary.MatchedRecordCount,
                 summary.ValidRecordCount,
                 summary.MatchedRecordCount - summary.ValidRecordCount,
                 TimeZoneAssumption,
-                "historical-maintenance-activity/v1",
+                "canonical-work-order-activity/v2",
                 [
-                    "Current WorkOrders are excluded.",
+                    "Only rows in the canonical WorkOrder snapshot are included.",
                     "Discipline values are exact raw source taxonomy.",
-                    "No Asset, Building, or Location relationship is inferred."
+                    "The legacy HistoricalWorkOrders snapshot is not queried."
                 ]));
     }
 
@@ -710,6 +726,7 @@ public sealed class EfAnalyticsQueryService(SmartFacilityDbContext dbContext) :
         IQueryable<WorkOrder> query,
         WorkOrderAnalyticsQuery filters)
     {
+        query = query.Where(item => item.IsInCanonicalSnapshot);
         query = ApplyWorkOrderDateFilters(query, filters.DateFrom, filters.DateTo);
 
         if (!string.IsNullOrWhiteSpace(filters.Discipline))
@@ -770,9 +787,9 @@ public sealed class EfAnalyticsQueryService(SmartFacilityDbContext dbContext) :
         return query;
     }
 
-    private static IQueryable<HistoricalWorkOrder> ApplyHistoricalWorkOrderFilters(
-        IQueryable<HistoricalWorkOrder> query,
-        HistoricalMaintenanceActivityQuery filters)
+    private static IQueryable<WorkOrder> ApplyWorkOrderActivityFilters(
+        IQueryable<WorkOrder> query,
+        WorkOrderActivityQuery filters)
     {
         if (filters.DateFrom.HasValue)
         {
@@ -888,19 +905,6 @@ public sealed class EfAnalyticsQueryService(SmartFacilityDbContext dbContext) :
             .SingleOrDefaultAsync(cancellationToken)
         ?? new DatedSummaryProjection(0, 0, null, null);
 
-    private static async Task<DatedSummaryProjection> GetHistoricalWorkOrderDateSummaryAsync(
-        IQueryable<HistoricalWorkOrder> workOrders,
-        CancellationToken cancellationToken) =>
-        await workOrders
-            .GroupBy(_ => 1)
-            .Select(group => new DatedSummaryProjection(
-                group.LongCount(),
-                group.LongCount(item => item.ReportedDateTime.HasValue),
-                group.Min(item => item.ReportedDateTime),
-                group.Max(item => item.ReportedDateTime)))
-            .SingleOrDefaultAsync(cancellationToken)
-        ?? new DatedSummaryProjection(0, 0, null, null);
-
     private static decimal CalculatePercent(long numerator, long denominator, int decimals) =>
         denominator == 0
             ? 0m
@@ -941,10 +945,11 @@ public sealed class EfAnalyticsQueryService(SmartFacilityDbContext dbContext) :
             summary.ValidRecordCount,
             summary.MatchedRecordCount - summary.ValidRecordCount,
             TimeZoneAssumption,
-            "work-order-analytics/v1",
+            "work-order-analytics/v2",
             [
-                "HistoricalWorkOrders are excluded.",
-                "Raw taxonomy values are not normalized."
+                "Only rows in the canonical WorkOrder snapshot are included.",
+                "Open/closed semantics use RawStatusCode A/K; workflow Status remains separate.",
+                "The legacy HistoricalWorkOrders snapshot is not queried."
             ]);
 
     private static DateRangeMetadataDto CreateScadaMetadata(

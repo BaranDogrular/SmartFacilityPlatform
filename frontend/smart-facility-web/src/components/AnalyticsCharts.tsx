@@ -53,7 +53,8 @@ export function ChartPanel({ title, subtitle, reliability, children }: ChartPane
   )
 }
 
-const palette = ['#176b73', '#237f7a', '#315c78', '#607686', '#8a6b36', '#456f68']
+const palette = ['#df0025', '#414141', '#595858', '#a51129', '#828282', '#242424']
+const chartFontFamily = '"Open Sans", "Segoe UI", Arial, sans-serif'
 
 export function HorizontalBarChart({
   data,
@@ -86,13 +87,13 @@ export function HorizontalBarChart({
       x: {
         beginAtZero: true,
         border: { display: false },
-        grid: { color: '#e7ecef' },
-        ticks: { color: '#677684', font: { size: 10 }, callback: (value) => formatCount(Number(value)) },
+        grid: { color: '#e1dddd' },
+        ticks: { color: '#595858', font: { family: chartFontFamily, size: 10 }, callback: (value) => formatCount(Number(value)) },
       },
       y: {
         border: { display: false },
         grid: { display: false },
-        ticks: { autoSkip: false, color: '#445563', font: { size: 10, weight: 600 } },
+        ticks: { autoSkip: false, color: '#414141', font: { family: chartFontFamily, size: 10, weight: 600 } },
       },
     },
   }
@@ -154,13 +155,13 @@ export function TrendLineChart({ points }: { points: TrendPoint[] }) {
       x: {
         border: { display: false },
         grid: { display: false },
-        ticks: { color: '#677684', font: { size: 10 } },
+        ticks: { color: '#595858', font: { family: chartFontFamily, size: 10 } },
       },
       y: {
         beginAtZero: true,
         border: { display: false },
-        grid: { color: '#e7ecef' },
-        ticks: { color: '#677684', font: { size: 10 }, callback: (value) => formatCount(Number(value)) },
+        grid: { color: '#e1dddd' },
+        ticks: { color: '#595858', font: { family: chartFontFamily, size: 10 }, callback: (value) => formatCount(Number(value)) },
       },
     },
   }
@@ -174,9 +175,9 @@ export function TrendLineChart({ points }: { points: TrendPoint[] }) {
           datasets: [
             {
               data: points.map((point) => point.count),
-              borderColor: '#176b73',
-              backgroundColor: 'rgba(23, 107, 115, 0.09)',
-              pointBackgroundColor: '#176b73',
+              borderColor: '#df0025',
+              backgroundColor: 'rgba(223, 0, 37, 0.07)',
+              pointBackgroundColor: '#df0025',
               pointRadius: 2,
               pointHoverRadius: 4,
               borderWidth: 2,

@@ -24,10 +24,10 @@ public interface IWorkOrderAnalyticsService
         CancellationToken cancellationToken = default);
 }
 
-public interface IHistoricalWorkOrderAnalyticsService
+public interface IWorkOrderActivityService
 {
-    Task<HistoricalMaintenanceActivityResponse> GetActivityAsync(
-        HistoricalMaintenanceActivityQuery query,
+    Task<WorkOrderActivityResponse> GetActivityAsync(
+        WorkOrderActivityQuery query,
         CancellationToken cancellationToken = default);
 }
 

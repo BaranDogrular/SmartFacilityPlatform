@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using SmartFacility.Infrastructure.Persistence;
 
@@ -11,9 +12,11 @@ using SmartFacility.Infrastructure.Persistence;
 namespace SmartFacility.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(SmartFacilityDbContext))]
-    partial class SmartFacilityDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260825121311_AddCanonicalWorkOrderSnapshot")]
+    partial class AddCanonicalWorkOrderSnapshot
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -503,10 +506,6 @@ namespace SmartFacility.Infrastructure.Persistence.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
 
-                    b.Property<string>("AssetCodeRaw")
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
                     b.Property<long?>("AssetId")
                         .HasColumnType("bigint");
 
@@ -557,10 +556,6 @@ namespace SmartFacility.Infrastructure.Persistence.Migrations
 
                     b.Property<long?>("LocationId")
                         .HasColumnType("bigint");
-
-                    b.Property<string>("LocationNameRaw")
-                        .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
 
                     b.Property<string>("MaintenanceDurationRaw")
                         .HasMaxLength(100)
@@ -613,8 +608,6 @@ namespace SmartFacility.Infrastructure.Persistence.Migrations
                         .HasColumnType("nvarchar(200)");
 
                     b.HasKey("Id");
-
-                    b.HasIndex("AssetCodeRaw");
 
                     b.HasIndex("AssetId");
 

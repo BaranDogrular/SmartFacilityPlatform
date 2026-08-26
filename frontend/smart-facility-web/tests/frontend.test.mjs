@@ -50,23 +50,23 @@ const asset = {
   countByBuilding: [{ id: 1, name: 'A Blok', count: 3200 }],
   countByLocation: [{ id: 1, name: 'Teknik Alan', count: 640 }],
   countByAssetGroup: [{ id: 1, name: 'Mekanik', count: 2200 }],
-  assetsWithCurrentWorkOrders: 767,
-  assetsWithoutCurrentWorkOrders: 4637,
+  assetsWithWorkOrders: 1488,
+  assetsWithoutWorkOrders: 3916,
   topAssetsByWorkOrderCount: [{ assetId: 1, assetCode: 'VRL-1', assetName: 'Pompa', workOrderCount: 42 }],
   topAssetsReliability: 'Yellow',
   metadata: { ...snapshotMetadata, sampleSize: 5404 },
 }
 
 const assetPareto = {
-  totalCurrentWorkOrders: 54823,
-  assetsWithCurrentWorkOrders: 767,
+  totalWorkOrders: 171136,
+  assetsWithWorkOrders: 1488,
   appliedTop: 10,
   topAssets: [
     {
       assetId: 651,
       assetCode: '2001KBL00009',
       assetName: 'SCADA LOKASYON KONTROL ÇALIŞMASI',
-      currentWorkOrderCount: 12372,
+      workOrderCount: 12372,
       sharePercent: 22.5672,
       cumulativeSharePercent: 22.5672,
     },
@@ -74,7 +74,7 @@ const assetPareto = {
       assetId: 647,
       assetCode: '2001KBL00002',
       assetName: 'ELEKTRİK LOKASYON KONTROL ÇALIŞMASI',
-      currentWorkOrderCount: 4219,
+      workOrderCount: 4219,
       sharePercent: 7.6957,
       cumulativeSharePercent: 30.2628,
     },
@@ -83,22 +83,27 @@ const assetPareto = {
     ...dateMetadata,
     reliability: 'Yellow',
     sourceDataset: 'core.WorkOrders + core.Assets',
-    matchedRecordCount: 54823,
-    validRecordCount: 54823,
+    matchedRecordCount: 171136,
+    validRecordCount: 171136,
   },
 }
 
 const workOrders = {
-  totalWorkOrders: 54823,
+  totalWorkOrders: 171136,
+  openWorkOrders: 75,
+  closedWorkOrders: 171054,
+  otherWorkOrders: 7,
+  last30DaysWorkOrders: 1234,
   byDiscipline: [{ category: 'MEKANİK', count: 30000 }],
   byWorkType: [{ category: 'ARIZA', count: 24000 }],
+  byRawStatusCode: [{ category: 'K', count: 171054 }, { category: 'A', count: 75 }, { category: 'I', count: 7 }],
   byStatus: [{ category: 'İŞ TESLİM EDİLDİ', count: 20000 }],
   byFailureType: [{ category: 'MEKANİK ARIZA', count: 12000 }],
   byBuilding: [{ id: 1, name: 'A Blok', count: 18000 }],
   byLocation: [{ id: 1, name: 'Teknik Alan', count: 4000 }],
   byBuildingReliability: 'Yellow',
   byLocationReliability: 'Yellow',
-  metadata: { ...dateMetadata, matchedRecordCount: 54823, validRecordCount: 54823 },
+  metadata: { ...dateMetadata, matchedRecordCount: 171136, validRecordCount: 171136 },
 }
 
 const workOrderTrend = {
@@ -107,7 +112,7 @@ const workOrderTrend = {
   metadata: { ...dateMetadata, matchedRecordCount: 54823, validRecordCount: 54823 },
 }
 
-const historicalActivity = {
+const workOrderActivity = {
   grain: 'Month',
   trend: [
     { period: '2025-01-01', count: 6144 },
@@ -121,9 +126,9 @@ const historicalActivity = {
   metadata: {
     ...dateMetadata,
     reliability: 'Green',
-    sourceDataset: 'analytics.HistoricalWorkOrders',
-    matchedRecordCount: 167143,
-    validRecordCount: 167143,
+    sourceDataset: 'core.WorkOrders',
+    matchedRecordCount: 171136,
+    validRecordCount: 171136,
   },
 }
 
@@ -206,8 +211,8 @@ function createQueryClient(overrides = {}) {
   client.setQueryData(['analytics', 'work-orders', 'overview', {}], workOrders)
   client.setQueryData(['analytics', 'work-orders', 'trend', { grain: 'Month' }], workOrderTrend)
   client.setQueryData(
-    ['analytics', 'historical-work-orders', 'activity', {}],
-    overrides.historicalActivity ?? historicalActivity,
+    ['analytics', 'work-orders', 'activity', {}],
+    overrides.workOrderActivity ?? workOrderActivity,
   )
   client.setQueryData(['analytics', 'scada', 'overview', {}], scada)
   client.setQueryData(['analytics', 'scada', 'trend', { grain: 'Month' }], scadaTrend)
@@ -263,7 +268,7 @@ test('new analytics clients call the accepted backend routes with serialized que
 
   try {
     await analytics.getAssetMaintenanceActivityPareto({ dateFrom: '2025-01-01', top: 5 })
-    await analytics.getHistoricalMaintenanceActivity({ dateTo: '2025-12-31', discipline: 'MEKANİK' })
+    await analytics.getWorkOrderActivity({ dateTo: '2025-12-31', discipline: 'MEKANİK' })
     await analytics.getScadaClearanceInterval({ sourceSheet: 'MEKANİK', alarmType: 'SOĞUTMA' })
   } finally {
     analytics.analyticsHttpClient.defaults.adapter = originalAdapter
@@ -275,7 +280,7 @@ test('new analytics clients call the accepted backend routes with serialized que
       params: { dateFrom: '2025-01-01', top: 5 },
     },
     {
-      url: '/api/analytics/historical-work-orders/activity',
+      url: '/api/analytics/work-orders/activity',
       params: { dateTo: '2025-12-31', discipline: 'MEKANİK' },
     },
     {
@@ -324,10 +329,10 @@ test('general dashboard renders production-contract KPI values without unsupport
   assert.match(html, /Bakım ve Güvenilirlik Operasyon Özeti/)
   assert.match(html, /Operasyon Özeti/)
   assert.match(html, /Bakım Aktivitesi Yoğunluğu/)
-  assert.match(html, /Mevcut İş Emri Disiplinleri/)
+  assert.match(html, /İş Emri Disiplinleri/)
   assert.match(html, /İkincil Operasyon Durumu/)
   assert.match(html, /5\.404/)
-  assert.match(html, /54\.823/)
+  assert.match(html, /171\.136/)
   assert.match(html, /1\.950/)
   assert.match(html, /Import Denetim Kaydı/)
   assert.doesNotMatch(html, /MTTR|MTBF|Asset Health|Open Alarm|Total Combined WorkOrders/i)
@@ -353,8 +358,8 @@ test('dashboard state and reliability components render accessible text', () => 
 test('asset Pareto renders Top-N counts, shares, cumulative values and Yellow guidance', () => {
   const html = renderPage(AssetsPage)
 
-  assert.match(html, /Current İş Emri Aktivitesi En Yoğun Asset&#x27;ler/)
-  assert.match(html, /Top-10 asset&#x27;in toplam current iş emri kayıtlarındaki payı/)
+  assert.match(html, /İş Emri Aktivitesi En Yoğun Asset&#x27;ler/)
+  assert.match(html, /Top-10 asset&#x27;in toplam canonical iş emri kayıtlarındaki payı/)
   assert.match(html, /2001KBL00009/)
   assert.match(html, /12\.372/)
   assert.match(html, /22,57%/)
@@ -369,14 +374,14 @@ test('asset Pareto renders a scoped empty state', () => {
   const html = renderPage(AssetsPage, {
     assetPareto: {
       ...assetPareto,
-      totalCurrentWorkOrders: 0,
-      assetsWithCurrentWorkOrders: 0,
+      totalWorkOrders: 0,
+      assetsWithWorkOrders: 0,
       topAssets: [],
       metadata: { ...assetPareto.metadata, matchedRecordCount: 0, validRecordCount: 0 },
     },
   })
 
-  assert.match(html, /current iş emri aktivitesi bulunan asset yok/)
+  assert.match(html, /iş emri aktivitesi bulunan asset yok/)
   assert.match(html, /YELLOW · Veri kalitesi notu/)
 })
 
@@ -387,35 +392,36 @@ test('work-order filters and reset control are present with exact raw options', 
   assert.match(html, /value="MEKANİK"/)
   assert.match(html, /value="İŞ TESLİM EDİLDİ"/)
   assert.match(html, />Temizle</)
-  assert.match(html, /yalnız güncel WorkOrder veri kaynağını içerir/)
-  assert.match(html, /Geçmiş İş Emri Aktivitesi/)
-  assert.match(html, /name="historicalDateFrom"/)
-  assert.match(html, /name="historicalDateTo"/)
-  assert.match(html, /name="historicalDiscipline"/)
+  assert.match(html, /Açık İş Emri/)
+  assert.match(html, /Kapalı İş Emri/)
+  assert.match(html, /Son 30 Gün Aktivitesi/)
+  assert.match(html, /İş Emri Aktivitesi/)
+  assert.match(html, /name="activityDateFrom"/)
+  assert.match(html, /name="activityDateTo"/)
+  assert.match(html, /name="activityDiscipline"/)
   assert.match(html, />Uygula</)
-  assert.match(html, /167\.143/)
+  assert.match(html, /171\.136/)
   assert.match(html, /MEKANİK: 51\.327/)
   assert.match(html, /GREEN · Doğrulanmış metrik/)
-  assert.match(html, /current WorkOrder verisi dahil değildir/)
-  assert.match(html, /analytics\.HistoricalWorkOrders/)
-  assert.match(html, /asset güvenilirliği değildir/)
+  assert.match(html, /core\.WorkOrders/)
+  assert.doesNotMatch(html, /Güncel İş Emri|Geçmiş İş Emri Aktivitesi/)
 })
 
-test('historical activity keeps filters visible and renders an empty state without current totals', () => {
+test('canonical activity keeps filters visible and renders an empty state', () => {
   const html = renderPage(WorkOrdersPage, {
-    historicalActivity: {
-      ...historicalActivity,
+    workOrderActivity: {
+      ...workOrderActivity,
       trend: [],
       byDiscipline: [],
       appliedDiscipline: '__NO_MATCH__',
-      metadata: { ...historicalActivity.metadata, matchedRecordCount: 0, validRecordCount: 0 },
+      metadata: { ...workOrderActivity.metadata, matchedRecordCount: 0, validRecordCount: 0 },
     },
   })
 
-  assert.match(html, /Geçmiş İş Emri Aktivitesi/)
-  assert.match(html, /Seçilen historical filtrelerle eşleşen kayıt bulunamadı/)
+  assert.match(html, /İş Emri Aktivitesi/)
+  assert.match(html, /Seçilen filtrelerle eşleşen iş emri kaydı bulunamadı/)
   assert.match(html, />Temizle</)
-  assert.doesNotMatch(html, /Historical.*54\.823/s)
+  assert.doesNotMatch(html, /Historical WorkOrders|current WorkOrder/i)
 })
 
 test('SCADA dashboard exposes quality metadata and source filter values', () => {

@@ -176,7 +176,11 @@ public sealed class ScadaCampusTrackingFingerprintTests
             ScadaOutageIdempotencyFingerprintCalculator.Algorithm,
             provider.GetIdempotencyAlgorithm(ImportSourceTypes.ScadaOutage, "Data"));
         Assert.Null(provider.GetIdempotencyAlgorithm(ImportSourceTypes.Asset, ScadaAlarmWorksheetNames.KampusTakip));
-        Assert.Null(provider.GetIdempotencyAlgorithm(ImportSourceTypes.WorkOrder, ScadaAlarmWorksheetNames.KampusTakip));
+        Assert.Equal(
+            CanonicalWorkOrderIdentityCalculator.Algorithm,
+            provider.GetIdempotencyAlgorithm(
+                ImportSourceTypes.WorkOrder,
+                ScadaAlarmWorksheetNames.KampusTakip));
         Assert.Null(provider.GetIdempotencyAlgorithm(ImportSourceTypes.ScadaAlarm, "ELEKTRİK ARIZALARI"));
         Assert.Null(provider.GetIdempotencyAlgorithm(ImportSourceTypes.ScadaAlarm, "MEKANİK"));
     }

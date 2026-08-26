@@ -2,11 +2,11 @@ import { useState } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 
 const navigation = [
-  { to: '/', label: 'Genel Bakış', short: 'GB' },
-  { to: '/assets', label: 'Varlıklar', short: 'VA' },
-  { to: '/work-orders', label: 'İş Emirleri', short: 'İE' },
-  { to: '/scada', label: 'SCADA', short: 'SC' },
-  { to: '/data-quality', label: 'Veri Kalitesi', short: 'VK' },
+  { to: '/', label: 'Genel Bakış' },
+  { to: '/assets', label: 'Varlıklar' },
+  { to: '/work-orders', label: 'İş Emirleri' },
+  { to: '/scada', label: 'SCADA' },
+  { to: '/data-quality', label: 'Veri Kalitesi' },
 ]
 
 const titles: Record<string, string> = {
@@ -38,7 +38,6 @@ export function AppLayout() {
               onClick={() => setSidebarOpen(false)}
               className={({ isActive }) => `sidebar-link${isActive ? ' sidebar-link--active' : ''}`}
             >
-              <span className="sidebar-link__icon" aria-hidden="true">{item.short}</span>
               {item.label}
             </NavLink>
           ))}

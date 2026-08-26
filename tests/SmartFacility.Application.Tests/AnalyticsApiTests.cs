@@ -21,7 +21,7 @@ public sealed class AnalyticsApiTests(AnalyticsApiFactory factory) :
     [InlineData("/api/analytics/assets/maintenance-activity-pareto")]
     [InlineData("/api/analytics/work-orders/overview")]
     [InlineData("/api/analytics/work-orders/trend")]
-    [InlineData("/api/analytics/historical-work-orders/activity")]
+    [InlineData("/api/analytics/work-orders/activity")]
     [InlineData("/api/analytics/scada/overview")]
     [InlineData("/api/analytics/scada/trend")]
     [InlineData("/api/analytics/scada/clearance-interval")]
@@ -41,7 +41,7 @@ public sealed class AnalyticsApiTests(AnalyticsApiFactory factory) :
     [InlineData("/api/analytics/assets/maintenance-activity-pareto?top=101")]
     [InlineData("/api/analytics/assets/maintenance-activity-pareto?dateFrom=2026-02-01&dateTo=2026-01-01")]
     [InlineData("/api/analytics/work-orders/overview?dateFrom=2026-02-01&dateTo=2026-01-01")]
-    [InlineData("/api/analytics/historical-work-orders/activity?dateFrom=2026-02-01&dateTo=2026-01-01")]
+    [InlineData("/api/analytics/work-orders/activity?dateFrom=2026-02-01&dateTo=2026-01-01")]
     [InlineData("/api/analytics/scada/trend?dateFrom=2026-02-01&dateTo=2026-01-01")]
     [InlineData("/api/analytics/scada/clearance-interval?dateFrom=2026-02-01&dateTo=2026-01-01")]
     [InlineData("/api/analytics/work-orders/trend?grain=Day")]
@@ -70,21 +70,21 @@ public sealed class AnalyticsApiTests(AnalyticsApiFactory factory) :
         using var paretoResponse = await _client.GetAsync(
             "/api/analytics/assets/maintenance-activity-pareto");
         using var pareto = JsonDocument.Parse(await paretoResponse.Content.ReadAsStreamAsync());
-        Assert.Equal(0, pareto.RootElement.GetProperty("totalCurrentWorkOrders").GetInt64());
+        Assert.Equal(0, pareto.RootElement.GetProperty("totalWorkOrders").GetInt64());
         Assert.Empty(pareto.RootElement.GetProperty("topAssets").EnumerateArray());
         Assert.Equal(
             "Yellow",
             pareto.RootElement.GetProperty("metadata").GetProperty("reliability").GetString());
 
-        using var historicalResponse = await _client.GetAsync(
-            "/api/analytics/historical-work-orders/activity");
-        using var historical = JsonDocument.Parse(
-            await historicalResponse.Content.ReadAsStreamAsync());
-        Assert.Empty(historical.RootElement.GetProperty("trend").EnumerateArray());
-        Assert.Empty(historical.RootElement.GetProperty("byDiscipline").EnumerateArray());
+        using var activityResponse = await _client.GetAsync(
+            "/api/analytics/work-orders/activity");
+        using var activity = JsonDocument.Parse(
+            await activityResponse.Content.ReadAsStreamAsync());
+        Assert.Empty(activity.RootElement.GetProperty("trend").EnumerateArray());
+        Assert.Empty(activity.RootElement.GetProperty("byDiscipline").EnumerateArray());
         Assert.Equal(
-            "analytics.HistoricalWorkOrders",
-            historical.RootElement.GetProperty("metadata")
+            "core.WorkOrders",
+            activity.RootElement.GetProperty("metadata")
                 .GetProperty("sourceDataset").GetString());
 
         using var clearanceResponse = await _client.GetAsync(
@@ -115,7 +115,7 @@ public sealed class AnalyticsApiTests(AnalyticsApiFactory factory) :
         Assert.Contains("/api/analytics/work-orders/overview", swagger, StringComparison.Ordinal);
         Assert.Contains("/api/analytics/work-orders/trend", swagger, StringComparison.Ordinal);
         Assert.Contains(
-            "/api/analytics/historical-work-orders/activity",
+            "/api/analytics/work-orders/activity",
             swagger,
             StringComparison.Ordinal);
         Assert.Contains("/api/analytics/scada/overview", swagger, StringComparison.Ordinal);
@@ -137,7 +137,7 @@ public sealed class AnalyticsApiFactory : WebApplicationFactory<Program>
         {
             services.RemoveAll<IAssetAnalyticsService>();
             services.RemoveAll<IWorkOrderAnalyticsService>();
-            services.RemoveAll<IHistoricalWorkOrderAnalyticsService>();
+            services.RemoveAll<IWorkOrderActivityService>();
             services.RemoveAll<IScadaAnalyticsService>();
             services.RemoveAll<IImportQualityAnalyticsService>();
 
@@ -146,7 +146,7 @@ public sealed class AnalyticsApiFactory : WebApplicationFactory<Program>
                 provider.GetRequiredService<FakeAnalyticsServices>());
             services.AddSingleton<IWorkOrderAnalyticsService>(provider =>
                 provider.GetRequiredService<FakeAnalyticsServices>());
-            services.AddSingleton<IHistoricalWorkOrderAnalyticsService>(provider =>
+            services.AddSingleton<IWorkOrderActivityService>(provider =>
                 provider.GetRequiredService<FakeAnalyticsServices>());
             services.AddSingleton<IScadaAnalyticsService>(provider =>
                 provider.GetRequiredService<FakeAnalyticsServices>());
@@ -159,7 +159,7 @@ public sealed class AnalyticsApiFactory : WebApplicationFactory<Program>
 internal sealed class FakeAnalyticsServices :
     IAssetAnalyticsService,
     IWorkOrderAnalyticsService,
-    IHistoricalWorkOrderAnalyticsService,
+    IWorkOrderActivityService,
     IScadaAnalyticsService,
     IImportQualityAnalyticsService
 {
@@ -197,6 +197,11 @@ internal sealed class FakeAnalyticsServices :
         CancellationToken cancellationToken = default) =>
         Task.FromResult(new WorkOrderOverviewResponse(
             0,
+            0,
+            0,
+            0,
+            0,
+            [],
             [],
             [],
             [],
@@ -215,16 +220,16 @@ internal sealed class FakeAnalyticsServices :
             [],
             DateMetadata("core.WorkOrders", "ReportedDateTime", KpiReliability.Green)));
 
-    public Task<HistoricalMaintenanceActivityResponse> GetActivityAsync(
-        HistoricalMaintenanceActivityQuery query,
+    public Task<WorkOrderActivityResponse> GetActivityAsync(
+        WorkOrderActivityQuery query,
         CancellationToken cancellationToken = default) =>
-        Task.FromResult(new HistoricalMaintenanceActivityResponse(
+        Task.FromResult(new WorkOrderActivityResponse(
             TimeGrain.Month,
             [],
             [],
             query.Discipline,
             DateMetadata(
-                "analytics.HistoricalWorkOrders",
+                "core.WorkOrders",
                 "ReportedDateTime",
                 KpiReliability.Green)));
 

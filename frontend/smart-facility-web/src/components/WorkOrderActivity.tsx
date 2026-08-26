@@ -1,17 +1,17 @@
 import { useState, type FormEvent } from 'react'
-import type { HistoricalMaintenanceActivityQuery } from '../api/analyticsTypes'
-import { useHistoricalMaintenanceActivity } from '../hooks/useAnalytics'
+import type { WorkOrderActivityQuery } from '../api/analyticsTypes'
+import { useWorkOrderActivity } from '../hooks/useAnalytics'
 import { ChartPanel, HorizontalBarChart, TrendLineChart } from './AnalyticsCharts'
 import { EmptyState, ErrorState, InfoNote, KpiCard, LoadingState, ReliabilityBadge } from './DashboardUi'
 
-const emptyFilters: HistoricalMaintenanceActivityQuery = {}
+const emptyFilters: WorkOrderActivityQuery = {}
 
-export function HistoricalMaintenanceActivity() {
-  const [draft, setDraft] = useState<HistoricalMaintenanceActivityQuery>(emptyFilters)
-  const [filters, setFilters] = useState<HistoricalMaintenanceActivityQuery>(emptyFilters)
+export function WorkOrderActivity() {
+  const [draft, setDraft] = useState<WorkOrderActivityQuery>(emptyFilters)
+  const [filters, setFilters] = useState<WorkOrderActivityQuery>(emptyFilters)
   const [filterError, setFilterError] = useState('')
-  const optionsQuery = useHistoricalMaintenanceActivity()
-  const activityQuery = useHistoricalMaintenanceActivity(filters)
+  const optionsQuery = useWorkOrderActivity()
+  const activityQuery = useWorkOrderActivity(filters)
 
   const applyFilters = (event: FormEvent) => {
     event.preventDefault()
@@ -35,23 +35,23 @@ export function HistoricalMaintenanceActivity() {
   const data = activityQuery.data
 
   return (
-    <section className="analytics-section analytics-section--historical" aria-labelledby="historical-activity-title">
+    <section className="analytics-section" aria-labelledby="work-order-activity-title">
       <header className="analytics-section__header">
         <div>
-          <p className="page-eyebrow">Ayrı historical dataset</p>
-          <h2 id="historical-activity-title">Geçmiş İş Emri Aktivitesi</h2>
-          <p>Historical kayıt trendi ve raw Discipline dağılımı; current WorkOrder verisi dahil değildir.</p>
+          <p className="page-eyebrow">Canonical tarihsel görünüm</p>
+          <h2 id="work-order-activity-title">İş Emri Aktivitesi</h2>
+          <p>Canonical WorkOrder kayıtlarının tarih trendi ve raw disiplin dağılımı.</p>
         </div>
         {data ? <ReliabilityBadge reliability={data.metadata.reliability} /> : null}
       </header>
 
-      <form className="filter-panel" onSubmit={applyFilters} aria-label="Historical iş emri filtreleri">
+      <form className="filter-panel" onSubmit={applyFilters} aria-label="İş emri aktivite filtreleri">
         <div className="filter-grid filter-grid--three">
           <label>
             <span>Başlangıç tarihi</span>
             <input
               className="form-control"
-              name="historicalDateFrom"
+              name="activityDateFrom"
               type="date"
               value={draft.dateFrom ?? ''}
               onChange={(event) => setDraft((current) => ({ ...current, dateFrom: event.target.value || undefined }))}
@@ -61,17 +61,17 @@ export function HistoricalMaintenanceActivity() {
             <span>Bitiş tarihi</span>
             <input
               className="form-control"
-              name="historicalDateTo"
+              name="activityDateTo"
               type="date"
               value={draft.dateTo ?? ''}
               onChange={(event) => setDraft((current) => ({ ...current, dateTo: event.target.value || undefined }))}
             />
           </label>
           <label>
-            <span>Raw Discipline</span>
+            <span>Disiplin</span>
             <select
               className="form-select"
-              name="historicalDiscipline"
+              name="activityDiscipline"
               value={draft.discipline ?? ''}
               onChange={(event) => setDraft((current) => ({ ...current, discipline: event.target.value || undefined }))}
             >
@@ -89,44 +89,27 @@ export function HistoricalMaintenanceActivity() {
         </div>
       </form>
 
-      {isPending ? <LoadingState label="Historical iş emri aktivitesi yükleniyor" /> : null}
+      {isPending ? <LoadingState label="İş emri aktivitesi yükleniyor" /> : null}
       {error ? (
-        <ErrorState
-          error={error}
-          onRetry={() => {
-            void optionsQuery.refetch()
-            void activityQuery.refetch()
-          }}
-        />
+        <ErrorState error={error} onRetry={() => {
+          void optionsQuery.refetch()
+          void activityQuery.refetch()
+        }} />
       ) : null}
       {!isPending && !error && !data ? <EmptyState /> : null}
       {!isPending && !error && data ? (
         data.metadata.matchedRecordCount === 0 ? (
-          <EmptyState message="Seçilen historical filtrelerle eşleşen kayıt bulunamadı." />
+          <EmptyState message="Seçilen filtrelerle eşleşen iş emri kaydı bulunamadı." />
         ) : (
           <>
-            <section className="kpi-grid kpi-grid--one" aria-label="Historical iş emri göstergeleri">
-              <KpiCard
-                label="Eşleşen Historical Kayıt"
-                value={data.metadata.matchedRecordCount}
-                reliability={data.metadata.reliability}
-                tone="teal"
-              />
+            <section className="kpi-grid kpi-grid--one" aria-label="İş emri aktivite göstergeleri">
+              <KpiCard label="Eşleşen İş Emri" value={data.metadata.matchedRecordCount} reliability={data.metadata.reliability} tone="teal" />
             </section>
-
             <div className="dashboard-grid dashboard-grid--two">
-              <ChartPanel
-                title="Historical Aylık Aktivite Trendi"
-                subtitle="Historical ReportedDateTime alanına göre"
-                reliability={data.metadata.reliability}
-              >
+              <ChartPanel title="Aylık Aktivite Trendi" subtitle="Canonical ReportedDateTime alanına göre" reliability={data.metadata.reliability}>
                 <TrendLineChart points={data.trend} />
               </ChartPanel>
-              <ChartPanel
-                title="Raw Discipline Dağılımı"
-                subtitle={data.appliedDiscipline ? `Uygulanan Discipline: ${data.appliedDiscipline}` : 'Historical kaynak değerleri'}
-                reliability={data.metadata.reliability}
-              >
+              <ChartPanel title="Disiplin Dağılımı" subtitle={data.appliedDiscipline ? `Uygulanan disiplin: ${data.appliedDiscipline}` : 'Raw kaynak değerleri'} reliability={data.metadata.reliability}>
                 <HorizontalBarChart data={data.byDiscipline.map((item) => ({ label: item.category, count: item.count }))} />
               </ChartPanel>
             </div>
@@ -135,8 +118,8 @@ export function HistoricalMaintenanceActivity() {
       ) : null}
 
       <InfoNote>
-        Kaynak <span className="code-chip">analytics.HistoricalWorkOrders</span> ayrı bir dataset'tir.
-        GREEN etiketi yalnız historical record count ve trend sözleşmesinin güvenilirliğini belirtir; asset güvenilirliği değildir.
+        Kaynak <span className="code-chip">core.WorkOrders</span> canonical snapshot'tır.
+        Legacy dated snapshot bu analitiğe dahil edilmez.
       </InfoNote>
     </section>
   )
