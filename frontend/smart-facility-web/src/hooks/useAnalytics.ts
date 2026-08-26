@@ -3,6 +3,7 @@ import {
   getAssetMaintenanceActivityPareto,
   getAssetOverview,
   getInspectionPriority,
+  getEarlyWarning,
   getWorkOrderActivity,
   getImportQualityOverview,
   getScadaClearanceInterval,
@@ -15,6 +16,7 @@ import type {
   AssetMaintenanceActivityParetoQuery,
   AssetOverviewQuery,
   InspectionPriorityQuery,
+  EarlyWarningQuery,
   WorkOrderActivityQuery,
   ScadaAnalyticsQuery,
   ScadaClearanceIntervalQuery,
@@ -39,6 +41,12 @@ export const useInspectionPriority = (query: InspectionPriorityQuery = {}) =>
   useQuery({
     queryKey: ['analytics', 'assets', 'inspection-priority', query],
     queryFn: () => getInspectionPriority(query),
+  })
+
+export const useEarlyWarning = (query: EarlyWarningQuery = {}) =>
+  useQuery({
+    queryKey: ['analytics', 'assets', 'early-warning', query],
+    queryFn: () => getEarlyWarning(query),
   })
 
 export const useWorkOrderOverview = (query: WorkOrderAnalyticsQuery = {}) =>

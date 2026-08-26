@@ -84,6 +84,71 @@ public sealed record InspectionPriorityResponse(
     InspectionPriorityMetadataDto Metadata,
     IReadOnlyList<InspectionPriorityItemDto> Items);
 
+public enum EarlyWarningLevel
+{
+    [JsonStringEnumMemberName("HIGH")]
+    High,
+
+    [JsonStringEnumMemberName("MEDIUM")]
+    Medium,
+
+    [JsonStringEnumMemberName("NORMAL")]
+    Normal
+}
+
+public enum EarlyWarningBaselineStatus
+{
+    [JsonStringEnumMemberName("SUFFICIENT")]
+    Sufficient,
+
+    [JsonStringEnumMemberName("INSUFFICIENT_BASELINE")]
+    InsufficientBaseline
+}
+
+public sealed record EarlyWarningBaselineWindowDto(
+    DateOnly From,
+    DateOnly Through,
+    int MonthCount,
+    int MinimumActiveMonths);
+
+public sealed record EarlyWarningMetadataDto(
+    DateOnly? AsOf,
+    EarlyWarningBaselineWindowDto? BaselineWindow,
+    long TotalAssetsConsidered,
+    long EligibleAssets,
+    long InsufficientBaselineAssets,
+    long EligibleWorkOrders,
+    long ExcludedUnlinkedWorkOrders,
+    decimal CoveragePercent,
+    int AppliedTop,
+    string SourceDataset,
+    string ScoringVersion,
+    IReadOnlyList<string> Notes);
+
+public sealed record EarlyWarningItemDto(
+    long AssetId,
+    string AssetCode,
+    string AssetName,
+    decimal? WarningScore,
+    EarlyWarningLevel? WarningLevel,
+    EarlyWarningBaselineStatus BaselineStatus,
+    long Last7Count,
+    long Previous7Count,
+    long Last30Count,
+    long Previous30Count,
+    long Last90Count,
+    long Previous90Count,
+    decimal? BaselineMedian,
+    decimal? BaselineMad,
+    int BaselineActiveMonths,
+    decimal? Deviation,
+    long OpenCount,
+    IReadOnlyList<string> Reasons);
+
+public sealed record EarlyWarningResponse(
+    EarlyWarningMetadataDto Metadata,
+    IReadOnlyList<EarlyWarningItemDto> Items);
+
 public sealed record WorkOrderOverviewResponse(
     long TotalWorkOrders,
     long OpenWorkOrders,

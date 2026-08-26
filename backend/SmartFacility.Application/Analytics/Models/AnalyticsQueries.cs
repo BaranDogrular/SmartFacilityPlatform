@@ -24,6 +24,12 @@ public sealed record InspectionPriorityQuery
     public DateOnly? AsOf { get; init; }
 }
 
+public sealed record EarlyWarningQuery
+{
+    public int? Top { get; init; }
+    public DateOnly? AsOf { get; init; }
+}
+
 public sealed record WorkOrderAnalyticsQuery
 {
     public DateOnly? DateFrom { get; init; }

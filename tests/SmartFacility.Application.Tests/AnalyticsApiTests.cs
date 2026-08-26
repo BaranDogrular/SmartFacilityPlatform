@@ -20,6 +20,7 @@ public sealed class AnalyticsApiTests(AnalyticsApiFactory factory) :
     [InlineData("/api/analytics/assets/overview")]
     [InlineData("/api/analytics/assets/maintenance-activity-pareto")]
     [InlineData("/api/analytics/assets/inspection-priority")]
+    [InlineData("/api/analytics/assets/early-warning")]
     [InlineData("/api/analytics/work-orders/overview")]
     [InlineData("/api/analytics/work-orders/trend")]
     [InlineData("/api/analytics/work-orders/activity")]
@@ -42,6 +43,8 @@ public sealed class AnalyticsApiTests(AnalyticsApiFactory factory) :
     [InlineData("/api/analytics/assets/maintenance-activity-pareto?top=101")]
     [InlineData("/api/analytics/assets/inspection-priority?top=0")]
     [InlineData("/api/analytics/assets/inspection-priority?top=101")]
+    [InlineData("/api/analytics/assets/early-warning?top=0")]
+    [InlineData("/api/analytics/assets/early-warning?top=101")]
     [InlineData("/api/analytics/assets/maintenance-activity-pareto?dateFrom=2026-02-01&dateTo=2026-01-01")]
     [InlineData("/api/analytics/work-orders/overview?dateFrom=2026-02-01&dateTo=2026-01-01")]
     [InlineData("/api/analytics/work-orders/activity?dateFrom=2026-02-01&dateTo=2026-01-01")]
@@ -120,6 +123,24 @@ public sealed class AnalyticsApiTests(AnalyticsApiFactory factory) :
     }
 
     [Fact]
+    public async Task Early_warning_contract_serializes_level_baseline_status_and_metadata()
+    {
+        using var response = await _client.GetAsync(
+            "/api/analytics/assets/early-warning?top=5&asOf=2026-08-25");
+        using var document = JsonDocument.Parse(await response.Content.ReadAsStreamAsync());
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal("2026-08-25", document.RootElement.GetProperty("metadata").GetProperty("asOf").GetString());
+        Assert.Equal(5, document.RootElement.GetProperty("metadata").GetProperty("appliedTop").GetInt32());
+        Assert.Equal(
+            "NORMAL",
+            document.RootElement.GetProperty("items")[0].GetProperty("warningLevel").GetString());
+        Assert.Equal(
+            "SUFFICIENT",
+            document.RootElement.GetProperty("items")[0].GetProperty("baselineStatus").GetString());
+    }
+
+    [Fact]
     public async Task Swagger_document_contains_all_analytics_routes()
     {
         var swagger = await _client.GetStringAsync("/swagger/v1/swagger.json");
@@ -132,6 +153,10 @@ public sealed class AnalyticsApiTests(AnalyticsApiFactory factory) :
             StringComparison.Ordinal);
         Assert.Contains(
             "/api/analytics/assets/inspection-priority",
+            swagger,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "/api/analytics/assets/early-warning",
             swagger,
             StringComparison.Ordinal);
         Assert.Contains("/api/analytics/work-orders/overview", swagger, StringComparison.Ordinal);
@@ -243,6 +268,49 @@ internal sealed class FakeAnalyticsServices :
                     0,
                     1,
                     ["Son 30 günde 1 iş emri"])
+            ]));
+
+    public Task<EarlyWarningResponse> GetEarlyWarningAsync(
+        EarlyWarningQuery query,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult(new EarlyWarningResponse(
+            new EarlyWarningMetadataDto(
+                query.AsOf,
+                new EarlyWarningBaselineWindowDto(
+                    new DateOnly(2025, 7, 1),
+                    new DateOnly(2026, 6, 30),
+                    12,
+                    6),
+                1,
+                1,
+                0,
+                0,
+                0,
+                0,
+                query.Top ?? 10,
+                "core.WorkOrders + core.Assets",
+                "early-warning/v1",
+                []),
+            [
+                new EarlyWarningItemDto(
+                    1,
+                    "A-1",
+                    "Asset",
+                    10,
+                    EarlyWarningLevel.Normal,
+                    EarlyWarningBaselineStatus.Sufficient,
+                    1,
+                    1,
+                    3,
+                    3,
+                    9,
+                    9,
+                    3,
+                    1,
+                    12,
+                    0,
+                    0,
+                    ["Yakın dönem aktivitesi kişisel tarihsel baseline içinde"])
             ]));
 
     public Task<WorkOrderOverviewResponse> GetOverviewAsync(

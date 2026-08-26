@@ -392,6 +392,220 @@ public sealed class EfAnalyticsQueryService(SmartFacilityDbContext dbContext) :
             rankedItems);
     }
 
+    public async Task<EarlyWarningResponse> GetEarlyWarningAsync(
+        EarlyWarningQuery query,
+        CancellationToken cancellationToken = default)
+    {
+        var appliedTop = query.Top ?? 10;
+        var canonicalWorkOrders = _dbContext.WorkOrders
+            .AsNoTracking()
+            .Where(item => item.IsInCanonicalSnapshot && item.ReportedDateTime.HasValue);
+        var latestSourceDateTime = query.AsOf.HasValue
+            ? null
+            : await canonicalWorkOrders.MaxAsync(
+                item => (DateTime?)item.ReportedDateTime,
+                cancellationToken);
+        var asOf = query.AsOf
+            ?? (latestSourceDateTime.HasValue
+                ? DateOnly.FromDateTime(latestSourceDateTime.Value)
+                : null);
+
+        if (!asOf.HasValue)
+        {
+            return new EarlyWarningResponse(
+                CreateEarlyWarningMetadata(null, null, 0, 0, 0, 0, 0, appliedTop),
+                []);
+        }
+
+        var exclusiveEnd = asOf.Value.AddDays(1).ToDateTime(TimeOnly.MinValue);
+        var last7Start = exclusiveEnd.AddDays(-7);
+        var previous7Start = exclusiveEnd.AddDays(-14);
+        var last30Start = exclusiveEnd.AddDays(-30);
+        var previous30Start = exclusiveEnd.AddDays(-60);
+        var last90Start = exclusiveEnd.AddDays(-90);
+        var previous90Start = exclusiveEnd.AddDays(-180);
+        var baselineEnd = new DateOnly(last30Start.Year, last30Start.Month, 1);
+        var baselineStart = baselineEnd.AddMonths(-EarlyWarningScoring.BaselineMonthCount);
+        var baselineStartDateTime = baselineStart.ToDateTime(TimeOnly.MinValue);
+        var baselineEndDateTime = baselineEnd.ToDateTime(TimeOnly.MinValue);
+        var workOrdersThroughCutoff = canonicalWorkOrders
+            .Where(item => item.ReportedDateTime < exclusiveEnd);
+
+        var coverage = await workOrdersThroughCutoff
+            .GroupBy(_ => 1)
+            .Select(group => new InspectionPriorityCoverageProjection(
+                group.LongCount(item => item.AssetId.HasValue),
+                group.LongCount(item => !item.AssetId.HasValue)))
+            .SingleOrDefaultAsync(cancellationToken)
+            ?? new InspectionPriorityCoverageProjection(0, 0);
+
+        var signalCounts = await workOrdersThroughCutoff
+            .Where(workOrder => workOrder.AssetId.HasValue)
+            .GroupBy(workOrder => workOrder.AssetId!.Value)
+            .Select(grouped => new EarlyWarningCountProjection(
+                grouped.Key,
+                grouped.LongCount(item => item.ReportedDateTime >= last7Start),
+                grouped.LongCount(item =>
+                    item.ReportedDateTime >= previous7Start
+                    && item.ReportedDateTime < last7Start),
+                grouped.LongCount(item => item.ReportedDateTime >= last30Start),
+                grouped.LongCount(item =>
+                    item.ReportedDateTime >= previous30Start
+                    && item.ReportedDateTime < last30Start),
+                grouped.LongCount(item => item.ReportedDateTime >= last90Start),
+                grouped.LongCount(item =>
+                    item.ReportedDateTime >= previous90Start
+                    && item.ReportedDateTime < last90Start),
+                grouped.LongCount(item => item.RawStatusCode == WorkOrderSourceState.Open),
+                grouped.LongCount(item =>
+                    item.RawStatusCode == WorkOrderSourceState.Open
+                    && item.ReportedDateTime >= baselineStartDateTime
+                    && item.ReportedDateTime < baselineEndDateTime)))
+            .ToListAsync(cancellationToken);
+
+        var baselineMonthlyCounts = await workOrdersThroughCutoff
+            .Where(workOrder => workOrder.AssetId.HasValue)
+            .Where(workOrder =>
+                workOrder.ReportedDateTime >= baselineStartDateTime
+                && workOrder.ReportedDateTime < baselineEndDateTime)
+            .GroupBy(workOrder => new
+            {
+                AssetId = workOrder.AssetId!.Value,
+                Year = workOrder.ReportedDateTime!.Value.Year,
+                Month = workOrder.ReportedDateTime.Value.Month
+            })
+            .Select(grouped => new EarlyWarningMonthlyCountProjection(
+                grouped.Key.AssetId,
+                grouped.Key.Year,
+                grouped.Key.Month,
+                grouped.LongCount()))
+            .ToListAsync(cancellationToken);
+
+        var linkedAssetIds = workOrdersThroughCutoff
+            .Where(workOrder => workOrder.AssetId.HasValue)
+            .Select(workOrder => workOrder.AssetId!.Value)
+            .Distinct();
+        var assets = await _dbContext.Assets
+            .AsNoTracking()
+            .Where(asset => linkedAssetIds.Contains(asset.Id))
+            .Select(asset => new { asset.Id, asset.AssetCode, asset.Name })
+            .ToDictionaryAsync(asset => asset.Id, cancellationToken);
+        var monthlyCountsByAsset = baselineMonthlyCounts
+            .GroupBy(item => item.AssetId)
+            .ToDictionary(group => group.Key, group => group.ToArray());
+
+        var warningRows = signalCounts
+            .Where(item => assets.ContainsKey(item.AssetId))
+            .Select(item =>
+            {
+                var asset = assets[item.AssetId];
+                var monthlyCounts = new long[EarlyWarningScoring.BaselineMonthCount];
+                if (monthlyCountsByAsset.TryGetValue(item.AssetId, out var baselineCounts))
+                {
+                    foreach (var count in baselineCounts)
+                    {
+                        var monthIndex = ((count.Year - baselineStart.Year) * 12)
+                            + count.Month
+                            - baselineStart.Month;
+                        if (monthIndex >= 0 && monthIndex < monthlyCounts.Length)
+                        {
+                            monthlyCounts[monthIndex] = count.Count;
+                        }
+                    }
+                }
+
+                var activeMonths = monthlyCounts.Count(count => count > 0);
+                if (activeMonths < EarlyWarningScoring.MinimumActiveMonths)
+                {
+                    return new EarlyWarningItemDto(
+                        asset.Id,
+                        asset.AssetCode,
+                        asset.Name,
+                        null,
+                        null,
+                        EarlyWarningBaselineStatus.InsufficientBaseline,
+                        item.Last7Count,
+                        item.Previous7Count,
+                        item.Last30Count,
+                        item.Previous30Count,
+                        item.Last90Count,
+                        item.Previous90Count,
+                        null,
+                        null,
+                        activeMonths,
+                        null,
+                        item.OpenCount,
+                        [$"12 aylık baseline içinde en az 6 aktif ay gerekir; {activeMonths} aktif ay bulundu"]);
+                }
+
+                var baselineMedian = EarlyWarningScoring.Median(monthlyCounts);
+                var baselineMad = EarlyWarningScoring.MedianAbsoluteDeviation(
+                    monthlyCounts,
+                    baselineMedian);
+                var result = EarlyWarningScoring.Calculate(new EarlyWarningSignals(
+                    item.Last7Count,
+                    item.Previous7Count,
+                    item.Last30Count,
+                    item.Previous30Count,
+                    item.Last90Count,
+                    item.OpenCount,
+                    item.BaselineOpenCount,
+                    baselineMedian,
+                    baselineMad));
+
+                return new EarlyWarningItemDto(
+                    asset.Id,
+                    asset.AssetCode,
+                    asset.Name,
+                    result.Score,
+                    result.Level,
+                    EarlyWarningBaselineStatus.Sufficient,
+                    item.Last7Count,
+                    item.Previous7Count,
+                    item.Last30Count,
+                    item.Previous30Count,
+                    item.Last90Count,
+                    item.Previous90Count,
+                    baselineMedian,
+                    baselineMad,
+                    activeMonths,
+                    result.Deviation,
+                    item.OpenCount,
+                    result.Reasons);
+            })
+            .ToArray();
+
+        var eligibleAssets = warningRows.LongCount(item =>
+            item.BaselineStatus == EarlyWarningBaselineStatus.Sufficient);
+        var insufficientAssets = warningRows.LongLength - eligibleAssets;
+        var rankedItems = warningRows
+            .OrderBy(item => item.BaselineStatus == EarlyWarningBaselineStatus.Sufficient ? 0 : 1)
+            .ThenByDescending(item => item.WarningScore)
+            .ThenByDescending(item => item.Last30Count)
+            .ThenByDescending(item => item.Last7Count)
+            .ThenBy(item => item.AssetCode, StringComparer.Ordinal)
+            .ThenBy(item => item.AssetId)
+            .Take(appliedTop)
+            .ToArray();
+        var baselineWindow = new EarlyWarningBaselineWindowDto(
+            baselineStart,
+            baselineEnd.AddDays(-1),
+            EarlyWarningScoring.BaselineMonthCount,
+            EarlyWarningScoring.MinimumActiveMonths);
+
+        return new EarlyWarningResponse(
+            CreateEarlyWarningMetadata(
+                asOf,
+                baselineWindow,
+                warningRows.LongLength,
+                eligibleAssets,
+                insufficientAssets,
+                coverage.EligibleWorkOrders,
+                coverage.ExcludedUnlinkedWorkOrders,
+                appliedTop),
+            rankedItems);
+    }
+
     public async Task<WorkOrderOverviewResponse> GetOverviewAsync(
         WorkOrderAnalyticsQuery query,
         CancellationToken cancellationToken = default)
@@ -1073,6 +1287,39 @@ public sealed class EfAnalyticsQueryService(SmartFacilityDbContext dbContext) :
             ]);
     }
 
+    private static EarlyWarningMetadataDto CreateEarlyWarningMetadata(
+        DateOnly? asOf,
+        EarlyWarningBaselineWindowDto? baselineWindow,
+        long totalAssetsConsidered,
+        long eligibleAssets,
+        long insufficientBaselineAssets,
+        long eligibleWorkOrders,
+        long excludedUnlinkedWorkOrders,
+        int appliedTop)
+    {
+        var coverageDenominator = eligibleWorkOrders + excludedUnlinkedWorkOrders;
+        return new EarlyWarningMetadataDto(
+            asOf,
+            baselineWindow,
+            totalAssetsConsidered,
+            eligibleAssets,
+            insufficientBaselineAssets,
+            eligibleWorkOrders,
+            excludedUnlinkedWorkOrders,
+            CalculatePercent(eligibleWorkOrders, coverageDenominator, 4),
+            appliedTop,
+            "core.WorkOrders + core.Assets",
+            EarlyWarningScoring.Version,
+            [
+                "Early Warning identifies explainable deviation from an asset's own WorkOrder activity history; it is not failure probability or an asset health score.",
+                "The baseline uses 12 complete calendar months before the month containing the current 30-day window; the current window is excluded.",
+                "At least 6 active baseline months are required; assets below that threshold are marked INSUFFICIENT_BASELINE and are not scored.",
+                "Only canonical WorkOrders with a resolved AssetId and ReportedDateTime on or before AsOf are used.",
+                "Unlinked WorkOrders are disclosed but not mapped through raw asset codes.",
+                "SCADA and the legacy HistoricalWorkOrders snapshot are not queried."
+            ]);
+    }
+
     private static string? NormalizeOptionalFilter(string? value) =>
         string.IsNullOrWhiteSpace(value) ? null : value;
 
@@ -1196,6 +1443,23 @@ public sealed class EfAnalyticsQueryService(SmartFacilityDbContext dbContext) :
         long Previous30Count,
         long Last90Count,
         long OpenCount);
+
+    private sealed record EarlyWarningCountProjection(
+        long AssetId,
+        long Last7Count,
+        long Previous7Count,
+        long Last30Count,
+        long Previous30Count,
+        long Last90Count,
+        long Previous90Count,
+        long OpenCount,
+        long BaselineOpenCount);
+
+    private sealed record EarlyWarningMonthlyCountProjection(
+        long AssetId,
+        int Year,
+        int Month,
+        long Count);
 
     private sealed class ScadaClearanceStatisticsProjection
     {

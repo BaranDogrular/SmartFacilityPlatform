@@ -128,6 +128,57 @@ export interface InspectionPriorityResponse {
   items: InspectionPriorityItem[]
 }
 
+export type EarlyWarningLevel = 'HIGH' | 'MEDIUM' | 'NORMAL'
+export type EarlyWarningBaselineStatus = 'SUFFICIENT' | 'INSUFFICIENT_BASELINE'
+
+export interface EarlyWarningBaselineWindow {
+  from: string
+  through: string
+  monthCount: number
+  minimumActiveMonths: number
+}
+
+export interface EarlyWarningMetadata {
+  asOf: string | null
+  baselineWindow: EarlyWarningBaselineWindow | null
+  totalAssetsConsidered: number
+  eligibleAssets: number
+  insufficientBaselineAssets: number
+  eligibleWorkOrders: number
+  excludedUnlinkedWorkOrders: number
+  coveragePercent: number
+  appliedTop: number
+  sourceDataset: string
+  scoringVersion: string
+  notes: string[]
+}
+
+export interface EarlyWarningItem {
+  assetId: number
+  assetCode: string
+  assetName: string
+  warningScore: number | null
+  warningLevel: EarlyWarningLevel | null
+  baselineStatus: EarlyWarningBaselineStatus
+  last7Count: number
+  previous7Count: number
+  last30Count: number
+  previous30Count: number
+  last90Count: number
+  previous90Count: number
+  baselineMedian: number | null
+  baselineMad: number | null
+  baselineActiveMonths: number
+  deviation: number | null
+  openCount: number
+  reasons: string[]
+}
+
+export interface EarlyWarningResponse {
+  metadata: EarlyWarningMetadata
+  items: EarlyWarningItem[]
+}
+
 export interface WorkOrderOverviewResponse {
   totalWorkOrders: number
   openWorkOrders: number
@@ -235,6 +286,11 @@ export interface AssetMaintenanceActivityParetoQuery {
 }
 
 export interface InspectionPriorityQuery {
+  top?: number
+  asOf?: string
+}
+
+export interface EarlyWarningQuery {
   top?: number
   asOf?: string
 }

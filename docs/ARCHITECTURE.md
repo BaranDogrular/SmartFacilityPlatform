@@ -93,6 +93,16 @@ Bounded score component'leri: last30 `30/21`, pozitif activity delta `20/8`, ope
 
 Bu sonuç ML, predictive maintenance, failure probability, risk probability veya asset health değildir. SCADA, legacy `HistoricalWorkOrders`, unmatched raw asset code, all-time recurrence, NLP, cost ve invented criticality V1 score'a dahil değildir.
 
+### Early Warning v1
+
+`GET /api/analytics/assets/early-warning`, yalnız canonical `core.WorkOrders` ve `core.Assets` üzerinde request-time read-only hesaplanır. Default `asOf` dataset'in maksimum `ReportedDateTime` günüdür. Current 30 günlük analysis window baseline'a girmez; baseline bu pencerenin başladığı ayın öncesindeki 12 tam takvim ayıdır.
+
+SQL tarafında linked WorkOrders asset bazında conditional aggregate edilir; baseline aylık sayımları en fazla asset × 12 bounded aggregate satırı üretir. WorkOrder satırları client memory'ye çekilmez, asset başına query yoktur ve cancellation tüm async sorgulara aktarılır. Asset metadata sorgusu materialized ID parametre listesi yerine server-side subquery kullanır.
+
+En az 6 aktif baseline ayı olmayan asset `INSUFFICIENT_BASELINE` olur ve score üretilmez. Yeterli asset'lerde median ve MAD temelli robust kişisel baseline; 30/7 günlük relative artış, 90 günlük yakın dönem kümelenmesi ve düşük ağırlıklı open-emergence sinyali kullanılır. Component'ler bounded olup toplam 0–100'dür. `HIGH >= 60`, `MEDIUM >= 30`, diğerleri `NORMAL` olur.
+
+Early Warning kişisel davranış sapmasıdır; Inspection Priority'nin mutlak aktivite/workload sıralamasından bağımsızdır. ML, failure probability, asset health, SCADA, legacy `HistoricalWorkOrders`, workflow completion, NLP, cost veya downtime kullanmaz.
+
 ## Reliability semantics
 
 - Green: İlgili record-count/trend veri sözleşmesi doğrulanmıştır; asset reliability değildir.
@@ -102,6 +112,7 @@ Bu sonuç ML, predictive maintenance, failure probability, risk probability veya
 - SCADA occurrence: Source row'dur; benzersiz fiziksel alarm değildir.
 - WorkOrder activity: Canonical record activity/volume'dür; açık workload veya failure prediction değildir.
 - Inspection Priority: Yakın dönem WorkOrder aktivitesine dayalı açıklanabilir inceleme sırasıdır; failure probability veya asset health değildir.
+- Early Warning: Asset'in kendi tarihsel WorkOrder davranışından açıklanabilir sapmasıdır; prediction veya risk probability değildir.
 
 ## Frontend sınırı
 
@@ -111,6 +122,7 @@ React uygulamasının route'ları:
 - `/assets`
 - `/work-orders`
 - `/inspection-priority`
+- `/early-warning`
 - `/scada`
 - `/data-quality`
 

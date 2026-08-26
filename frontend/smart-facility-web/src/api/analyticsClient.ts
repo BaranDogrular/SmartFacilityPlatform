@@ -6,6 +6,8 @@ import type {
   AssetOverviewResponse,
   InspectionPriorityQuery,
   InspectionPriorityResponse,
+  EarlyWarningQuery,
+  EarlyWarningResponse,
   WorkOrderActivityQuery,
   WorkOrderActivityResponse,
   ImportQualityOverviewResponse,
@@ -110,6 +112,12 @@ export const getAssetMaintenanceActivityPareto = (
 export const getInspectionPriority = (query: InspectionPriorityQuery = {}) =>
   get<InspectionPriorityResponse>(
     '/api/analytics/assets/inspection-priority',
+    query as QueryParameters,
+  )
+
+export const getEarlyWarning = (query: EarlyWarningQuery = {}) =>
+  get<EarlyWarningResponse>(
+    '/api/analytics/assets/early-warning',
     query as QueryParameters,
   )
 

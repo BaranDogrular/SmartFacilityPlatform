@@ -15,6 +15,10 @@ public interface IAssetAnalyticsService
     Task<InspectionPriorityResponse> GetInspectionPriorityAsync(
         InspectionPriorityQuery query,
         CancellationToken cancellationToken = default);
+
+    Task<EarlyWarningResponse> GetEarlyWarningAsync(
+        EarlyWarningQuery query,
+        CancellationToken cancellationToken = default);
 }
 
 public interface IWorkOrderAnalyticsService

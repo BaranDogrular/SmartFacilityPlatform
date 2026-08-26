@@ -3,6 +3,7 @@ import { after, test } from 'node:test'
 import React from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { MemoryRouter } from 'react-router-dom'
 import { createServer } from 'vite'
 
 const vite = await createServer({
@@ -19,6 +20,8 @@ const { OverviewPage } = await vite.ssrLoadModule('/src/pages/OverviewPage.tsx')
 const { AssetsPage } = await vite.ssrLoadModule('/src/pages/AssetsPage.tsx')
 const { WorkOrdersPage } = await vite.ssrLoadModule('/src/pages/WorkOrdersPage.tsx')
 const { InspectionPriorityPage } = await vite.ssrLoadModule('/src/pages/InspectionPriorityPage.tsx')
+const { EarlyWarningPage } = await vite.ssrLoadModule('/src/pages/EarlyWarningPage.tsx')
+const { AppLayout } = await vite.ssrLoadModule('/src/components/AppLayout.tsx')
 const { ScadaPage } = await vite.ssrLoadModule('/src/pages/ScadaPage.tsx')
 
 const snapshotMetadata = {
@@ -155,6 +158,110 @@ const inspectionPriority = {
   ],
 }
 
+const earlyWarning = {
+  metadata: {
+    asOf: '2026-08-25',
+    baselineWindow: {
+      from: '2025-07-01',
+      through: '2026-06-30',
+      monthCount: 12,
+      minimumActiveMonths: 6,
+    },
+    totalAssetsConsidered: 1283,
+    eligibleAssets: 248,
+    insufficientBaselineAssets: 1035,
+    eligibleWorkOrders: 162590,
+    excludedUnlinkedWorkOrders: 8546,
+    coveragePercent: 95.0063,
+    appliedTop: 10,
+    sourceDataset: 'core.WorkOrders + core.Assets',
+    scoringVersion: 'early-warning/v1',
+    notes: [],
+  },
+  items: [
+    {
+      assetId: 1,
+      assetCode: 'WARNING-HIGH',
+      assetName: 'Sharp increase asset',
+      warningScore: 87,
+      warningLevel: 'HIGH',
+      baselineStatus: 'SUFFICIENT',
+      last7Count: 3,
+      previous7Count: 0,
+      last30Count: 3,
+      previous30Count: 0,
+      last90Count: 5,
+      previous90Count: 4,
+      baselineMedian: 0.5,
+      baselineMad: 0.5,
+      baselineActiveMonths: 6,
+      deviation: 2.5,
+      openCount: 0,
+      reasons: ['Önceki 30 günde kayıt yokken son 30 günde 3 yeni aktivite oluştu'],
+    },
+    {
+      assetId: 2,
+      assetCode: 'WARNING-MEDIUM',
+      assetName: 'Watch asset',
+      warningScore: 42,
+      warningLevel: 'MEDIUM',
+      baselineStatus: 'SUFFICIENT',
+      last7Count: 2,
+      previous7Count: 1,
+      last30Count: 7,
+      previous30Count: 5,
+      last90Count: 21,
+      previous90Count: 18,
+      baselineMedian: 4,
+      baselineMad: 1,
+      baselineActiveMonths: 9,
+      deviation: 3,
+      openCount: 1,
+      reasons: ['Son 7 günlük aktivite önceki 7 güne göre 1 kayıt arttı'],
+    },
+    {
+      assetId: 3,
+      assetCode: 'WARNING-NORMAL',
+      assetName: 'Stable asset',
+      warningScore: 8,
+      warningLevel: 'NORMAL',
+      baselineStatus: 'SUFFICIENT',
+      last7Count: 4,
+      previous7Count: 4,
+      last30Count: 20,
+      previous30Count: 20,
+      last90Count: 60,
+      previous90Count: 60,
+      baselineMedian: 20,
+      baselineMad: 2,
+      baselineActiveMonths: 12,
+      deviation: 0,
+      openCount: 0,
+      reasons: ['Yakın dönem aktivitesi kişisel tarihsel baseline içinde'],
+    },
+    {
+      assetId: 4,
+      assetCode: 'NO-BASELINE',
+      assetName: 'New asset',
+      warningScore: null,
+      warningLevel: null,
+      baselineStatus: 'INSUFFICIENT_BASELINE',
+      last7Count: 1,
+      previous7Count: 0,
+      last30Count: 1,
+      previous30Count: 0,
+      last90Count: 1,
+      previous90Count: 0,
+      baselineMedian: null,
+      baselineMad: null,
+      baselineActiveMonths: 1,
+      deviation: null,
+      openCount: 0,
+      reasons: ['12 aylık baseline içinde en az 6 aktif ay gerekir; 1 aktif ay bulundu'],
+    },
+  ],
+}
+
 const workOrders = {
   totalWorkOrders: 171136,
   openWorkOrders: 75,
@@ -279,6 +386,10 @@ function createQueryClient(overrides = {}) {
     ['analytics', 'assets', 'inspection-priority', { top: 10 }],
     overrides.inspectionPriority ?? inspectionPriority,
   )
+  client.setQueryData(
+    ['analytics', 'assets', 'early-warning', { top: 10 }],
+    overrides.earlyWarning ?? earlyWarning,
+  )
   client.setQueryData(['analytics', 'work-orders', 'overview', {}], workOrders)
   client.setQueryData(['analytics', 'work-orders', 'trend', { grain: 'Month' }], workOrderTrend)
   client.setQueryData(
@@ -340,6 +451,7 @@ test('new analytics clients call the accepted backend routes with serialized que
   try {
     await analytics.getAssetMaintenanceActivityPareto({ dateFrom: '2025-01-01', top: 5 })
     await analytics.getInspectionPriority({ asOf: '2026-08-25', top: 25 })
+    await analytics.getEarlyWarning({ asOf: '2026-08-25', top: 10 })
     await analytics.getWorkOrderActivity({ dateTo: '2025-12-31', discipline: 'MEKANİK' })
     await analytics.getScadaClearanceInterval({ sourceSheet: 'MEKANİK', alarmType: 'SOĞUTMA' })
   } finally {
@@ -354,6 +466,10 @@ test('new analytics clients call the accepted backend routes with serialized que
     {
       url: '/api/analytics/assets/inspection-priority',
       params: { asOf: '2026-08-25', top: 25 },
+    },
+    {
+      url: '/api/analytics/assets/early-warning',
+      params: { asOf: '2026-08-25', top: 10 },
     },
     {
       url: '/api/analytics/work-orders/activity',
@@ -521,6 +637,86 @@ test('inspection priority renders scoped empty, loading, error and retry states'
   )
   assert.match(errorHtml, /Priority servisi kullanılamıyor/)
   assert.match(errorHtml, /Yeniden dene/)
+})
+
+test('early warning renders levels, reasons, baseline coverage and safe semantics', () => {
+  const html = renderPage(EarlyWarningPage)
+
+  assert.match(html, /Erken Uyarı/)
+  assert.match(html, /WARNING-HIGH/)
+  assert.match(html, /WARNING-MEDIUM/)
+  assert.match(html, /WARNING-NORMAL/)
+  assert.match(html, /NO-BASELINE/)
+  assert.match(html, /YÜKSEK SAPMA/)
+  assert.match(html, /İZLE/)
+  assert.match(html, /NORMAL/)
+  assert.match(html, /BASELINE YETERSİZ/)
+  assert.match(html, /87/)
+  assert.match(html, /yeni aktivite oluştu/)
+  assert.match(html, /1\.283/)
+  assert.match(html, /248/)
+  assert.match(html, /1\.035/)
+  assert.match(html, /95,01%/)
+  assert.match(html, /arıza olasılığı veya varlık sağlık skoru değildir/)
+  assert.match(html, /hangi asset kendi normal davranışından sapıyor/)
+  assert.match(html, /early-warning-table-wrap/)
+  assert.doesNotMatch(html, /failure probability|predictive maintenance|arıza riski %/i)
+})
+
+test('early warning renders empty, loading, error and retry states', () => {
+  const emptyHtml = renderPage(EarlyWarningPage, {
+    earlyWarning: {
+      ...earlyWarning,
+      metadata: { ...earlyWarning.metadata, totalAssetsConsidered: 0, eligibleAssets: 0 },
+      items: [],
+    },
+  })
+  assert.match(emptyHtml, /değerlendirilebilecek bağlı varlık bulunamadı/)
+
+  const pendingClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  const pendingHtml = renderToStaticMarkup(
+    React.createElement(
+      QueryClientProvider,
+      { client: pendingClient },
+      React.createElement(EarlyWarningPage),
+    ),
+  )
+  assert.match(pendingHtml, /Erken uyarı aktivite sapmaları hesaplanıyor/)
+
+  const errorClient = new QueryClient({
+    defaultOptions: {
+      queries: { retry: false, retryOnMount: false, refetchOnMount: false, staleTime: Infinity },
+    },
+  })
+  const errorQuery = errorClient.getQueryCache().build(errorClient, {
+    queryKey: ['analytics', 'assets', 'early-warning', { top: 10 }],
+    queryFn: async () => earlyWarning,
+  })
+  errorQuery.setState({ ...errorQuery.state, status: 'error', fetchStatus: 'idle', error: new Error('Erken uyarı servisi kullanılamıyor') })
+  const errorHtml = renderToStaticMarkup(
+    React.createElement(
+      QueryClientProvider,
+      { client: errorClient },
+      React.createElement(EarlyWarningPage),
+    ),
+  )
+  assert.match(errorHtml, /Erken uyarı servisi kullanılamıyor/)
+  assert.match(errorHtml, /Yeniden dene/)
+})
+
+test('early warning navigation is exposed independently from inspection priority', () => {
+  const html = renderToStaticMarkup(
+    React.createElement(
+      MemoryRouter,
+      { initialEntries: ['/early-warning'] },
+      React.createElement(AppLayout),
+    ),
+  )
+
+  assert.match(html, /href="\/early-warning"/)
+  assert.match(html, /Erken Uyarı/)
+  assert.match(html, /href="\/inspection-priority"/)
+  assert.match(html, /İnceleme Önceliği/)
 })
 
 test('work-order filters and reset control are present with exact raw options', () => {

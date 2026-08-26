@@ -33,9 +33,10 @@ Mimari ayrıntılar için [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), release 
 - Asset Maintenance Activity Pareto
 - Canonical monthly WorkOrder activity trend ve raw Discipline dağılımı
 - Açıklanabilir Inspection Priority v1
+- Kişisel WorkOrder geçmişine göre açıklanabilir Early Warning v1
 - Quality-eligible SCADA Clearance Interval median/P90 analitiği
 - Import/data-quality analytics
-- Dashboard, Assets, WorkOrders, İnceleme Önceliği, SCADA ve Data Quality ekranları
+- Dashboard, Assets, WorkOrders, İnceleme Önceliği, Erken Uyarı, SCADA ve Data Quality ekranları
 - Tarih, Discipline, status ve SourceSheet filtreleri
 - Loading, error, empty/no-match ve retry durumları
 - Green/Yellow reliability badge'leri ve güvenli semantik açıklamalar
@@ -165,6 +166,7 @@ Mevcut HTTP yüzeyinin tamamı `GET /api/analytics` altındadır:
 | `/api/analytics/assets/overview` | Asset envanteri ve canonical WorkOrder ilişkisi |
 | `/api/analytics/assets/maintenance-activity-pareto` | Asset bazında canonical WorkOrder aktivite yoğunluğu |
 | `/api/analytics/assets/inspection-priority` | Yakın dönem WorkOrder aktivitesine dayalı açıklanabilir inceleme önceliği |
+| `/api/analytics/assets/early-warning` | Asset'in kendi tarihsel davranışına göre WorkOrder aktivite sapması |
 | `/api/analytics/work-orders/overview` | Canonical toplam/açık/kapalı/diğer ve dağılımlar |
 | `/api/analytics/work-orders/trend` | Canonical WorkOrder aylık trendi |
 | `/api/analytics/work-orders/activity` | Canonical WorkOrder tarih ve Discipline aktivitesi |
@@ -229,6 +231,7 @@ Representative local production-mode measurements on the current acceptance data
 - Historical Activity default median: yaklaşık 296 ms
 - SCADA Clearance default median: yaklaşık 120 ms
 - Inspection Priority default median: yaklaşık 300 ms
+- Early Warning default median: yaklaşık 1.900 ms
 
 Bunlar SLA değildir; donanım, SQL Server, veri hacmi ve eşzamanlı yükle birlikte değişir.
 
@@ -251,6 +254,22 @@ Score 0–100 aralığındadır ve beş bounded component kullanır:
 `HIGH >= 50`, `MEDIUM >= 25`, diğer sonuçlar `LOW` olarak sunulur. HIGH, yalnız “öncelikli inceleme önerilir” anlamındadır; arıza olasılığı değildir. Sıralama `PriorityScore DESC`, `OpenCount DESC`, `Last30Count DESC`, `AssetCode ASC`, `AssetId ASC` şeklindedir.
 
 Yalnız `AssetId` bağlı WorkOrder kayıtları score'a katılır. Unlinked kayıtlar raw code ile zorla eşlenmez ve response coverage metadata'sında açıklanır. V1 SCADA, legacy HistoricalWorkOrders, all-time recurrence, NLP, maliyet veya manuel criticality kullanmaz.
+
+## Early Warning v1
+
+Early Warning v1, ML, failure prediction, risk probability veya asset health score değildir. Bir asset'in yakın dönem canonical WorkOrder aktivitesinin kendi geçmiş davranışından açıklanabilir biçimde sapıp sapmadığını gösterir. Inspection Priority mutlak aktivite ve workload ile “nereye önce bakmalıyım?” sorusunu; Early Warning kişisel baseline ile “hangi asset normal davranışından sapıyor?” sorusunu yanıtlar. İki score birleştirilmez.
+
+Default `asOf`, canonical dataset'in maksimum `ReportedDateTime` günüdür. Baseline, current 30 günlük pencereyi içermeyen önceki 12 tam takvim ayıdır. En az 6 aktif baseline ayı olmayan asset `INSUFFICIENT_BASELINE` olarak işaretlenir ve sahte normal davranış veya warning score üretilmez.
+
+0–100 score beş bounded component kullanır:
+
+- Son 30 günün önceki 30 güne göre pozitif relative artışı: 25 puan
+- Son 7 günün önceki 7 güne göre pozitif relative artışı: 25 puan
+- Tarihsel aylık median/MAD üzerinden robust sapma: 30 puan
+- Son 90 günlük aktivitenin son 30 günde kümelenmesi: 15 puan
+- Baseline döneminde görülmeyen açık workload oluşumu: 5 puan
+
+`HIGH >= 60`, `MEDIUM >= 30`, diğer yeterli-baseline sonuçları `NORMAL` olur. Sıralama score, last30 ve last7 descending; asset code ve asset id ascending şeklindedir. Yalnız `AssetId` bağlı canonical WorkOrders kullanılır; unlinked raw kodlar eşlenmez. SCADA, legacy `HistoricalWorkOrders`, NLP, cost, downtime ve completion bilgisi score'a dahil değildir.
 
 ## Offline ML sonucu
 

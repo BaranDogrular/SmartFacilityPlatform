@@ -6,6 +6,7 @@ const navigation = [
   { to: '/assets', label: 'Varlıklar' },
   { to: '/work-orders', label: 'İş Emirleri' },
   { to: '/inspection-priority', label: 'İnceleme Önceliği' },
+  { to: '/early-warning', label: 'Erken Uyarı' },
   { to: '/scada', label: 'SCADA' },
   { to: '/data-quality', label: 'Veri Kalitesi' },
 ]
@@ -15,6 +16,7 @@ const titles: Record<string, string> = {
   '/assets': 'Varlık Analitiği',
   '/work-orders': 'İş Emri Analitiği',
   '/inspection-priority': 'İnceleme Önceliği',
+  '/early-warning': 'Erken Uyarı',
   '/scada': 'SCADA Analitiği',
   '/data-quality': 'Veri Kalitesi',
 }

@@ -35,6 +35,12 @@ public static class AnalyticsEndpoints
             .Produces<InspectionPriorityResponse>()
             .ProducesValidationProblem();
 
+        group.MapGet("/assets/early-warning", GetEarlyWarningAsync)
+            .WithName("GetEarlyWarning")
+            .WithSummary("Returns explainable per-asset WorkOrder activity deviations from personal history.")
+            .Produces<EarlyWarningResponse>()
+            .ProducesValidationProblem();
+
         group.MapGet("/work-orders/overview", GetWorkOrderOverviewAsync)
             .WithName("GetWorkOrderOverview")
             .WithSummary("Returns canonical WorkOrder totals and source-state aggregations.")
@@ -123,6 +129,22 @@ public static class AnalyticsEndpoints
 
         return TypedResults.Ok(
             await service.GetInspectionPriorityAsync(query, cancellationToken));
+    }
+
+    private static async Task<Results<Ok<EarlyWarningResponse>, ValidationProblem>>
+        GetEarlyWarningAsync(
+            [AsParameters] EarlyWarningQuery query,
+            IAssetAnalyticsService service,
+            CancellationToken cancellationToken)
+    {
+        var errors = AnalyticsQueryValidation.Validate(query);
+        if (errors.Count > 0)
+        {
+            return TypedResults.ValidationProblem(errors);
+        }
+
+        return TypedResults.Ok(
+            await service.GetEarlyWarningAsync(query, cancellationToken));
     }
 
     private static async Task<Results<Ok<WorkOrderOverviewResponse>, ValidationProblem>> GetWorkOrderOverviewAsync(
@@ -263,6 +285,25 @@ internal static class AnalyticsQueryValidation
                 || query.AsOf == DateOnly.MaxValue))
         {
             errors["asOf"] = ["AsOf must allow a complete 90-day analysis window."];
+        }
+
+        return errors;
+    }
+
+    public static Dictionary<string, string[]> Validate(EarlyWarningQuery query)
+    {
+        var errors = new Dictionary<string, string[]>(StringComparer.Ordinal);
+
+        if (query.Top.HasValue && query.Top is < 1 or > 100)
+        {
+            errors["top"] = ["Top must be between 1 and 100."];
+        }
+
+        if (query.AsOf.HasValue
+            && (query.AsOf < DateOnly.MinValue.AddYears(1).AddMonths(2)
+                || query.AsOf == DateOnly.MaxValue))
+        {
+            errors["asOf"] = ["AsOf must allow the analysis and 12-month baseline windows."];
         }
 
         return errors;
