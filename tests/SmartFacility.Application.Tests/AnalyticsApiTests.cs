@@ -24,6 +24,7 @@ public sealed class AnalyticsApiTests(AnalyticsApiFactory factory) :
     [InlineData("/api/analytics/work-orders/overview")]
     [InlineData("/api/analytics/work-orders/trend")]
     [InlineData("/api/analytics/work-orders/activity")]
+    [InlineData("/api/analytics/work-orders/1/similar-cases")]
     [InlineData("/api/analytics/scada/overview")]
     [InlineData("/api/analytics/scada/trend")]
     [InlineData("/api/analytics/scada/clearance-interval")]
@@ -45,6 +46,8 @@ public sealed class AnalyticsApiTests(AnalyticsApiFactory factory) :
     [InlineData("/api/analytics/assets/inspection-priority?top=101")]
     [InlineData("/api/analytics/assets/early-warning?top=0")]
     [InlineData("/api/analytics/assets/early-warning?top=101")]
+    [InlineData("/api/analytics/work-orders/1/similar-cases?top=0")]
+    [InlineData("/api/analytics/work-orders/1/similar-cases?top=51")]
     [InlineData("/api/analytics/assets/maintenance-activity-pareto?dateFrom=2026-02-01&dateTo=2026-01-01")]
     [InlineData("/api/analytics/work-orders/overview?dateFrom=2026-02-01&dateTo=2026-01-01")]
     [InlineData("/api/analytics/work-orders/activity?dateFrom=2026-02-01&dateTo=2026-01-01")]
@@ -141,6 +144,30 @@ public sealed class AnalyticsApiTests(AnalyticsApiFactory factory) :
     }
 
     [Fact]
+    public async Task Similar_cases_contract_serializes_mode_excludes_pii_and_returns_problem_details_for_missing_target()
+    {
+        using var response = await _client.GetAsync(
+            "/api/analytics/work-orders/1/similar-cases?top=5");
+        var payload = await response.Content.ReadAsStringAsync();
+        using var document = JsonDocument.Parse(payload);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(
+            "SAME_ASSET_DISCIPLINE",
+            document.RootElement.GetProperty("metadata").GetProperty("retrievalMode").GetString());
+        Assert.Equal(1, document.RootElement.GetProperty("items")[0].GetProperty("workOrderId").GetInt64());
+        Assert.DoesNotContain("requestedByName", payload, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("assignedPersonnelName", payload, StringComparison.OrdinalIgnoreCase);
+
+        using var missing = await _client.GetAsync(
+            "/api/analytics/work-orders/404/similar-cases");
+        using var problem = JsonDocument.Parse(await missing.Content.ReadAsStreamAsync());
+        Assert.Equal(HttpStatusCode.NotFound, missing.StatusCode);
+        Assert.Equal(404, problem.RootElement.GetProperty("status").GetInt32());
+        Assert.Equal("Canonical WorkOrder not found.", problem.RootElement.GetProperty("title").GetString());
+    }
+
+    [Fact]
     public async Task Swagger_document_contains_all_analytics_routes()
     {
         var swagger = await _client.GetStringAsync("/swagger/v1/swagger.json");
@@ -163,6 +190,10 @@ public sealed class AnalyticsApiTests(AnalyticsApiFactory factory) :
         Assert.Contains("/api/analytics/work-orders/trend", swagger, StringComparison.Ordinal);
         Assert.Contains(
             "/api/analytics/work-orders/activity",
+            swagger,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "/api/analytics/work-orders/{id}/similar-cases",
             swagger,
             StringComparison.Ordinal);
         Assert.Contains("/api/analytics/scada/overview", swagger, StringComparison.Ordinal);
@@ -340,6 +371,42 @@ internal sealed class FakeAnalyticsServices :
             TimeGrain.Month,
             [],
             DateMetadata("core.WorkOrders", "ReportedDateTime", KpiReliability.Green)));
+
+    public Task<SimilarCasesResponse?> GetSimilarCasesAsync(
+        long workOrderId,
+        SimilarCasesQuery query,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult<SimilarCasesResponse?>(workOrderId == 404
+            ? null
+            : new SimilarCasesResponse(
+                new SimilarCasesMetadataDto(
+                    workOrderId,
+                    new DateTime(2026, 8, 25, 10, 0, 0),
+                    new SimilarCasesTargetAssetDto(1, "A-1", "Asset"),
+                    "MEKANİK",
+                    SimilarCasesRetrievalMode.SameAssetDiscipline,
+                    1,
+                    1,
+                    0,
+                    new DateTime(2026, 8, 25, 10, 0, 0),
+                    500,
+                    "similar-cases/hybrid-jaccard/v1",
+                    null),
+                [
+                    new SimilarCaseItemDto(
+                        1,
+                        "WO-1",
+                        new DateTime(2026, 8, 20, 10, 0, 0),
+                        "A-1",
+                        "Asset",
+                        "MEKANİK",
+                        "ARIZA - İŞ TALEBİ",
+                        "İŞ TALEBİ",
+                        "KONTROL",
+                        85,
+                        ["Aynı varlık", "Aynı disiplin", "Benzer açıklama (%80)"],
+                        "Pompa motorunda titreşim gözlendi.")
+                ]));
 
     public Task<WorkOrderActivityResponse> GetActivityAsync(
         WorkOrderActivityQuery query,

@@ -20,6 +20,8 @@ public sealed class EfAnalyticsQueryService(SmartFacilityDbContext dbContext) :
     private const string UnknownCategory = "<Unknown>";
     private const string LegacyFingerprintAlgorithm = "<Legacy>";
     private const string TimeZoneAssumption = "UnspecifiedSourceLocal";
+    private const int SimilarCasesCandidatePoolCap = 500;
+    private const int SimilarCasesPrimaryPoolMinimum = 25;
 
     private const string ScadaClearanceStatisticsSql = """
         WITH Matched AS
@@ -714,6 +716,158 @@ public sealed class EfAnalyticsQueryService(SmartFacilityDbContext dbContext) :
             CreateWorkOrderMetadata(query, summary, KpiReliability.Green));
     }
 
+    public async Task<SimilarCasesResponse?> GetSimilarCasesAsync(
+        long workOrderId,
+        SimilarCasesQuery query,
+        CancellationToken cancellationToken = default)
+    {
+        var appliedTop = query.Top ?? 10;
+        var target = await _dbContext.WorkOrders
+            .AsNoTracking()
+            .Where(item => item.Id == workOrderId && item.IsInCanonicalSnapshot)
+            .Select(item => new SimilarCaseTargetProjection(
+                item.Id,
+                item.ReportedDateTime,
+                item.AssetId,
+                item.AssetCodeRaw ?? (item.Asset == null ? null : item.Asset.AssetCode),
+                item.Asset == null ? null : item.Asset.Name,
+                item.Asset == null ? null : item.Asset.AssetGroupId,
+                item.Description,
+                item.Discipline,
+                item.WorkType,
+                item.FailureType,
+                item.FailureReason,
+                item.CanonicalIdentityFingerprint))
+            .SingleOrDefaultAsync(cancellationToken);
+
+        if (target is null)
+        {
+            return null;
+        }
+
+        var unavailableReason = GetSimilarCasesUnavailableReason(target);
+        if (unavailableReason is not null)
+        {
+            return CreateUnavailableSimilarCasesResponse(target, unavailableReason);
+        }
+
+        var targetDate = target.ReportedDateTime!.Value;
+        var targetDescription = target.Description!;
+        var primary = PriorEligibleCases(targetDate, target)
+            .Where(item => item.AssetId == target.AssetId && item.Discipline == target.Discipline);
+        var primaryCount = await primary.LongCountAsync(cancellationToken);
+        var retrievalMode = SimilarCasesRetrievalMode.SameAssetDiscipline;
+        IQueryable<WorkOrder> structuredCandidates = primary;
+
+        if (primaryCount < SimilarCasesPrimaryPoolMinimum && target.AssetGroupId.HasValue)
+        {
+            retrievalMode = SimilarCasesRetrievalMode.AssetGroupDiscipline;
+            structuredCandidates = PriorEligibleCases(targetDate, target)
+                .Where(item => item.Asset != null
+                    && item.Asset.AssetGroupId == target.AssetGroupId
+                    && item.Discipline == target.Discipline);
+        }
+
+        var candidates = await structuredCandidates
+            .OrderByDescending(item => item.Description == targetDescription)
+            .ThenByDescending(item => item.AssetId == target.AssetId)
+            .ThenByDescending(item => item.ReportedDateTime)
+            .ThenByDescending(item => item.Id)
+            .Take(SimilarCasesCandidatePoolCap)
+            .Select(item => new SimilarCaseCandidateProjection(
+                item.Id,
+                item.WorkOrderNumber,
+                item.ReportedDateTime!.Value,
+                item.AssetId,
+                item.AssetCodeRaw ?? (item.Asset == null ? null : item.Asset.AssetCode),
+                item.Asset == null ? null : item.Asset.Name,
+                item.Asset == null ? null : item.Asset.AssetGroupId,
+                item.Description!,
+                item.Discipline,
+                item.WorkType,
+                item.FailureType,
+                item.FailureReason))
+            .ToListAsync(cancellationToken);
+
+        var normalizedFrequency = candidates
+            .GroupBy(
+                item => SimilarCasesScoring.NormalizeText(item.Description),
+                StringComparer.Ordinal)
+            .ToDictionary(group => group.Key, group => group.Count(), StringComparer.Ordinal);
+        var ranked = candidates
+            .Select(item =>
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var normalized = SimilarCasesScoring.NormalizeText(item.Description);
+                var result = SimilarCasesScoring.Calculate(new SimilarCaseSignals(
+                    targetDescription,
+                    item.Description,
+                    item.AssetId == target.AssetId,
+                    string.Equals(item.Discipline, target.Discipline, StringComparison.Ordinal),
+                    item.AssetGroupId.HasValue
+                        && item.AssetGroupId == target.AssetGroupId,
+                    string.Equals(item.WorkType, target.WorkType, StringComparison.Ordinal),
+                    string.Equals(item.FailureType, target.FailureType, StringComparison.Ordinal),
+                    string.Equals(item.FailureReason, target.FailureReason, StringComparison.Ordinal),
+                    normalizedFrequency[normalized]));
+                return new RankedSimilarCase(item, result);
+            })
+            .Where(item => SimilarCasesScoring.IsEligible(item.Score))
+            .ToArray();
+        var deduplicated = ranked
+            .GroupBy(item => item.Score.NormalizedDescription, StringComparer.Ordinal)
+            .Select(group => group
+                .OrderByDescending(item => item.Score.Score)
+                .ThenByDescending(item => item.Score.TextSimilarity)
+                .ThenByDescending(item => item.Candidate.ReportedDateTime)
+                .ThenByDescending(item => item.Candidate.Id)
+                .First())
+            .ToArray();
+        var duplicateTemplatesSuppressed = ranked.Length - deduplicated.Length;
+        var items = deduplicated
+            .OrderByDescending(item => item.Score.Score)
+            .ThenByDescending(item => item.Score.TextSimilarity)
+            .ThenByDescending(item => item.Candidate.ReportedDateTime)
+            .ThenBy(item => item.Candidate.AssetCode, StringComparer.Ordinal)
+            .ThenBy(item => item.Candidate.Id)
+            .Take(appliedTop)
+            .Select(item => new SimilarCaseItemDto(
+                item.Candidate.Id,
+                item.Candidate.WorkOrderNumber,
+                item.Candidate.ReportedDateTime,
+                item.Candidate.AssetCode,
+                item.Candidate.AssetName,
+                item.Candidate.Discipline,
+                item.Candidate.WorkType,
+                item.Candidate.FailureType,
+                item.Candidate.FailureReason,
+                item.Score.Score,
+                item.Score.Reasons,
+                SimilarCasesScoring.CreatePrivacySafeSnippet(item.Candidate.Description)))
+            .ToArray();
+
+        return new SimilarCasesResponse(
+            new SimilarCasesMetadataDto(
+                target.Id,
+                target.ReportedDateTime,
+                new SimilarCasesTargetAssetDto(
+                    target.AssetId,
+                    target.AssetCode,
+                    target.AssetName),
+                target.Discipline,
+                retrievalMode,
+                candidates.Count,
+                items.Length,
+                duplicateTemplatesSuppressed,
+                target.ReportedDateTime,
+                SimilarCasesCandidatePoolCap,
+                SimilarCasesScoring.AlgorithmVersion,
+                items.Length == 0
+                    ? "No sufficiently similar historical cases found."
+                    : null),
+            items);
+    }
+
     public async Task<WorkOrderActivityResponse> GetActivityAsync(
         WorkOrderActivityQuery query,
         CancellationToken cancellationToken = default)
@@ -1113,6 +1267,69 @@ public sealed class EfAnalyticsQueryService(SmartFacilityDbContext dbContext) :
         return query;
     }
 
+    private IQueryable<WorkOrder> PriorEligibleCases(
+        DateTime targetDate,
+        SimilarCaseTargetProjection target) =>
+        _dbContext.WorkOrders
+            .AsNoTracking()
+            .Where(item => item.IsInCanonicalSnapshot
+                && item.Id != target.Id
+                && item.ReportedDateTime.HasValue
+                && item.ReportedDateTime < targetDate
+                && item.Description != null
+                && item.Description.Trim() != string.Empty
+                && (target.CanonicalIdentityFingerprint == null
+                    || item.CanonicalIdentityFingerprint == null
+                    || item.CanonicalIdentityFingerprint != target.CanonicalIdentityFingerprint));
+
+    private static string? GetSimilarCasesUnavailableReason(SimilarCaseTargetProjection target)
+    {
+        if (!target.ReportedDateTime.HasValue)
+        {
+            return "Similar cases are unavailable because the target has no ReportedDateTime.";
+        }
+
+        if (!target.AssetId.HasValue)
+        {
+            return "Similar cases are unavailable because the target has no linked AssetId.";
+        }
+
+        if (string.IsNullOrWhiteSpace(target.Discipline))
+        {
+            return "Similar cases are unavailable because the target has no Discipline.";
+        }
+
+        if (SimilarCasesScoring.Tokenize(target.Description).Count
+            < SimilarCasesScoring.MinimumTokenCount)
+        {
+            return "Similar cases are unavailable because the target description is too short.";
+        }
+
+        return null;
+    }
+
+    private static SimilarCasesResponse CreateUnavailableSimilarCasesResponse(
+        SimilarCaseTargetProjection target,
+        string reason) =>
+        new(
+            new SimilarCasesMetadataDto(
+                target.Id,
+                target.ReportedDateTime,
+                new SimilarCasesTargetAssetDto(
+                    target.AssetId,
+                    target.AssetCode,
+                    target.AssetName),
+                target.Discipline,
+                SimilarCasesRetrievalMode.NotAvailable,
+                0,
+                0,
+                0,
+                target.ReportedDateTime,
+                SimilarCasesCandidatePoolCap,
+                SimilarCasesScoring.AlgorithmVersion,
+                reason),
+            []);
+
     private static IQueryable<WorkOrder> ApplyWorkOrderDateFilters(
         IQueryable<WorkOrder> query,
         DateOnly? dateFrom,
@@ -1413,6 +1630,38 @@ public sealed class EfAnalyticsQueryService(SmartFacilityDbContext dbContext) :
         long WorkOrderCount);
 
     private sealed record TrendPointProjection(int Year, int Month, long Count);
+
+    private sealed record SimilarCaseTargetProjection(
+        long Id,
+        DateTime? ReportedDateTime,
+        long? AssetId,
+        string? AssetCode,
+        string? AssetName,
+        long? AssetGroupId,
+        string? Description,
+        string? Discipline,
+        string? WorkType,
+        string? FailureType,
+        string? FailureReason,
+        string? CanonicalIdentityFingerprint);
+
+    private sealed record SimilarCaseCandidateProjection(
+        long Id,
+        string WorkOrderNumber,
+        DateTime ReportedDateTime,
+        long? AssetId,
+        string? AssetCode,
+        string? AssetName,
+        long? AssetGroupId,
+        string Description,
+        string? Discipline,
+        string? WorkType,
+        string? FailureType,
+        string? FailureReason);
+
+    private sealed record RankedSimilarCase(
+        SimilarCaseCandidateProjection Candidate,
+        SimilarCaseScoreResult Score);
 
     private sealed record SourceTypeCountProjection(string SourceType, long Count);
 

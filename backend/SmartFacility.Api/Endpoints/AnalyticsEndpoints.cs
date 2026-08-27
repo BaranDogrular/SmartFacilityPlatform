@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Http.HttpResults;
+using Microsoft.AspNetCore.Mvc;
 using SmartFacility.Application.Analytics.Abstractions;
 using SmartFacility.Application.Analytics.Models;
 
@@ -57,6 +58,13 @@ public static class AnalyticsEndpoints
             .WithName("GetWorkOrderActivity")
             .WithSummary("Returns dated activity from the canonical WorkOrder dataset.")
             .Produces<WorkOrderActivityResponse>()
+            .ProducesValidationProblem();
+
+        group.MapGet("/work-orders/{id:long}/similar-cases", GetSimilarCasesAsync)
+            .WithName("GetSimilarHistoricalCases")
+            .WithSummary("Returns deterministic prior canonical WorkOrders similar to the selected case.")
+            .Produces<SimilarCasesResponse>()
+            .Produces<ProblemDetails>(StatusCodes.Status404NotFound)
             .ProducesValidationProblem();
 
         group.MapGet("/scada/overview", GetScadaOverviewAsync)
@@ -190,6 +198,30 @@ public static class AnalyticsEndpoints
         return TypedResults.Ok(await service.GetActivityAsync(query, cancellationToken));
     }
 
+    private static async Task<Results<Ok<SimilarCasesResponse>, NotFound<ProblemDetails>, ValidationProblem>>
+        GetSimilarCasesAsync(
+            long id,
+            [AsParameters] SimilarCasesQuery query,
+            IWorkOrderAnalyticsService service,
+            CancellationToken cancellationToken)
+    {
+        var errors = AnalyticsQueryValidation.Validate(query);
+        if (errors.Count > 0)
+        {
+            return TypedResults.ValidationProblem(errors);
+        }
+
+        var result = await service.GetSimilarCasesAsync(id, query, cancellationToken);
+        return result is null
+            ? TypedResults.NotFound(new ProblemDetails
+            {
+                Status = StatusCodes.Status404NotFound,
+                Title = "Canonical WorkOrder not found.",
+                Detail = $"No canonical WorkOrder exists with Id {id}."
+            })
+            : TypedResults.Ok(result);
+    }
+
     private static async Task<Results<Ok<ScadaOverviewResponse>, ValidationProblem>> GetScadaOverviewAsync(
         [AsParameters] ScadaAnalyticsQuery query,
         IScadaAnalyticsService service,
@@ -311,6 +343,17 @@ internal static class AnalyticsQueryValidation
 
     public static Dictionary<string, string[]> Validate(WorkOrderActivityQuery query) =>
         ValidateDateRange(query.DateFrom, query.DateTo, "dateFrom", "dateTo");
+
+    public static Dictionary<string, string[]> Validate(SimilarCasesQuery query)
+    {
+        var errors = new Dictionary<string, string[]>(StringComparer.Ordinal);
+        if (query.Top.HasValue && query.Top is < 1 or > 50)
+        {
+            errors["top"] = ["Top must be between 1 and 50."];
+        }
+
+        return errors;
+    }
 
     public static Dictionary<string, string[]> Validate(ScadaAnalyticsQuery query)
     {

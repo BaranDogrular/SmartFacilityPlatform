@@ -103,6 +103,16 @@ En az 6 aktif baseline ayı olmayan asset `INSUFFICIENT_BASELINE` olur ve score 
 
 Early Warning kişisel davranış sapmasıdır; Inspection Priority'nin mutlak aktivite/workload sıralamasından bağımsızdır. ML, failure probability, asset health, SCADA, legacy `HistoricalWorkOrders`, workflow completion, NLP, cost veya downtime kullanmaz.
 
+### Similar Historical Cases v1
+
+`GET /api/analytics/work-orders/{id}/similar-cases`, yalnız canonical `core.WorkOrders` üzerinde read-only çalışır. Target identity database `Id` alanıdır; `WorkOrderNumber` unique kabul edilmez. Candidate kayıtlar target'tan kesin olarak daha eski olmalı, target ID ve canonical fingerprint ile self-match dışlanmalıdır.
+
+Retrieval iki aşamalıdır: primary pool aynı `AssetId` + aynı `Discipline`, kontrollü widening ise yalnız primary havuz yetersiz olduğunda aynı `AssetGroupId` + aynı `Discipline` kullanır. SQL `AsNoTracking` sorgusu en fazla 500 projection materialize eder; N+1 veya tüm WorkOrder tablosunun client evaluation'ı yoktur. Bounded adaylar Türkçe-aware deterministic normalization, token Jaccard ve açıklanabilir structured bonuslarla rerank edilir. ML, embedding ve vector store kullanılmaz.
+
+Data-driven normalized-description frequency penalty generic template'lerin etkisini azaltır; aynı normalized description sonuç listesinde tek temsilciye collapse edilir. Response description'ın bounded, HTML-free ve temel email/telefon redaction uygulanmış snippet'ini taşır; requester/personel alanlarını taşımaz ve description text loglanmaz. Legacy `analytics.HistoricalWorkOrders`, SCADA ve future records hiçbir retrieval aşamasında kullanılmaz.
+
+Bu feature solution recommendation değildir. Gelecekte Solution Support değerlendirilecekse canonical source modelinde gerçek `ActionTaken`, `Resolution`, `Outcome` ve completion note alanları toplanıp kalite/audit sözleşmesiyle doğrulanmalıdır; mevcut description/failure alanlarından çözüm türetilmez.
+
 ## Reliability semantics
 
 - Green: İlgili record-count/trend veri sözleşmesi doğrulanmıştır; asset reliability değildir.
@@ -121,6 +131,7 @@ React uygulamasının route'ları:
 - `/`
 - `/assets`
 - `/work-orders`
+- `/work-orders/:id/similar-cases`
 - `/inspection-priority`
 - `/early-warning`
 - `/scada`

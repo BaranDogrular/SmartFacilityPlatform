@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react'
+import { useNavigate } from 'react-router-dom'
 import type { WorkOrderAnalyticsQuery } from '../api/analyticsTypes'
 import { ChartPanel, HorizontalBarChart, TrendLineChart } from '../components/AnalyticsCharts'
 import { DataTimestamp, EmptyState, ErrorState, InfoNote, KpiCard, LoadingState, PageHeader } from '../components/DashboardUi'
@@ -8,9 +9,12 @@ import { useWorkOrderOverview, useWorkOrderTrend } from '../hooks/useAnalytics'
 const emptyFilters: WorkOrderAnalyticsQuery = {}
 
 export function WorkOrdersPage() {
+  const navigate = useNavigate()
   const [draft, setDraft] = useState<WorkOrderAnalyticsQuery>(emptyFilters)
   const [filters, setFilters] = useState<WorkOrderAnalyticsQuery>(emptyFilters)
   const [filterError, setFilterError] = useState('')
+  const [similarCaseId, setSimilarCaseId] = useState('')
+  const [similarCaseError, setSimilarCaseError] = useState('')
   const optionsQuery = useWorkOrderOverview()
   const overview = useWorkOrderOverview(filters)
   const trend = useWorkOrderTrend({ ...filters, grain: 'Month' })
@@ -30,6 +34,18 @@ export function WorkOrdersPage() {
     setDraft({})
     setFilters({})
     setFilterError('')
+  }
+
+  const openSimilarCases = (event: FormEvent) => {
+    event.preventDefault()
+    const id = Number(similarCaseId)
+    if (!Number.isSafeInteger(id) || id <= 0) {
+      setSimilarCaseError('Geçerli bir canonical WorkOrder ID girin.')
+      return
+    }
+
+    setSimilarCaseError('')
+    navigate(`/work-orders/${id}/similar-cases`)
   }
 
   const isPending = optionsQuery.isPending || overview.isPending || trend.isPending
@@ -166,6 +182,33 @@ export function WorkOrdersPage() {
       </section>
 
       <WorkOrderActivity />
+
+      <section className="similar-cases-launcher" aria-labelledby="similar-cases-launcher-title">
+        <div>
+          <p className="page-eyebrow">Canonical vaka geçmişi</p>
+          <h2 id="similar-cases-launcher-title">Benzer Geçmiş Vakalar</h2>
+          <p>Canonical WorkOrder ID ile seçilen kayda benzeyen, yalnız daha eski iş emirlerini inceleyin.</p>
+        </div>
+        <form onSubmit={openSimilarCases}>
+          <label>
+            <span>WorkOrder ID</span>
+            <input
+              className="form-control"
+              type="number"
+              min="1"
+              step="1"
+              value={similarCaseId}
+              onChange={(event) => setSimilarCaseId(event.target.value)}
+              placeholder="Örn. 54838"
+            />
+          </label>
+          <button className="btn btn-primary" type="submit">Benzer vakaları aç</button>
+        </form>
+        {similarCaseError ? <p className="filter-error" role="alert">{similarCaseError}</p> : null}
+        <InfoNote>
+          Bu özellik çözüm önerisi üretmez; yalnız geçmiş canonical talep ve bakım kayıtlarını karşılaştırır.
+        </InfoNote>
+      </section>
     </div>
   )
 }

@@ -171,6 +171,55 @@ public sealed record WorkOrderTrendResponse(
     IReadOnlyList<TrendPointDto> Points,
     DateRangeMetadataDto Metadata);
 
+public enum SimilarCasesRetrievalMode
+{
+    [JsonStringEnumMemberName("SAME_ASSET_DISCIPLINE")]
+    SameAssetDiscipline,
+
+    [JsonStringEnumMemberName("ASSET_GROUP_DISCIPLINE")]
+    AssetGroupDiscipline,
+
+    [JsonStringEnumMemberName("NOT_AVAILABLE")]
+    NotAvailable
+}
+
+public sealed record SimilarCasesTargetAssetDto(
+    long? AssetId,
+    string? AssetCode,
+    string? AssetName);
+
+public sealed record SimilarCasesMetadataDto(
+    long TargetWorkOrderId,
+    DateTime? TargetReportedDateTime,
+    SimilarCasesTargetAssetDto TargetAsset,
+    string? TargetDiscipline,
+    SimilarCasesRetrievalMode RetrievalMode,
+    int CandidateCount,
+    int ReturnedCount,
+    int DuplicateTemplatesSuppressed,
+    DateTime? TemporalCutoff,
+    int CandidatePoolCap,
+    string AlgorithmVersion,
+    string? AvailabilityMessage);
+
+public sealed record SimilarCaseItemDto(
+    long WorkOrderId,
+    string WorkOrderNumber,
+    DateTime ReportedDateTime,
+    string? AssetCode,
+    string? AssetName,
+    string? Discipline,
+    string? WorkType,
+    string? FailureType,
+    string? FailureReason,
+    decimal SimilarityScore,
+    IReadOnlyList<string> SimilarityReasons,
+    string DescriptionSnippet);
+
+public sealed record SimilarCasesResponse(
+    SimilarCasesMetadataDto Metadata,
+    IReadOnlyList<SimilarCaseItemDto> Items);
+
 public sealed record WorkOrderActivityResponse(
     TimeGrain Grain,
     IReadOnlyList<TrendPointDto> Trend,

@@ -3,7 +3,7 @@ import { after, test } from 'node:test'
 import React from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { MemoryRouter } from 'react-router-dom'
+import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { createServer } from 'vite'
 
 const vite = await createServer({
@@ -19,6 +19,7 @@ const dashboardUi = await vite.ssrLoadModule('/src/components/DashboardUi.tsx')
 const { OverviewPage } = await vite.ssrLoadModule('/src/pages/OverviewPage.tsx')
 const { AssetsPage } = await vite.ssrLoadModule('/src/pages/AssetsPage.tsx')
 const { WorkOrdersPage } = await vite.ssrLoadModule('/src/pages/WorkOrdersPage.tsx')
+const { SimilarCasesPage } = await vite.ssrLoadModule('/src/pages/SimilarCasesPage.tsx')
 const { InspectionPriorityPage } = await vite.ssrLoadModule('/src/pages/InspectionPriorityPage.tsx')
 const { EarlyWarningPage } = await vite.ssrLoadModule('/src/pages/EarlyWarningPage.tsx')
 const { AppLayout } = await vite.ssrLoadModule('/src/components/AppLayout.tsx')
@@ -262,6 +263,39 @@ const earlyWarning = {
   ],
 }
 
+const similarCases = {
+  metadata: {
+    targetWorkOrderId: 54838,
+    targetReportedDateTime: '2026-08-02T12:00:00',
+    targetAsset: { assetId: 651, assetCode: '20011XZ00112', assetName: 'Giriş LED Aydınlatma' },
+    targetDiscipline: 'ELEKTRİK / ELEKTRONİK',
+    retrievalMode: 'SAME_ASSET_DISCIPLINE',
+    candidateCount: 387,
+    returnedCount: 1,
+    duplicateTemplatesSuppressed: 2,
+    temporalCutoff: '2026-08-02T12:00:00',
+    candidateCap: 500,
+    algorithmVersion: 'similar-cases/hybrid-jaccard/v1',
+    availabilityMessage: null,
+  },
+  items: [
+    {
+      workOrderId: 33630,
+      workOrderNumber: 'WO-REUSED',
+      reportedDateTime: '2026-07-12T09:30:00',
+      assetCode: '20011XZ00112',
+      assetName: 'Giriş LED Aydınlatma',
+      discipline: 'ELEKTRİK / ELEKTRONİK',
+      workType: 'ARIZA',
+      failureType: 'ELEKTRİK ARIZASI',
+      failureReason: null,
+      similarityScore: 68.75,
+      similarityReasons: ['Açıklama benzerliği %64', 'Aynı varlık', 'Aynı disiplin'],
+      descriptionSnippet: 'Giriş bölümündeki LED aydınlatma çalışmıyor.',
+    },
+  ],
+}
+
 const workOrders = {
   totalWorkOrders: 171136,
   openWorkOrders: 75,
@@ -393,6 +427,10 @@ function createQueryClient(overrides = {}) {
   client.setQueryData(['analytics', 'work-orders', 'overview', {}], workOrders)
   client.setQueryData(['analytics', 'work-orders', 'trend', { grain: 'Month' }], workOrderTrend)
   client.setQueryData(
+    ['analytics', 'work-orders', 54838, 'similar-cases', { top: 10 }],
+    overrides.similarCases ?? similarCases,
+  )
+  client.setQueryData(
     ['analytics', 'work-orders', 'activity', {}],
     overrides.workOrderActivity ?? workOrderActivity,
   )
@@ -409,9 +447,34 @@ function createQueryClient(overrides = {}) {
 function renderPage(Component, overrides) {
   return renderToStaticMarkup(
     React.createElement(
-      QueryClientProvider,
-      { client: createQueryClient(overrides) },
-      React.createElement(Component),
+      MemoryRouter,
+      null,
+      React.createElement(
+        QueryClientProvider,
+        { client: createQueryClient(overrides) },
+        React.createElement(Component),
+      ),
+    ),
+  )
+}
+
+function renderSimilarCasesPage(overrides) {
+  return renderToStaticMarkup(
+    React.createElement(
+      MemoryRouter,
+      { initialEntries: ['/work-orders/54838/similar-cases'] },
+      React.createElement(
+        QueryClientProvider,
+        { client: createQueryClient(overrides) },
+        React.createElement(
+          Routes,
+          null,
+          React.createElement(Route, {
+            path: '/work-orders/:id/similar-cases',
+            element: React.createElement(SimilarCasesPage),
+          }),
+        ),
+      ),
     ),
   )
 }
@@ -452,6 +515,7 @@ test('new analytics clients call the accepted backend routes with serialized que
     await analytics.getAssetMaintenanceActivityPareto({ dateFrom: '2025-01-01', top: 5 })
     await analytics.getInspectionPriority({ asOf: '2026-08-25', top: 25 })
     await analytics.getEarlyWarning({ asOf: '2026-08-25', top: 10 })
+    await analytics.getSimilarCases(54838, { top: 5 })
     await analytics.getWorkOrderActivity({ dateTo: '2025-12-31', discipline: 'MEKANİK' })
     await analytics.getScadaClearanceInterval({ sourceSheet: 'MEKANİK', alarmType: 'SOĞUTMA' })
   } finally {
@@ -470,6 +534,10 @@ test('new analytics clients call the accepted backend routes with serialized que
     {
       url: '/api/analytics/assets/early-warning',
       params: { asOf: '2026-08-25', top: 10 },
+    },
+    {
+      url: '/api/analytics/work-orders/54838/similar-cases',
+      params: { top: 5 },
     },
     {
       url: '/api/analytics/work-orders/activity',
@@ -738,7 +806,89 @@ test('work-order filters and reset control are present with exact raw options', 
   assert.match(html, /MEKANİK: 51\.327/)
   assert.match(html, /GREEN · Doğrulanmış metrik/)
   assert.match(html, /core\.WorkOrders/)
+  assert.match(html, /Benzer Geçmiş Vakalar/)
+  assert.match(html, /Canonical WorkOrder ID/)
+  assert.match(html, /çözüm önerisi üretmez/i)
   assert.doesNotMatch(html, /Güncel İş Emri|Geçmiş İş Emri Aktivitesi/)
+})
+
+test('similar historical cases render bounded evidence without solution or personnel claims', () => {
+  const html = renderSimilarCasesPage()
+
+  assert.match(html, /Benzer Geçmiş Vakalar/)
+  assert.match(html, /Seçilen iş emrine benzer geçmiş bakım\/talep kayıtlarını gösterir/)
+  assert.match(html, /Benzerlik 68,75%/)
+  assert.match(html, /Giriş bölümündeki LED aydınlatma çalışmıyor/)
+  assert.match(html, /Aynı varlık/)
+  assert.match(html, /Aynı disiplin/)
+  assert.match(html, /Aynı varlık \+ aynı disiplin/)
+  assert.match(html, /Değerlendirilen aday<\/span><strong>387/)
+  assert.match(html, /Tekrarlayan template bastırıldı<\/span><strong>2/)
+  assert.match(html, /core\.WorkOrders/)
+  assert.match(html, /Requester ve sorumlu personel alanları gösterilmez/)
+  assert.match(html, /çözüm önerisi veya otomatik bakım talimatı değildir/)
+  assert.doesNotMatch(html, /failure probability|çözüm adımı|önerilen çözüm|RequestedBy|AssignedPerson/i)
+})
+
+test('similar historical cases render empty, loading, error and retry states', () => {
+  const emptyHtml = renderSimilarCasesPage({
+    similarCases: {
+      metadata: {
+        ...similarCases.metadata,
+        retrievalMode: 'NOT_AVAILABLE',
+        candidateCount: 0,
+        returnedCount: 0,
+        duplicateTemplatesSuppressed: 0,
+        availabilityMessage: 'Target WorkOrder has no linked AssetId.',
+      },
+      items: [],
+    },
+  })
+  assert.match(emptyHtml, /bir varlığa bağlı olmadığı için benzer vaka analizi kullanılamıyor/)
+
+  const pendingClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  const pendingHtml = renderToStaticMarkup(
+    React.createElement(
+      MemoryRouter,
+      { initialEntries: ['/work-orders/54838/similar-cases'] },
+      React.createElement(
+        QueryClientProvider,
+        { client: pendingClient },
+        React.createElement(Routes, null, React.createElement(Route, {
+          path: '/work-orders/:id/similar-cases',
+          element: React.createElement(SimilarCasesPage),
+        })),
+      ),
+    ),
+  )
+  assert.match(pendingHtml, /Benzer geçmiş vakalar aranıyor/)
+
+  const errorClient = new QueryClient({
+    defaultOptions: {
+      queries: { retry: false, retryOnMount: false, refetchOnMount: false, staleTime: Infinity },
+    },
+  })
+  const errorQuery = errorClient.getQueryCache().build(errorClient, {
+    queryKey: ['analytics', 'work-orders', 54838, 'similar-cases', { top: 10 }],
+    queryFn: async () => similarCases,
+  })
+  errorQuery.setState({ ...errorQuery.state, status: 'error', fetchStatus: 'idle', error: new Error('Benzer vaka servisi kullanılamıyor') })
+  const errorHtml = renderToStaticMarkup(
+    React.createElement(
+      MemoryRouter,
+      { initialEntries: ['/work-orders/54838/similar-cases'] },
+      React.createElement(
+        QueryClientProvider,
+        { client: errorClient },
+        React.createElement(Routes, null, React.createElement(Route, {
+          path: '/work-orders/:id/similar-cases',
+          element: React.createElement(SimilarCasesPage),
+        })),
+      ),
+    ),
+  )
+  assert.match(errorHtml, /Benzer vaka servisi kullanılamıyor/)
+  assert.match(errorHtml, /Yeniden dene/)
 })
 
 test('canonical activity keeps filters visible and renders an empty state', () => {

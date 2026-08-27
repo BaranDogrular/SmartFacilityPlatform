@@ -203,6 +203,52 @@ export interface WorkOrderTrendResponse {
   metadata: DateRangeMetadata
 }
 
+export type SimilarCasesRetrievalMode =
+  | 'SAME_ASSET_DISCIPLINE'
+  | 'ASSET_GROUP_DISCIPLINE'
+  | 'NOT_AVAILABLE'
+
+export interface SimilarCasesTargetAsset {
+  assetId: number | null
+  assetCode: string | null
+  assetName: string | null
+}
+
+export interface SimilarCasesMetadata {
+  targetWorkOrderId: number
+  targetReportedDateTime: string | null
+  targetAsset: SimilarCasesTargetAsset
+  targetDiscipline: string | null
+  retrievalMode: SimilarCasesRetrievalMode
+  candidateCount: number
+  returnedCount: number
+  duplicateTemplatesSuppressed: number
+  temporalCutoff: string | null
+  candidatePoolCap: number
+  algorithmVersion: string
+  availabilityMessage: string | null
+}
+
+export interface SimilarCaseItem {
+  workOrderId: number
+  workOrderNumber: string
+  reportedDateTime: string
+  assetCode: string | null
+  assetName: string | null
+  discipline: string | null
+  workType: string | null
+  failureType: string | null
+  failureReason: string | null
+  similarityScore: number
+  similarityReasons: string[]
+  descriptionSnippet: string
+}
+
+export interface SimilarCasesResponse {
+  metadata: SimilarCasesMetadata
+  items: SimilarCaseItem[]
+}
+
 export interface WorkOrderActivityResponse {
   grain: TimeGrain
   trend: TrendPoint[]
@@ -306,6 +352,10 @@ export interface WorkOrderAnalyticsQuery {
   locationId?: number
   assetId?: number
   grain?: TimeGrain
+}
+
+export interface SimilarCasesQuery {
+  top?: number
 }
 
 export interface ScadaAnalyticsQuery {

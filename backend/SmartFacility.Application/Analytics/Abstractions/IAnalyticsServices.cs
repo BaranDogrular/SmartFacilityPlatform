@@ -30,6 +30,11 @@ public interface IWorkOrderAnalyticsService
     Task<WorkOrderTrendResponse> GetTrendAsync(
         WorkOrderAnalyticsQuery query,
         CancellationToken cancellationToken = default);
+
+    Task<SimilarCasesResponse?> GetSimilarCasesAsync(
+        long workOrderId,
+        SimilarCasesQuery query,
+        CancellationToken cancellationToken = default);
 }
 
 public interface IWorkOrderActivityService

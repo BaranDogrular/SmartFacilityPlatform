@@ -170,6 +170,7 @@ Mevcut HTTP yüzeyinin tamamı `GET /api/analytics` altındadır:
 | `/api/analytics/work-orders/overview` | Canonical toplam/açık/kapalı/diğer ve dağılımlar |
 | `/api/analytics/work-orders/trend` | Canonical WorkOrder aylık trendi |
 | `/api/analytics/work-orders/activity` | Canonical WorkOrder tarih ve Discipline aktivitesi |
+| `/api/analytics/work-orders/{id}/similar-cases` | Seçilen canonical WorkOrder için temporal-safe benzer geçmiş vakalar |
 | `/api/analytics/scada/overview` | SCADA source-occurrence ve timestamp kalite özeti |
 | `/api/analytics/scada/trend` | Geçerli ReceivedAt kayıtlarıyla aylık occurrence trendi |
 | `/api/analytics/scada/clearance-interval` | Quality-eligible occurrence subset'i için clearance median/P90 |
@@ -270,6 +271,14 @@ Default `asOf`, canonical dataset'in maksimum `ReportedDateTime` günüdür. Bas
 - Baseline döneminde görülmeyen açık workload oluşumu: 5 puan
 
 `HIGH >= 60`, `MEDIUM >= 30`, diğer yeterli-baseline sonuçları `NORMAL` olur. Sıralama score, last30 ve last7 descending; asset code ve asset id ascending şeklindedir. Yalnız `AssetId` bağlı canonical WorkOrders kullanılır; unlinked raw kodlar eşlenmez. SCADA, legacy `HistoricalWorkOrders`, NLP, cost, downtime ve completion bilgisi score'a dahil değildir.
+
+## Similar Historical Cases v1
+
+`GET /api/analytics/work-orders/{id}/similar-cases`, seçilen canonical WorkOrder için yalnız daha eski `core.WorkOrders` kayıtlarını tarar. Primary aday havuzu aynı asset ve discipline ile sınırlıdır; havuz yetersizse aynı asset group ve discipline kapsamına kontrollü genişler. SQL tarafında en fazla 500 aday seçilir, ardından Türkçe karakterleri koruyan deterministic token/Jaccard benzerliği ve sınırlı structured bağlam bonuslarıyla in-memory reranking yapılır. Bu yaklaşım ML veya embedding kullanmaz.
+
+Sonuçlar `candidate.ReportedDateTime < target.ReportedDateTime` temporal cutoff'una uyar; target ID ve canonical fingerprint kendisi aday olamaz. Yüksek frekanslı açıklamalar data-driven penalty alır ve aynı normalize edilmiş template sonuç listesinde tek temsilciye collapse edilir. Description yalnız bounded, HTML-free, temel email/telefon redaction uygulanmış snippet olarak döner; requester ve personel alanları response'a dahil değildir. Legacy `analytics.HistoricalWorkOrders` sorgulanmaz.
+
+Benzerlik yüzdesi failure probability veya confidence probability değildir; özellik çözüm önerisi, bakım talimatı veya geçmişte uygulanan çözüm üretmez. Gelecekteki ayrı bir Solution Support özelliği için source sistemden gerçek `ActionTaken`, `Resolution`, `Outcome` ve completion note verilerinin canonical olarak toplanması gerekir.
 
 ## Offline ML sonucu
 

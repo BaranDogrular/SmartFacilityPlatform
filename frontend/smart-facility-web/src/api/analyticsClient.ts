@@ -10,6 +10,8 @@ import type {
   EarlyWarningResponse,
   WorkOrderActivityQuery,
   WorkOrderActivityResponse,
+  SimilarCasesQuery,
+  SimilarCasesResponse,
   ImportQualityOverviewResponse,
   ScadaAnalyticsQuery,
   ScadaClearanceIntervalQuery,
@@ -132,6 +134,15 @@ export const getWorkOrderActivity = (
 ) =>
   get<WorkOrderActivityResponse>(
     '/api/analytics/work-orders/activity',
+    query as QueryParameters,
+  )
+
+export const getSimilarCases = (
+  workOrderId: number,
+  query: SimilarCasesQuery = {},
+) =>
+  get<SimilarCasesResponse>(
+    `/api/analytics/work-orders/${workOrderId}/similar-cases`,
     query as QueryParameters,
   )
 

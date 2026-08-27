@@ -44,6 +44,11 @@ public sealed record WorkOrderAnalyticsQuery
     public TimeGrain? Grain { get; init; }
 }
 
+public sealed record SimilarCasesQuery
+{
+    public int? Top { get; init; }
+}
+
 public sealed record ScadaAnalyticsQuery
 {
     public DateOnly? DateFrom { get; init; }

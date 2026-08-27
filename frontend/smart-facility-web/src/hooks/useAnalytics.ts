@@ -5,6 +5,7 @@ import {
   getInspectionPriority,
   getEarlyWarning,
   getWorkOrderActivity,
+  getSimilarCases,
   getImportQualityOverview,
   getScadaClearanceInterval,
   getScadaOverview,
@@ -18,6 +19,7 @@ import type {
   InspectionPriorityQuery,
   EarlyWarningQuery,
   WorkOrderActivityQuery,
+  SimilarCasesQuery,
   ScadaAnalyticsQuery,
   ScadaClearanceIntervalQuery,
   WorkOrderAnalyticsQuery,
@@ -67,6 +69,17 @@ export const useWorkOrderActivity = (
   useQuery({
     queryKey: ['analytics', 'work-orders', 'activity', query],
     queryFn: () => getWorkOrderActivity(query),
+  })
+
+export const useSimilarCases = (
+  workOrderId: number,
+  query: SimilarCasesQuery = {},
+  enabled = true,
+) =>
+  useQuery({
+    queryKey: ['analytics', 'work-orders', workOrderId, 'similar-cases', query],
+    queryFn: () => getSimilarCases(workOrderId, query),
+    enabled,
   })
 
 export const useScadaOverview = (query: ScadaAnalyticsQuery = {}) =>
