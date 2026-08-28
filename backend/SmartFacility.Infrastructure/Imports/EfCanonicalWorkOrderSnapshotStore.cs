@@ -18,14 +18,16 @@ public sealed class EfCanonicalWorkOrderSnapshotStore(
 
     public Task<CanonicalWorkOrderDatabasePreflight> PreflightAsync(
         IReadOnlyList<CanonicalWorkOrderRow> rows,
-        CancellationToken cancellationToken) =>
-        InspectAsync(rows, cancellationToken);
+        CancellationToken cancellationToken,
+        CanonicalSnapshotImportOptions? options = null) =>
+        InspectAsync(rows, options, cancellationToken);
 
     public async Task<ImportResult> ApplyAsync(
         string sourceType,
         string fileName,
         IReadOnlyList<CanonicalWorkOrderRow> rows,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        CanonicalSnapshotImportOptions? options = null)
     {
         var batch = new ImportBatch
         {
@@ -44,11 +46,31 @@ public sealed class EfCanonicalWorkOrderSnapshotStore(
         try
         {
             await AcquireImportLockAsync(cancellationToken);
-            var preflight = await InspectAsync(rows, cancellationToken);
+            var preflight = await InspectAsync(rows, options, cancellationToken);
             if (preflight.ExistingIdentityCollisions.Count > 0)
             {
                 throw new InvalidOperationException(
                     "Canonical WorkOrder database preflight changed or failed after the import lock was acquired.");
+            }
+
+            if (!preflight.IsSnapshotCompletenessAllowed)
+            {
+                throw new CanonicalSnapshotSafetyException(
+                    preflight.SafetyWarnings.FirstOrDefault()
+                    ?? "Canonical snapshot completeness safety guard rejected the source.");
+            }
+
+            if (preflight.SuspiciousSnapshotShrinkOverrideApplied)
+            {
+                logger.LogWarning(
+                    "Canonical snapshot shrink override applied. Source rows: {SourceRowCount}; " +
+                    "current active: {CurrentActiveCount}; expected inactive: {ExpectedInactiveCount}; " +
+                    "expected final active: {ExpectedFinalActiveCount}; shrink percent: {SourceShrinkPercent}.",
+                    preflight.SourceRowCount,
+                    preflight.CurrentActiveCount,
+                    preflight.ExpectedInactiveCount,
+                    preflight.ExpectedFinalActiveCount,
+                    preflight.SourceShrinkPercent);
             }
 
             var assetMap = await dbContext.Assets
@@ -166,9 +188,13 @@ public sealed class EfCanonicalWorkOrderSnapshotStore(
             dbContext.ImportErrors.Add(new ImportError
             {
                 ImportBatchId = batch.Id,
-                ErrorMessage = exception is OperationCanceledException
-                    ? "Canonical WorkOrder import was cancelled; the snapshot transaction was rolled back."
-                    : "Canonical WorkOrder import failed; the snapshot transaction was rolled back."
+                ErrorMessage = exception switch
+                {
+                    OperationCanceledException =>
+                        "Canonical WorkOrder import was cancelled; the snapshot transaction was rolled back.",
+                    CanonicalSnapshotSafetyException => exception.Message,
+                    _ => "Canonical WorkOrder import failed; the snapshot transaction was rolled back."
+                }
             });
             await dbContext.SaveChangesAsync(CancellationToken.None);
             dbContext.ChangeTracker.Clear();
@@ -178,6 +204,7 @@ public sealed class EfCanonicalWorkOrderSnapshotStore(
 
     private async Task<CanonicalWorkOrderDatabasePreflight> InspectAsync(
         IReadOnlyList<CanonicalWorkOrderRow> rows,
+        CanonicalSnapshotImportOptions? options,
         CancellationToken cancellationToken)
     {
         var assets = await dbContext.Assets
@@ -234,14 +261,57 @@ public sealed class EfCanonicalWorkOrderSnapshotStore(
             .Select(group => group.Key)
             .OrderBy(value => value, StringComparer.Ordinal)
             .ToArray();
-        var existingIdentities = existingWithIdentity
+        var existingByIdentity = existingWithIdentity
+            .GroupBy(item => item.Identity!, StringComparer.Ordinal)
+            .ToDictionary(group => group.Key, group => group.First().Item, StringComparer.Ordinal);
+        var incomingByIdentity = rows
+            .GroupBy(row => row.IdentityFingerprint, StringComparer.Ordinal)
+            .ToDictionary(group => group.Key, group => group.First(), StringComparer.Ordinal);
+        var matched = incomingByIdentity.LongCount(item => existingByIdentity.ContainsKey(item.Key));
+        var expectedInsertCount = incomingByIdentity.Count - matched;
+        var expectedReactivationCount = incomingByIdentity.LongCount(item =>
+            existingByIdentity.TryGetValue(item.Key, out var existingItem)
+            && !existingItem.IsInCanonicalSnapshot);
+        var expectedUpdateCount = incomingByIdentity.LongCount(item =>
+            existingByIdentity.TryGetValue(item.Key, out var existingItem)
+            && !string.Equals(
+                existingItem.SourceRowFingerprint,
+                item.Value.RowFingerprint,
+                StringComparison.Ordinal));
+        var expectedUnchangedCount = matched - expectedUpdateCount;
+        var activeIdentities = existingWithIdentity
+            .Where(item => item.Item.IsInCanonicalSnapshot)
             .Select(item => item.Identity!)
             .ToHashSet(StringComparer.Ordinal);
-        var matched = rows.LongCount(row => existingIdentities.Contains(row.IdentityFingerprint));
+        var matchedActiveCount = incomingByIdentity.LongCount(item => activeIdentities.Contains(item.Key));
+        var currentActiveCount = existing.LongCount(item => item.IsInCanonicalSnapshot);
+        var expectedInactiveCount = currentActiveCount - matchedActiveCount;
+        var expectedFinalActiveCount = incomingByIdentity.Count;
+        var importOptions = options ?? new CanonicalSnapshotImportOptions();
+        var completeness = CanonicalSnapshotCompletenessGuard.Evaluate(
+            currentActiveCount,
+            rows.Count,
+            expectedFinalActiveCount,
+            expectedInactiveCount,
+            importOptions.AllowSuspiciousSnapshotShrink);
 
         return new CanonicalWorkOrderDatabasePreflight(
-            existing.LongCount(item => item.IsInCanonicalSnapshot),
+            currentActiveCount,
+            rows.Count,
             matched,
+            expectedUnchangedCount,
+            expectedInsertCount,
+            expectedUpdateCount,
+            expectedInactiveCount,
+            expectedReactivationCount,
+            expectedFinalActiveCount,
+            completeness.SourceShrinkPercent,
+            completeness.ExpectedInactivationPercent,
+            completeness.Status,
+            importOptions.AllowSuspiciousSnapshotShrink,
+            completeness.OverrideApplied,
+            completeness.IsAllowed,
+            completeness.SafetyWarnings,
             unresolvedAssetRowCount,
             unresolvedAssetCodes,
             ambiguousLocationRowCount,

@@ -1,6 +1,8 @@
 using System.Text.Json.Serialization;
 using SmartFacility.Api.Endpoints;
 using SmartFacility.Application.Imports.Abstractions;
+using SmartFacility.Application.Imports.Models;
+using SmartFacility.Application.Imports.Services;
 using SmartFacility.Infrastructure;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -28,10 +30,16 @@ if (canonicalCommand is not null)
     await using var scope = app.Services.CreateAsyncScope();
     var service = scope.ServiceProvider.GetRequiredService<ICanonicalWorkOrderImportService>();
     var filePath = args[commandIndex + 1];
-    var preflight = await service.PreflightAsync(filePath);
+    var importOptions = new CanonicalSnapshotImportOptions(
+        args.Any(argument => string.Equals(
+            argument,
+            "--allow-suspicious-snapshot-shrink",
+            StringComparison.OrdinalIgnoreCase)));
+    var serializerOptions = new System.Text.Json.JsonSerializerOptions { WriteIndented = true };
+    var preflight = await service.PreflightAsync(filePath, options: importOptions);
     Console.WriteLine(System.Text.Json.JsonSerializer.Serialize(
         preflight,
-        new System.Text.Json.JsonSerializerOptions { WriteIndented = true }));
+        serializerOptions));
 
     if (string.Equals(
             canonicalCommand,
@@ -40,14 +48,38 @@ if (canonicalCommand is not null)
     {
         if (!preflight.CanImport)
         {
-            throw new InvalidOperationException(
-                "Canonical WorkOrder preflight did not pass; import was not started.");
+            var error = preflight.Errors.FirstOrDefault()
+                ?? (preflight.DuplicateIdentityCount > 0
+                    ? "Canonical WorkOrder source contains duplicate canonical identities."
+                    : null)
+                ?? (preflight.Database.ExistingIdentityCollisions.Count > 0
+                    ? "The existing database contains canonical identity collisions."
+                    : null)
+                ?? preflight.SafetyWarnings.FirstOrDefault()
+                ?? "Canonical WorkOrder preflight did not pass; import was not started.";
+            Console.Error.WriteLine(System.Text.Json.JsonSerializer.Serialize(
+                new
+                {
+                    Status = "Blocked",
+                    Error = error
+                },
+                serializerOptions));
+            Environment.ExitCode = 2;
+            return;
         }
 
-        var result = await service.ImportAsync(filePath);
-        Console.WriteLine(System.Text.Json.JsonSerializer.Serialize(
-            result,
-            new System.Text.Json.JsonSerializerOptions { WriteIndented = true }));
+        try
+        {
+            var result = await service.ImportAsync(filePath, options: importOptions);
+            Console.WriteLine(System.Text.Json.JsonSerializer.Serialize(result, serializerOptions));
+        }
+        catch (CanonicalSnapshotSafetyException exception)
+        {
+            Console.Error.WriteLine(System.Text.Json.JsonSerializer.Serialize(
+                new { Status = "Blocked", Error = exception.Message },
+                serializerOptions));
+            Environment.ExitCode = 2;
+        }
     }
 
     return;

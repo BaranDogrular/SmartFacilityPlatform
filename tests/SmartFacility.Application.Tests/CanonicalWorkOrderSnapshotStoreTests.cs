@@ -92,6 +92,150 @@ public sealed class CanonicalWorkOrderSnapshotStoreTests
     }
 
     [Fact]
+    public async Task Preflight_allows_full_snapshot_growth_and_reports_reconciliation_metadata()
+    {
+        await using var database = await SqliteTestDatabase.CreateAsync();
+        await SeedDimensionsAsync(database);
+        var store = CreateStore(database);
+        var initial = Rows(100);
+        await store.ApplyAsync("WorkOrder", "initial.xlsx", initial, default);
+        var growing = Rows(105);
+
+        var result = await store.PreflightAsync(growing, default);
+
+        Assert.Equal(100, result.CurrentActiveCount);
+        Assert.Equal(105, result.SourceRowCount);
+        Assert.Equal(100, result.MatchedExistingCount);
+        Assert.Equal(100, result.ExpectedUnchangedCount);
+        Assert.Equal(5, result.ExpectedInsertCount);
+        Assert.Equal(0, result.ExpectedUpdateCount);
+        Assert.Equal(0, result.ExpectedInactiveCount);
+        Assert.Equal(0, result.ExpectedReactivationCount);
+        Assert.Equal(105, result.ExpectedFinalActiveCount);
+        Assert.Equal(0m, result.SourceShrinkPercent);
+        Assert.Equal(CanonicalSnapshotCompletenessGuard.CompleteStatus, result.SnapshotCompletenessStatus);
+        Assert.True(result.IsSnapshotCompletenessAllowed);
+        Assert.Empty(result.SafetyWarnings);
+    }
+
+    [Fact]
+    public async Task Small_normal_shrink_is_allowed_and_percentages_are_correct()
+    {
+        await using var database = await SqliteTestDatabase.CreateAsync();
+        await SeedDimensionsAsync(database);
+        var store = CreateStore(database);
+        await store.ApplyAsync("WorkOrder", "initial.xlsx", Rows(100), default);
+
+        var result = await store.PreflightAsync(Rows(95), default);
+
+        Assert.Equal(5, result.ExpectedInactiveCount);
+        Assert.Equal(95, result.ExpectedFinalActiveCount);
+        Assert.Equal(5m, result.SourceShrinkPercent);
+        Assert.Equal(5m, result.ExpectedInactivationPercent);
+        Assert.True(result.IsSnapshotCompletenessAllowed);
+    }
+
+    [Fact]
+    public async Task Extreme_shrink_is_blocked_inside_apply_and_leaves_core_and_source_transaction_unchanged()
+    {
+        await using var database = await SqliteTestDatabase.CreateAsync();
+        await SeedDimensionsAsync(database);
+        var store = CreateStore(database);
+        await store.ApplyAsync("WorkOrder", "initial.xlsx", Rows(200), default);
+        var partial = Rows(50);
+
+        var preflight = await store.PreflightAsync(partial, default);
+        var exception = await Assert.ThrowsAsync<CanonicalSnapshotSafetyException>(() =>
+            store.ApplyAsync("WorkOrder", "partial.xlsx", partial, default));
+
+        Assert.Equal(150, preflight.ExpectedInactiveCount);
+        Assert.Equal(75m, preflight.SourceShrinkPercent);
+        Assert.Equal(CanonicalSnapshotCompletenessGuard.BlockedStatus, preflight.SnapshotCompletenessStatus);
+        Assert.False(preflight.IsSnapshotCompletenessAllowed);
+        Assert.Contains("50 rows", exception.Message, StringComparison.Ordinal);
+        Assert.Contains("200 canonical records", exception.Message, StringComparison.Ordinal);
+        Assert.Equal(200, await database.Context.WorkOrders.CountAsync(item => item.IsInCanonicalSnapshot));
+        Assert.Equal(200, await database.Context.ImportSourceRecords.CountAsync());
+        Assert.Equal(2, await database.Context.ImportBatches.CountAsync());
+        Assert.Equal("Failed", (await database.Context.ImportBatches.OrderBy(item => item.Id).LastAsync()).Status);
+        Assert.Contains(
+            await database.Context.ImportErrors.ToListAsync(),
+            error => error.ErrorMessage.Contains("75.00%", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task Explicit_override_allows_suspicious_shrink_and_is_visible_in_preflight()
+    {
+        await using var database = await SqliteTestDatabase.CreateAsync();
+        await SeedDimensionsAsync(database);
+        var store = CreateStore(database);
+        await store.ApplyAsync("WorkOrder", "initial.xlsx", Rows(200), default);
+        var partial = Rows(50);
+        var options = new CanonicalSnapshotImportOptions(AllowSuspiciousSnapshotShrink: true);
+
+        var preflight = await store.PreflightAsync(partial, default, options);
+        var result = await store.ApplyAsync("WorkOrder", "partial.xlsx", partial, default, options);
+
+        Assert.True(preflight.IsSnapshotCompletenessAllowed);
+        Assert.True(preflight.AllowSuspiciousSnapshotShrink);
+        Assert.True(preflight.SuspiciousSnapshotShrinkOverrideApplied);
+        Assert.Equal(CanonicalSnapshotCompletenessGuard.OverrideStatus, preflight.SnapshotCompletenessStatus);
+        Assert.Single(preflight.SafetyWarnings);
+        Assert.Equal("Completed", result.Status);
+        Assert.Equal(50, await database.Context.WorkOrders.CountAsync(item => item.IsInCanonicalSnapshot));
+        Assert.Equal(150, await database.Context.WorkOrders.CountAsync(item => !item.IsInCanonicalSnapshot));
+    }
+
+    [Fact]
+    public async Task Protected_recheck_blocks_a_preflight_that_became_stale()
+    {
+        await using var database = await SqliteTestDatabase.CreateAsync();
+        await SeedDimensionsAsync(database);
+        var store = CreateStore(database);
+        await store.ApplyAsync("WorkOrder", "initial.xlsx", Rows(100), default);
+        var staleSource = Rows(95);
+        var originalPreflight = await store.PreflightAsync(staleSource, default);
+        await store.ApplyAsync("WorkOrder", "concurrent.xlsx", Rows(200), default);
+        var sourceRecordCountBeforeBlockedApply = await database.Context.ImportSourceRecords.CountAsync();
+
+        await Assert.ThrowsAsync<CanonicalSnapshotSafetyException>(() =>
+            store.ApplyAsync("WorkOrder", "stale.xlsx", staleSource, default));
+
+        Assert.True(originalPreflight.IsSnapshotCompletenessAllowed);
+        Assert.Equal(200, await database.Context.WorkOrders.CountAsync(item => item.IsInCanonicalSnapshot));
+        Assert.Equal(
+            sourceRecordCountBeforeBlockedApply,
+            await database.Context.ImportSourceRecords.CountAsync());
+        Assert.Equal("Failed", (await database.Context.ImportBatches.OrderBy(item => item.Id).LastAsync()).Status);
+    }
+
+    [Fact]
+    public async Task Preflight_reports_updates_and_reactivations_separately()
+    {
+        await using var database = await SqliteTestDatabase.CreateAsync();
+        await SeedDimensionsAsync(database);
+        var store = CreateStore(database);
+        var initial = Rows(100);
+        await store.ApplyAsync("WorkOrder", "initial.xlsx", initial, default);
+        await store.ApplyAsync("WorkOrder", "smaller.xlsx", initial.Take(95).ToArray(), default);
+        var restored = initial.ToArray();
+        restored[0] = restored[0] with
+        {
+            Description = "updated",
+            RowFingerprint = Fingerprint(restored[0].IdentityFingerprint, "updated")
+        };
+
+        var result = await store.PreflightAsync(restored, default);
+
+        Assert.Equal(100, result.MatchedExistingCount);
+        Assert.Equal(99, result.ExpectedUnchangedCount);
+        Assert.Equal(1, result.ExpectedUpdateCount);
+        Assert.Equal(5, result.ExpectedReactivationCount);
+        Assert.Equal(0, result.ExpectedInactiveCount);
+        Assert.Equal(100, result.ExpectedFinalActiveCount);
+    }
+
+    [Fact]
     public async Task Cancellation_after_snapshot_retirement_rolls_back_core_changes_and_records_failed_batch()
     {
         using var cancellationSource = new CancellationTokenSource();
@@ -153,8 +297,7 @@ public sealed class CanonicalWorkOrderSnapshotStoreTests
             number,
             reportedAt,
             "ASSET-1");
-        var rowFingerprint = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(
-            System.Text.Encoding.UTF8.GetBytes($"{identity}|{description}")));
+        var rowFingerprint = Fingerprint(identity, description);
 
         return new CanonicalWorkOrderRow(
             "İş Emirleri",
@@ -182,6 +325,19 @@ public sealed class CanonicalWorkOrderSnapshotStoreTests
             null,
             "K");
     }
+
+    private static CanonicalWorkOrderRow[] Rows(int count) =>
+        Enumerable.Range(1, count)
+            .Select(index => Row(
+                index + 1,
+                $"WO-{index}",
+                new DateTime(2026, 1, 1, 8, 0, 0).AddMinutes(index),
+                $"description-{index}"))
+            .ToArray();
+
+    private static string Fingerprint(string identity, string description) =>
+        Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(
+            System.Text.Encoding.UTF8.GetBytes($"{identity}|{description}")));
 
     private sealed class CancelAfterSnapshotRetirementInterceptor(
         CancellationTokenSource cancellationSource) : DbCommandInterceptor

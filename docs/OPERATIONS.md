@@ -72,6 +72,13 @@ dotnet run --no-build -c Release --project .\backend\SmartFacility.Api\SmartFaci
 
 `CanImport=true`, parse/header/identity collision sayıları sıfır ve source baseline açıklanabilir olmadan import çalıştırılmaz. Unresolved asset/location değerleri raw anahtarlarıyla korunur; placeholder dimension yaratılmaz ve nullable ilişkiler açıkça raporlanır.
 
+Canonical kaynak tam snapshot olmalıdır. Preflight; mevcut active sayı, source satır sayısı,
+beklenen insert/update/inactive/reactivation/final active sayıları ile shrink yüzdelerini raporlar.
+Beklenen final active membership mevcut active snapshot'ın `%90` değerinin altına düşüyorsa
+source partial/filtered olabileceği için varsayılan olarak `CanImport=false` döner. Bu kontrol,
+import transaction'ı ve application lock alındıktan sonra güncel database state ile tekrar yapılır.
+Open-only veya başka bir filtreli export'u full snapshot olarak import etmeyin.
+
 Onaylı write window'da aynı preflight'ı tekrar yapan atomic import:
 
 ```powershell
@@ -80,6 +87,24 @@ dotnet run --no-build -c Release --project .\backend\SmartFacility.Api\SmartFaci
 ```
 
 Bu komut import-level SQL application lock ve tek snapshot transaction kullanır. Failure/cancellation core snapshot ve source records'ı rollback eder; batch failure audit'i korunur. Aynı export core duplicate üretmez. Legacy `analytics.HistoricalWorkOrders` tablosu bu prosedürde değiştirilmez.
+
+Gerçek ve onaylı bir full snapshot'ın olağanüstü biçimde `%10` değerinden fazla küçülmesi
+gerekiyorsa explicit override aynı preflight ve import komutunda görülebilir şekilde verilmelidir:
+
+```powershell
+dotnet run --no-build -c Release --project .\backend\SmartFacility.Api\SmartFacility.Api.csproj -- `
+  --canonical-work-orders-preflight "C:\controlled-input\work-orders.xlsx" `
+  --allow-suspicious-snapshot-shrink
+
+dotnet run --no-build -c Release --project .\backend\SmartFacility.Api\SmartFacility.Api.csproj -- `
+  --canonical-work-orders-import "C:\controlled-input\work-orders.xlsx" `
+  --allow-suspicious-snapshot-shrink
+```
+
+Override yalnız completeness kararını açar. Sheet/header/parse doğrulaması, incoming veya
+existing identity collision kontrolleri, transaction, application lock ve idempotency
+korumaları bypass edilmez. Preflight `AllowedByExplicitOverride` durumunu ve safety warning'i
+göstermeden override importuna devam etmeyin. Override normal operasyon komutlarına eklenmemelidir.
 
 ## 5. Read-only database smoke
 

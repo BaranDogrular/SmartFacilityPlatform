@@ -12,10 +12,62 @@ public sealed class CanonicalWorkOrderImportService(
 {
     public async Task<CanonicalWorkOrderPreflightResult> PreflightAsync(
         string filePath,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        CanonicalSnapshotImportOptions? options = null)
     {
         var loaded = await LoadAsync(filePath, cancellationToken);
-        var database = await snapshotStore.PreflightAsync(loaded.Rows, cancellationToken);
+        var database = await snapshotStore.PreflightAsync(
+            loaded.Rows,
+            cancellationToken,
+            options);
+
+        return CreatePreflightResult(loaded, database);
+    }
+
+    public async Task<ImportResult> ImportAsync(
+        string filePath,
+        CancellationToken cancellationToken = default,
+        CanonicalSnapshotImportOptions? options = null)
+    {
+        var loaded = await LoadAsync(filePath, cancellationToken);
+        var database = await snapshotStore.PreflightAsync(
+            loaded.Rows,
+            cancellationToken,
+            options);
+        var preflight = CreatePreflightResult(loaded, database);
+
+        if (!preflight.CanImport)
+        {
+            if (loaded.Errors.Count > 0
+                || preflight.DuplicateIdentityCount > 0
+                || database.ExistingIdentityCollisions.Count > 0)
+            {
+                throw new ImportPipelineException(
+                    "Canonical WorkOrder preflight failed; no database writes were made. " +
+                    $"Parse errors: {loaded.Errors.Count}; " +
+                    $"incoming identity collisions: {preflight.DuplicateIdentityCount}; " +
+                    $"unresolved asset codes (warning): {database.UnresolvedAssetCodes.Count}; " +
+                    $"existing identity collisions: {database.ExistingIdentityCollisions.Count}.");
+            }
+
+            throw new CanonicalSnapshotSafetyException(
+                database.SafetyWarnings.FirstOrDefault()
+                ?? "Canonical snapshot completeness safety guard rejected the source.");
+        }
+
+        var profile = profileCatalog.GetRequired(ImportProfileKeys.WorkOrder);
+        return await snapshotStore.ApplyAsync(
+            profile.SourceType,
+            Path.GetFileName(filePath),
+            loaded.Rows,
+            cancellationToken,
+            options);
+    }
+
+    private static CanonicalWorkOrderPreflightResult CreatePreflightResult(
+        LoadedRows loaded,
+        CanonicalWorkOrderDatabasePreflight database)
+    {
         var duplicateIdentityCount = loaded.Rows
             .GroupBy(row => row.IdentityFingerprint, StringComparer.Ordinal)
             .Count(group => group.Count() > 1);
@@ -33,36 +85,6 @@ public sealed class CanonicalWorkOrderImportService(
             loaded.Rows.Count == 0 ? null : loaded.Rows.Max(row => row.ReportedDateTime),
             database,
             loaded.Errors);
-    }
-
-    public async Task<ImportResult> ImportAsync(
-        string filePath,
-        CancellationToken cancellationToken = default)
-    {
-        var loaded = await LoadAsync(filePath, cancellationToken);
-        var database = await snapshotStore.PreflightAsync(loaded.Rows, cancellationToken);
-        var duplicateIdentityCount = loaded.Rows
-            .GroupBy(row => row.IdentityFingerprint, StringComparer.Ordinal)
-            .Count(group => group.Count() > 1);
-
-        if (loaded.Errors.Count > 0
-            || duplicateIdentityCount > 0
-            || database.ExistingIdentityCollisions.Count > 0)
-        {
-            throw new ImportPipelineException(
-                "Canonical WorkOrder preflight failed; no database writes were made. " +
-                $"Parse errors: {loaded.Errors.Count}; " +
-                $"incoming identity collisions: {duplicateIdentityCount}; " +
-                $"unresolved asset codes (warning): {database.UnresolvedAssetCodes.Count}; " +
-                $"existing identity collisions: {database.ExistingIdentityCollisions.Count}.");
-        }
-
-        var profile = profileCatalog.GetRequired(ImportProfileKeys.WorkOrder);
-        return await snapshotStore.ApplyAsync(
-            profile.SourceType,
-            Path.GetFileName(filePath),
-            loaded.Rows,
-            cancellationToken);
     }
 
     private async Task<LoadedRows> LoadAsync(
