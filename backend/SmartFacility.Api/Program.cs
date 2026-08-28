@@ -15,6 +15,46 @@ builder.Services.AddInfrastructure(builder.Configuration);
 
 var app = builder.Build();
 
+var historicalInterventionCommand = args.FirstOrDefault(argument =>
+    string.Equals(argument, "--historical-interventions-preflight", StringComparison.OrdinalIgnoreCase)
+    || string.Equals(argument, "--historical-interventions-import", StringComparison.OrdinalIgnoreCase));
+if (historicalInterventionCommand is not null)
+{
+    var commandIndex = Array.IndexOf(args, historicalInterventionCommand);
+    var filePaths = args.Skip(commandIndex + 1)
+        .Where(argument => !argument.StartsWith("--", StringComparison.Ordinal))
+        .ToArray();
+    await using var scope = app.Services.CreateAsyncScope();
+    var service = scope.ServiceProvider.GetRequiredService<IHistoricalInterventionImportService>();
+    var serializerOptions = new System.Text.Json.JsonSerializerOptions { WriteIndented = true };
+    var preflight = await service.PreflightAsync(filePaths);
+    Console.WriteLine(System.Text.Json.JsonSerializer.Serialize(preflight, serializerOptions));
+
+    if (string.Equals(
+            historicalInterventionCommand,
+            "--historical-interventions-import",
+            StringComparison.OrdinalIgnoreCase))
+    {
+        if (!preflight.CanImport)
+        {
+            Console.Error.WriteLine(System.Text.Json.JsonSerializer.Serialize(
+                new
+                {
+                    Status = "Blocked",
+                    Error = "Historical Intervention preflight did not pass; import was not started."
+                },
+                serializerOptions));
+            Environment.ExitCode = 2;
+            return;
+        }
+
+        var result = await service.ImportAsync(filePaths);
+        Console.WriteLine(System.Text.Json.JsonSerializer.Serialize(result, serializerOptions));
+    }
+
+    return;
+}
+
 var canonicalCommand = args.FirstOrDefault(argument =>
     string.Equals(argument, "--canonical-work-orders-preflight", StringComparison.OrdinalIgnoreCase)
     || string.Equals(argument, "--canonical-work-orders-import", StringComparison.OrdinalIgnoreCase));

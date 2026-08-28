@@ -106,6 +106,49 @@ existing identity collision kontrolleri, transaction, application lock ve idempo
 korumaları bypass edilmez. Preflight `AllowedByExplicitOverride` durumunu ve safety warning'i
 göstermeden override importuna devam etmeyin. Override normal operasyon komutlarına eklenmemelidir.
 
+### BEAM Historical Intervention import
+
+Kaynak yalnız beş yıllık BEAM `Varlık Tarihçesi` `.xls` partition'ıdır (2022-2026). Normal
+`İş Emirleri` export'u, 65.536 satırda kesilmiş birleşik legacy `.xls` veya SCADA dosyası bu
+pipeline'a verilmez. Önce write-free preflight çalıştırılır:
+
+```powershell
+dotnet run --no-build -c Release --project .\backend\SmartFacility.Api\SmartFacility.Api.csproj -- `
+  --historical-interventions-preflight `
+  "C:\controlled-input\history-2022.xls" `
+  "C:\controlled-input\history-2023.xls" `
+  "C:\controlled-input\history-2024.xls" `
+  "C:\controlled-input\history-2025.xls" `
+  "C:\controlled-input\history-2026.xls"
+```
+
+Import için tüm koşullar zorunludur: toplam/parsed `170983`, invalid `0`, strict canonical match
+`170983`, unmatched/ambiguous `0`, duplicate fingerprint/conflicting identity `0`, `CanImport=true`.
+Kaynak dosya hash, sheet, satır ve tarih aralıkları değişirse import başlamaz; neden incelenir.
+
+Yeni schema önce migration history karşılaştırması, onaylı change window ve doğrulanmış backup
+sonrasında manuel uygulanır. `AddHistoricalInterventions` yalnız `core.HistoricalInterventions`,
+restrict FK'ler ve hedefli index'leri ekler. Migration sonrası aynı preflight tekrar PASS olmalıdır.
+
+```powershell
+dotnet run --no-build -c Release --project .\backend\SmartFacility.Api\SmartFacility.Api.csproj -- `
+  --historical-interventions-import `
+  "C:\controlled-input\history-2022.xls" `
+  "C:\controlled-input\history-2023.xls" `
+  "C:\controlled-input\history-2024.xls" `
+  "C:\controlled-input\history-2025.xls" `
+  "C:\controlled-input\history-2026.xls"
+```
+
+Apply tek serializable transaction ve exclusive SQL application lock kullanır. Failure/cancellation
+intervention ve ImportSourceRecord yazılarını birlikte rollback eder; failed batch audit'i korunur.
+Aynı beş dosyayla ikinci çalıştırma `0` insert ve `170983` duplicate/unchanged vermelidir. Canonical
+WorkOrders, legacy HistoricalWorkOrders ve SCADA tabloları bu importta değiştirilmez.
+
+Bu tablo "gözlenen geçmiş müdahale" semantiğindedir; "recommended solution" değildir. Personel,
+requester ve iletişim alanları persist/audit payload dışıdır. Future DTO yalnız `*Sanitized`
+alanlarını kullanmalı; raw metinler public API/UI'a açılmamalıdır.
+
 ## 5. Read-only database smoke
 
 Yetkili read-only bağlantıyla:

@@ -29,6 +29,24 @@ Browser
 - `SmartFacility.Domain`: Core ve ingestion entity'leri; başka proje bağımlılığı yoktur.
 - `SmartFacility.Application`: Import profilleri, processors, fingerprint hesapları, analytics query/response sözleşmeleri ve abstraction'lar.
 - `SmartFacility.Infrastructure`: EF Core DbContext/mappings/migrations, SQL Server locks, import data store, ClosedXML reader ve analytics query implementasyonu.
+
+## Historical Intervention data layer
+
+`core.HistoricalInterventions`, BEAM `Varlık Tarihçesi` raporunun 2022-2026 yıllık
+partition'larında gözlenen geçmiş müdahaleleri canonical `core.WorkOrders` kayıtlarına bağlar.
+Bu veri bir öneri, garanti edilen çözüm veya prescriptive maintenance talimatı değildir.
+
+- Link yalnız `WorkOrderNumber + ReportedDateTime + AssetCode` strict canonical identity ile kurulur.
+- `Yapılan İşin Açıklaması`, problem/açıklama ve arıza nedeni ayrı alanlardır; metinler birleştirilmez.
+- Raw business text audit için korunur. DTO-safe paralel metinlerde email ve Türk mobil telefon
+  kalıpları redacted edilir. Talep eden, iletişim ve sorumlu personel kolonları yeni entity veya
+  import audit JSON'una alınmaz.
+- Action quality `Informative`, `Generic` veya `NoAction` olarak deterministic ve conservative
+  sınıflandırılır. Generic/no-action satırlar silinmez.
+- `historical-intervention/v1` SHA-256 fingerprint canonical identity, source year ve stabil iş
+  alanlarını kapsar. Unique fingerprint index, serializable transaction ve SQL application lock
+  birlikte concurrent/retry duplicate oluşumunu engeller.
+- `analytics.HistoricalWorkOrders` ayrı legacy analytics dataset'idir; bu import onu değiştirmez.
 - `SmartFacility.Api`: Minimal API endpoint mapping, validation problem responses, JSON enum contract ve composition root.
 
 Başlangıçta DbContext oluşturulur fakat `Migrate`, `EnsureCreated` veya import çağrılmaz. Schema değişikliği startup sorumluluğu değildir.

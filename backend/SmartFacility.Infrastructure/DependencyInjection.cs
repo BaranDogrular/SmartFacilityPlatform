@@ -80,6 +80,9 @@ public static class DependencyInjection
         services.AddScoped<IImportDataStore, EfImportDataStore>();
         services.AddScoped<ICanonicalWorkOrderSnapshotStore, EfCanonicalWorkOrderSnapshotStore>();
         services.AddScoped<ICanonicalWorkOrderImportService, CanonicalWorkOrderImportService>();
+        services.AddScoped<IHistoricalInterventionSourceReader, BeamHistoricalInterventionSourceReader>();
+        services.AddScoped<IHistoricalInterventionStore, EfHistoricalInterventionStore>();
+        services.AddScoped<IHistoricalInterventionImportService, HistoricalInterventionImportService>();
         services.AddScoped<IImportRowProcessor, AssetImportProcessor>();
         services.AddScoped<IImportRowProcessor, WorkOrderImportProcessor>();
         services.AddScoped<IImportRowProcessor, HistoricalWorkOrderImportProcessor>();

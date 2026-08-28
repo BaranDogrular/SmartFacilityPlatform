@@ -9,6 +9,7 @@ public sealed class SmartFacilityDbContext(DbContextOptions<SmartFacilityDbConte
     public DbSet<Asset> Assets => Set<Asset>();
     public DbSet<WorkOrder> WorkOrders => Set<WorkOrder>();
     public DbSet<HistoricalWorkOrder> HistoricalWorkOrders => Set<HistoricalWorkOrder>();
+    public DbSet<HistoricalIntervention> HistoricalInterventions => Set<HistoricalIntervention>();
     public DbSet<Building> Buildings => Set<Building>();
     public DbSet<Location> Locations => Set<Location>();
     public DbSet<AssetGroup> AssetGroups => Set<AssetGroup>();

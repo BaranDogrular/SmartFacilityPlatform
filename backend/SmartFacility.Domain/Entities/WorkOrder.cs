@@ -35,4 +35,5 @@ public sealed class WorkOrder
     public Building? Building { get; set; }
     public Location? Location { get; set; }
     public ImportBatch? LastSeenImportBatch { get; set; }
+    public ICollection<HistoricalIntervention> HistoricalInterventions { get; set; } = [];
 }
