@@ -1453,6 +1453,62 @@ select:focus-visible {
   white-space: nowrap;
 }
 
+.similar-case-intervention {
+  display: grid;
+  gap: 8px;
+  padding: 11px 12px;
+  border-left: 3px solid #9eb8c4;
+  background: #f6f9fa;
+}
+
+.similar-case-intervention__heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.similar-case-intervention h3 {
+  margin: 0;
+  color: var(--navy-900);
+  font-size: 0.7rem;
+}
+
+.similar-case-intervention__heading > span {
+  flex: 0 0 auto;
+  padding: 3px 5px;
+  border: 1px solid #d1dade;
+  border-radius: 3px;
+  color: var(--slate-600);
+  background: #ffffff;
+  font-size: 0.57rem;
+  font-weight: 700;
+}
+
+.similar-case-intervention__action,
+.similar-case-intervention__empty {
+  margin: 0;
+  color: var(--slate-700);
+  font-size: 0.7rem;
+  line-height: 1.5;
+}
+
+.similar-case-intervention__empty {
+  color: var(--slate-500);
+}
+
+.similar-case-card .similar-case-intervention__context {
+  grid-template-columns: 1fr;
+  gap: 6px;
+  padding-top: 7px;
+  border-top: 1px solid var(--slate-200);
+}
+
+.similar-case-card .similar-case-intervention__context dd {
+  overflow: visible;
+  white-space: normal;
+}
+
 .similar-case-reasons {
   display: flex;
   flex-wrap: wrap;

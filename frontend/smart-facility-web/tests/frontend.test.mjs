@@ -292,6 +292,13 @@ const similarCases = {
       similarityScore: 68.75,
       similarityReasons: ['Açıklama benzerliği %64', 'Aynı varlık', 'Aynı disiplin'],
       descriptionSnippet: 'Giriş bölümündeki LED aydınlatma çalışmıyor.',
+      historicalIntervention: {
+        requestDescription: 'Giriş aydınlatması çalışmıyor.',
+        failureReasonDescription: 'LED sürücü arızası',
+        workPerformedDescription: 'LED sürücü değiştirilerek çalışma testi yapıldı.',
+        quality: 'INFORMATIVE',
+        completionDateTime: '2026-07-12T11:30:00',
+      },
     },
   ],
 }
@@ -825,9 +832,77 @@ test('similar historical cases render bounded evidence without solution or perso
   assert.match(html, /Değerlendirilen aday<\/span><strong>387/)
   assert.match(html, /Tekrarlayan template bastırıldı<\/span><strong>2/)
   assert.match(html, /core\.WorkOrders/)
+  assert.match(html, /core\.HistoricalInterventions/)
+  assert.match(html, /Geçmiş Vakada Yapılan İşlem/)
+  assert.match(html, /LED sürücü değiştirilerek çalışma testi yapıldı/)
+  assert.match(html, /LED sürücü arızası/)
+  assert.match(html, /12 Tem 2026 11:30/)
   assert.match(html, /Requester ve sorumlu personel alanları gösterilmez/)
   assert.match(html, /çözüm önerisi veya otomatik bakım talimatı değildir/)
-  assert.doesNotMatch(html, /failure probability|çözüm adımı|önerilen çözüm|RequestedBy|AssignedPerson/i)
+  assert.doesNotMatch(html, /failure probability|çözüm adımı|önerilen çözüm|RequestedBy|AssignedPerson|dangerouslySetInnerHTML/i)
+})
+
+test('similar historical cases render generic, no-action and missing intervention states safely', () => {
+  const baseItem = similarCases.items[0]
+  const html = renderSimilarCasesPage({
+    similarCases: {
+      ...similarCases,
+      metadata: { ...similarCases.metadata, returnedCount: 3 },
+      items: [
+        {
+          ...baseItem,
+          workOrderId: 1,
+          historicalIntervention: {
+            requestDescription: null,
+            failureReasonDescription: null,
+            workPerformedDescription: 'Genel kontrol gerçekleştirildi.',
+            quality: 'GENERIC',
+            completionDateTime: null,
+          },
+        },
+        {
+          ...baseItem,
+          workOrderId: 2,
+          historicalIntervention: {
+            requestDescription: null,
+            failureReasonDescription: null,
+            workPerformedDescription: null,
+            quality: 'NO_ACTION',
+            completionDateTime: null,
+          },
+        },
+        { ...baseItem, workOrderId: 3, historicalIntervention: null },
+      ],
+    },
+  })
+
+  assert.match(html, /Kayıt kalitesi: Genel/)
+  assert.match(html, /Genel kontrol gerçekleştirildi/)
+  assert.match(html, /Bu geçmiş kayıt için anlamlı müdahale açıklaması bulunmuyor/)
+  assert.match(html, /Bu geçmiş vaka için müdahale verisi bulunamadı/)
+  assert.doesNotMatch(html, /Önerilen Çözüm|Kesin Çözüm|AI Önerisi|MTTR/i)
+})
+
+test('similar historical intervention content is escaped as plain React text', () => {
+  const html = renderSimilarCasesPage({
+    similarCases: {
+      ...similarCases,
+      items: [{
+        ...similarCases.items[0],
+        historicalIntervention: {
+          ...similarCases.items[0].historicalIntervention,
+          workPerformedDescription: '<b>Gözlenen işlem</b>',
+          requestDescriptionRaw: 'PRIVATE-REQUEST-RAW',
+          workPerformedDescriptionRaw: 'PRIVATE-ACTION-RAW',
+          sourceFileName: 'PRIVATE-SOURCE-PATH',
+        },
+      }],
+    },
+  })
+
+  assert.match(html, /&lt;b&gt;Gözlenen işlem&lt;\/b&gt;/)
+  assert.doesNotMatch(html, /<b>Gözlenen işlem<\/b>/)
+  assert.doesNotMatch(html, /PRIVATE-REQUEST-RAW|PRIVATE-ACTION-RAW|PRIVATE-SOURCE-PATH/)
 })
 
 test('similar historical cases render empty, loading, error and retry states', () => {

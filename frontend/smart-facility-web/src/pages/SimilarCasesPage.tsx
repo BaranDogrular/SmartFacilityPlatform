@@ -1,6 +1,10 @@
 import { useState, type FormEvent } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import type { SimilarCasesQuery, SimilarCasesRetrievalMode } from '../api/analyticsTypes'
+import type {
+  SimilarCaseHistoricalIntervention,
+  SimilarCasesQuery,
+  SimilarCasesRetrievalMode,
+} from '../api/analyticsTypes'
 import { EmptyState, ErrorState, InfoNote, LoadingState, PageHeader } from '../components/DashboardUi'
 import { useSimilarCases } from '../hooks/useAnalytics'
 import { formatCount, formatPercent } from '../utils/format'
@@ -29,6 +33,63 @@ function availabilityMessage(message: string | null): string {
   if (message.includes('no Discipline')) return 'Kayıtta disiplin bilgisi bulunmadığı için karşılaştırma yapılamıyor.'
   if (message.includes('no ReportedDateTime')) return 'Kayıtta bildirim tarihi bulunmadığı için temporal karşılaştırma yapılamıyor.'
   return 'Yeterince benzer geçmiş vaka bulunamadı.'
+}
+
+function HistoricalInterventionPanel({
+  intervention,
+}: {
+  intervention: SimilarCaseHistoricalIntervention | null
+}) {
+  if (!intervention) {
+    return (
+      <section className="similar-case-intervention" aria-label="Geçmiş vakada yapılan işlem">
+        <h3>Geçmiş Vakada Yapılan İşlem</h3>
+        <p className="similar-case-intervention__empty">
+          Bu geçmiş vaka için müdahale verisi bulunamadı.
+        </p>
+      </section>
+    )
+  }
+
+  if (intervention.quality === 'NO_ACTION') {
+    return (
+      <section className="similar-case-intervention" aria-label="Geçmiş vakada yapılan işlem">
+        <h3>Geçmiş Vakada Yapılan İşlem</h3>
+        <p className="similar-case-intervention__empty">
+          Bu geçmiş kayıt için anlamlı müdahale açıklaması bulunmuyor.
+        </p>
+      </section>
+    )
+  }
+
+  return (
+    <section className="similar-case-intervention" aria-label="Geçmiş vakada yapılan işlem">
+      <div className="similar-case-intervention__heading">
+        <h3>Geçmiş Vakada Yapılan İşlem</h3>
+        {intervention.quality === 'GENERIC' ? (
+          <span>Kayıt kalitesi: Genel</span>
+        ) : null}
+      </div>
+      <p className="similar-case-intervention__action">
+        {intervention.workPerformedDescription ?? 'Müdahale açıklaması bulunmuyor.'}
+      </p>
+      {intervention.requestDescription
+        || intervention.failureReasonDescription
+        || intervention.completionDateTime ? (
+          <dl className="similar-case-intervention__context">
+            {intervention.requestDescription ? (
+              <div><dt>Talep bağlamı</dt><dd>{intervention.requestDescription}</dd></div>
+            ) : null}
+            {intervention.failureReasonDescription ? (
+              <div><dt>Arıza nedeni / bağlam</dt><dd>{intervention.failureReasonDescription}</dd></div>
+            ) : null}
+            {intervention.completionDateTime ? (
+              <div><dt>Tamamlanma</dt><dd>{formatDateTime(intervention.completionDateTime)}</dd></div>
+            ) : null}
+          </dl>
+        ) : null}
+    </section>
+  )
 }
 
 export function SimilarCasesPage() {
@@ -134,6 +195,7 @@ export function SimilarCasesPage() {
                 <div><dt>Bakım / arıza sınıfı</dt><dd>{item.failureType ?? '—'}</dd></div>
                 <div><dt>İş emri</dt><dd>{item.workOrderNumber}</dd></div>
               </dl>
+              <HistoricalInterventionPanel intervention={item.historicalIntervention} />
               <div className="similar-case-reasons" aria-label="Benzerlik nedenleri">
                 {item.similarityReasons.map((reason) => <span key={reason}>{reason}</span>)}
               </div>
@@ -143,7 +205,7 @@ export function SimilarCasesPage() {
       )}
 
       <InfoNote>
-        Kaynak yalnız <span className="code-chip">core.WorkOrders</span>. Requester ve sorumlu personel alanları gösterilmez; aynı veya gelecekteki timestamp kayıtları aday değildir.
+        Problem benzerliği <span className="code-chip">core.WorkOrders</span>, gözlenen işlem bilgisi <span className="code-chip">core.HistoricalInterventions</span> kaynağındandır. Gösterilen işlemler bakım talimatı, önerilen veya garanti edilen çözüm değildir. Requester ve sorumlu personel alanları gösterilmez; aynı veya gelecekteki timestamp kayıtları aday değildir.
       </InfoNote>
     </div>
   )

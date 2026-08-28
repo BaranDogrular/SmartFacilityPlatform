@@ -814,11 +814,45 @@ public sealed class EfAnalyticsQueryService(SmartFacilityDbContext dbContext) :
             })
             .Where(item => SimilarCasesScoring.IsEligible(item.Score))
             .ToArray();
+        var rankedCandidateIds = ranked
+            .Select(item => item.Candidate.Id)
+            .Distinct()
+            .ToArray();
+        var interventionRows = rankedCandidateIds.Length == 0
+            ? []
+            : await _dbContext.HistoricalInterventions
+                .AsNoTracking()
+                .Where(item => rankedCandidateIds.Contains(item.WorkOrderId))
+                .Select(item => new SimilarCaseInterventionProjection(
+                    item.Id,
+                    item.WorkOrderId,
+                    item.RequestDescriptionSanitized,
+                    item.FailureReasonDescriptionSanitized,
+                    item.WorkPerformedDescriptionSanitized,
+                    item.InterventionQuality,
+                    item.CompletionDateTime,
+                    item.SourceYear,
+                    item.ReportedDateTime))
+                .ToListAsync(cancellationToken);
+        var interventionByWorkOrderId = interventionRows
+            .GroupBy(item => item.WorkOrderId)
+            .ToDictionary(
+                group => group.Key,
+                group => group
+                    .OrderBy(item => InterventionQualityRank(item.Quality))
+                    .ThenByDescending(item => item.CompletionDateTime.HasValue)
+                    .ThenByDescending(item => item.CompletionDateTime)
+                    .ThenByDescending(item => item.SourceYear)
+                    .ThenByDescending(item => item.ReportedDateTime)
+                    .ThenBy(item => item.Id)
+                    .First());
         var deduplicated = ranked
             .GroupBy(item => item.Score.NormalizedDescription, StringComparer.Ordinal)
             .Select(group => group
                 .OrderByDescending(item => item.Score.Score)
                 .ThenByDescending(item => item.Score.TextSimilarity)
+                .ThenBy(item => InterventionQualityRank(
+                    interventionByWorkOrderId.GetValueOrDefault(item.Candidate.Id)?.Quality))
                 .ThenByDescending(item => item.Candidate.ReportedDateTime)
                 .ThenByDescending(item => item.Candidate.Id)
                 .First())
@@ -827,6 +861,8 @@ public sealed class EfAnalyticsQueryService(SmartFacilityDbContext dbContext) :
         var items = deduplicated
             .OrderByDescending(item => item.Score.Score)
             .ThenByDescending(item => item.Score.TextSimilarity)
+            .ThenBy(item => InterventionQualityRank(
+                interventionByWorkOrderId.GetValueOrDefault(item.Candidate.Id)?.Quality))
             .ThenByDescending(item => item.Candidate.ReportedDateTime)
             .ThenBy(item => item.Candidate.AssetCode, StringComparer.Ordinal)
             .ThenBy(item => item.Candidate.Id)
@@ -843,7 +879,9 @@ public sealed class EfAnalyticsQueryService(SmartFacilityDbContext dbContext) :
                 item.Candidate.FailureReason,
                 item.Score.Score,
                 item.Score.Reasons,
-                SimilarCasesScoring.CreatePrivacySafeSnippet(item.Candidate.Description)))
+                SimilarCasesScoring.CreatePrivacySafeSnippet(item.Candidate.Description),
+                MapHistoricalIntervention(
+                    interventionByWorkOrderId.GetValueOrDefault(item.Candidate.Id))))
             .ToArray();
 
         return new SimilarCasesResponse(
@@ -1546,6 +1584,32 @@ public sealed class EfAnalyticsQueryService(SmartFacilityDbContext dbContext) :
             Value = value.HasValue ? value.Value : DBNull.Value
         };
 
+    private static int InterventionQualityRank(HistoricalInterventionQuality? quality) =>
+        quality switch
+        {
+            HistoricalInterventionQuality.Informative => 0,
+            HistoricalInterventionQuality.Generic => 1,
+            HistoricalInterventionQuality.NoAction => 2,
+            _ => 3
+        };
+
+    private static SimilarCaseHistoricalInterventionDto? MapHistoricalIntervention(
+        SimilarCaseInterventionProjection? intervention) =>
+        intervention is null
+            ? null
+            : new SimilarCaseHistoricalInterventionDto(
+                intervention.RequestDescriptionSanitized,
+                intervention.FailureReasonDescriptionSanitized,
+                intervention.WorkPerformedDescriptionSanitized,
+                intervention.Quality switch
+                {
+                    HistoricalInterventionQuality.Informative =>
+                        SimilarCaseInterventionQuality.Informative,
+                    HistoricalInterventionQuality.Generic => SimilarCaseInterventionQuality.Generic,
+                    _ => SimilarCaseInterventionQuality.NoAction
+                },
+                intervention.CompletionDateTime);
+
     private static SqlParameter StringParameter(string name, string? value, int size) =>
         new(name, SqlDbType.NVarChar, size)
         {
@@ -1662,6 +1726,17 @@ public sealed class EfAnalyticsQueryService(SmartFacilityDbContext dbContext) :
     private sealed record RankedSimilarCase(
         SimilarCaseCandidateProjection Candidate,
         SimilarCaseScoreResult Score);
+
+    private sealed record SimilarCaseInterventionProjection(
+        long Id,
+        long WorkOrderId,
+        string? RequestDescriptionSanitized,
+        string? FailureReasonDescriptionSanitized,
+        string? WorkPerformedDescriptionSanitized,
+        HistoricalInterventionQuality Quality,
+        DateTime? CompletionDateTime,
+        int SourceYear,
+        DateTime ReportedDateTime);
 
     private sealed record SourceTypeCountProjection(string SourceType, long Count);
 

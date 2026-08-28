@@ -202,6 +202,25 @@ public sealed record SimilarCasesMetadataDto(
     string AlgorithmVersion,
     string? AvailabilityMessage);
 
+public enum SimilarCaseInterventionQuality
+{
+    [JsonStringEnumMemberName("INFORMATIVE")]
+    Informative,
+
+    [JsonStringEnumMemberName("GENERIC")]
+    Generic,
+
+    [JsonStringEnumMemberName("NO_ACTION")]
+    NoAction
+}
+
+public sealed record SimilarCaseHistoricalInterventionDto(
+    string? RequestDescription,
+    string? FailureReasonDescription,
+    string? WorkPerformedDescription,
+    SimilarCaseInterventionQuality Quality,
+    DateTime? CompletionDateTime);
+
 public sealed record SimilarCaseItemDto(
     long WorkOrderId,
     string WorkOrderNumber,
@@ -214,7 +233,8 @@ public sealed record SimilarCaseItemDto(
     string? FailureReason,
     decimal SimilarityScore,
     IReadOnlyList<string> SimilarityReasons,
-    string DescriptionSnippet);
+    string DescriptionSnippet,
+    SimilarCaseHistoricalInterventionDto? HistoricalIntervention);
 
 public sealed record SimilarCasesResponse(
     SimilarCasesMetadataDto Metadata,

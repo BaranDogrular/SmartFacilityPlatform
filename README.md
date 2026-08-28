@@ -231,14 +231,16 @@ Representative local production-mode measurements on the current acceptance data
 - Asset Pareto default median: yaklaşık 78 ms
 - Historical Activity default median: yaklaşık 296 ms
 - SCADA Clearance default median: yaklaşık 120 ms
-- Inspection Priority default median: yaklaşık 300 ms
-- Early Warning default median: yaklaşık 1.900 ms
+- WorkOrders Overview default median: yaklaşık 905 ms
+- Inspection Priority default median: yaklaşık 326 ms
+- Early Warning default median: yaklaşık 467 ms
+- Similar Historical Cases V2 (`top=10`, temsilî target) median: yaklaşık 28 ms
 
 Bunlar SLA değildir; donanım, SQL Server, veri hacmi ve eşzamanlı yükle birlikte değişir.
 
 Canonical modelde `core.WorkOrders` toplam kaynak dataset'ini temsil eder. Açık durum `RawStatusCode=A`, kapalı durum `RawStatusCode=K` ile hesaplanır; workflow `Status` alanı bu sınıflandırmayı belirlemez. `analytics.HistoricalWorkOrders` yalnız legacy dated snapshot/audit lineage olarak korunur ve business analytics tarafından sorgulanmaz.
 
-25.08.2026 canonical export acceptance baseline'ı yaklaşık 171.136 WorkOrders, 75 açık, 171.054 kapalı ve 7 diğer kayıttır. Bu sayılar hard-coded product contract değildir.
+27.08.2026 canonical export acceptance baseline'ı 171.468 fiziksel WorkOrder; 171.453 aktif canonical, 15 inactive, 91 açık, 171.338 kapalı ve 24 diğer kayıttır. Bu sayılar hard-coded product contract değildir.
 
 ## Inspection Priority v1
 
@@ -272,13 +274,13 @@ Default `asOf`, canonical dataset'in maksimum `ReportedDateTime` günüdür. Bas
 
 `HIGH >= 60`, `MEDIUM >= 30`, diğer yeterli-baseline sonuçları `NORMAL` olur. Sıralama score, last30 ve last7 descending; asset code ve asset id ascending şeklindedir. Yalnız `AssetId` bağlı canonical WorkOrders kullanılır; unlinked raw kodlar eşlenmez. SCADA, legacy `HistoricalWorkOrders`, NLP, cost, downtime ve completion bilgisi score'a dahil değildir.
 
-## Similar Historical Cases v1
+## Similar Historical Cases v2
 
 `GET /api/analytics/work-orders/{id}/similar-cases`, seçilen canonical WorkOrder için yalnız daha eski `core.WorkOrders` kayıtlarını tarar. Primary aday havuzu aynı asset ve discipline ile sınırlıdır; havuz yetersizse aynı asset group ve discipline kapsamına kontrollü genişler. SQL tarafında en fazla 500 aday seçilir, ardından Türkçe karakterleri koruyan deterministic token/Jaccard benzerliği ve sınırlı structured bağlam bonuslarıyla in-memory reranking yapılır. Bu yaklaşım ML veya embedding kullanmaz.
 
 Sonuçlar `candidate.ReportedDateTime < target.ReportedDateTime` temporal cutoff'una uyar; target ID ve canonical fingerprint kendisi aday olamaz. Yüksek frekanslı açıklamalar data-driven penalty alır ve aynı normalize edilmiş template sonuç listesinde tek temsilciye collapse edilir. Description yalnız bounded, HTML-free, temel email/telefon redaction uygulanmış snippet olarak döner; requester ve personel alanları response'a dahil değildir. Legacy `analytics.HistoricalWorkOrders` sorgulanmaz.
 
-Benzerlik yüzdesi failure probability veya confidence probability değildir; özellik çözüm önerisi, bakım talimatı veya geçmişte uygulanan çözüm üretmez. Gelecekteki ayrı bir Solution Support özelliği için source sistemden gerçek `ActionTaken`, `Resolution`, `Outcome` ve completion note verilerinin canonical olarak toplanması gerekir.
+V2, benzer vaka seçildikten sonra strict `HistoricalIntervention.WorkOrderId` FK bağıyla geçmişte gözlenen müdahaleyi ek output olarak getirir. Yalnız sanitized request/reason/action, persisted quality ve opsiyonel completion timestamp public DTO'ya girer; raw/source/audit/personel alanları açılmaz. Intervention metni similarity input'u değildir ve base score'u değiştirmez. Gösterilen işlem önerilen veya garanti edilen onarım değil, benzer geçmiş vakada gözlenmiş müdahaledir.
 
 ## Offline ML sonucu
 
@@ -300,6 +302,7 @@ Bu sonuç ana ürünün başarısız olduğu anlamına gelmez. Import, data qual
 - Production reverse proxy, TLS ve static-host configuration repository'de hazır artifact olarak bulunmaz.
 - Readiness/health endpoint'i yoktur; release smoke kontrolü analytics GET endpoint'iyle yapılır.
 - SQL connection retry özel olarak yapılandırılmamıştır.
+- Eşzamanlı çoklu dashboard açılış burst'ünde pahalı aggregate sorgular SQL command timeout'a ulaşabilir; multi-user/public deployment öncesi kapasite testi ve hedefli query/index incelemesi gerekir.
 - Mevcut acceptance verisindeki stale `InProgress` HistoricalWorkOrder batch için otomatik recovery yoktur; audit geçmişi korunarak operasyonel inceleme gerekir.
 - Frontend'in dev-transitive `nanoid` P3 advisory'si ayrı dependency-maintenance işidir; runtime feature blocker değildir.
 - Offline ML production inference olarak kullanılmaz; predictive maintenance/failure prediction mevcut scope değildir.
@@ -311,7 +314,7 @@ Bu sonuç ana ürünün başarısız olduğu anlamına gelmez. Import, data qual
 ## Future roadmap — v1.0 kapsamında değil
 
 1. Approved asset criticality ve inspection workflow integration
-2. Similar historical cases / suggested past actions
+2. Historical intervention outcome/feedback kalitesinin ayrıca değerlendirilmesi
 3. Predictive maintenance ML feasibility round 2
 
 Bu maddeler tamamlanmış özellik veya mevcut ürün taahhüdü değildir.

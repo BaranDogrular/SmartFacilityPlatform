@@ -146,8 +146,15 @@ Aynı beş dosyayla ikinci çalıştırma `0` insert ve `170983` duplicate/uncha
 WorkOrders, legacy HistoricalWorkOrders ve SCADA tabloları bu importta değiştirilmez.
 
 Bu tablo "gözlenen geçmiş müdahale" semantiğindedir; "recommended solution" değildir. Personel,
-requester ve iletişim alanları persist/audit payload dışıdır. Future DTO yalnız `*Sanitized`
+requester ve iletişim alanları persist/audit payload dışıdır. Public DTO yalnız `*Sanitized`
 alanlarını kullanmalı; raw metinler public API/UI'a açılmamalıdır.
+
+`GET /api/analytics/work-orders/{id}/similar-cases` V2 response'u, benzer canonical vaka ile strict
+`HistoricalIntervention.WorkOrderId` FK bağını kullanır. Endpoint read-only'dir; import veya migration
+tetiklemez. `historicalIntervention` yalnız sanitized request/reason/action, persisted quality ve
+opsiyonel completion timestamp taşır. Raw/source/audit/personnel alanlarının response'ta görülmesi
+release blocker'dır. Gösterilen işlem, benzer geçmiş vakada gözlenmiş aksiyondur; bakım önerisi veya
+garanti edilen çözüm değildir.
 
 ## 5. Read-only database smoke
 
@@ -162,7 +169,7 @@ SELECT COUNT_BIG(*) AS LegacyHistoricalSnapshotRows FROM [analytics].[Historical
 SELECT COUNT_BIG(*) AS ScadaAlarmEvents FROM [core].[ScadaAlarmEvents];
 ```
 
-25.08.2026 canonical acceptance için beklenen yaklaşık baseline `5.404 Assets / 171.136 canonical WorkOrders / 75 open / 171.054 closed / 7 other / 167.143 legacy snapshot / 1.950 SCADA` değeridir. Bunlar hard-coded product contract değildir.
+27.08.2026 canonical acceptance baseline'ı `5.404 Assets / 171.468 physical WorkOrders / 171.453 active canonical / 15 inactive / 91 open / 171.338 closed / 24 other / 167.143 legacy snapshot / 170.983 HistoricalInterventions / 1.950 SCADA` değeridir. Bunlar hard-coded product contract değildir.
 
 ## 6. Stale import batch kontrolü
 

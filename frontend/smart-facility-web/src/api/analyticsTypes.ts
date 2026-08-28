@@ -242,6 +242,17 @@ export interface SimilarCaseItem {
   similarityScore: number
   similarityReasons: string[]
   descriptionSnippet: string
+  historicalIntervention: SimilarCaseHistoricalIntervention | null
+}
+
+export type SimilarCaseInterventionQuality = 'INFORMATIVE' | 'GENERIC' | 'NO_ACTION'
+
+export interface SimilarCaseHistoricalIntervention {
+  requestDescription: string | null
+  failureReasonDescription: string | null
+  workPerformedDescription: string | null
+  quality: SimilarCaseInterventionQuality
+  completionDateTime: string | null
 }
 
 export interface SimilarCasesResponse {

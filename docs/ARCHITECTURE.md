@@ -121,7 +121,7 @@ En az 6 aktif baseline ayı olmayan asset `INSUFFICIENT_BASELINE` olur ve score 
 
 Early Warning kişisel davranış sapmasıdır; Inspection Priority'nin mutlak aktivite/workload sıralamasından bağımsızdır. ML, failure probability, asset health, SCADA, legacy `HistoricalWorkOrders`, workflow completion, NLP, cost veya downtime kullanmaz.
 
-### Similar Historical Cases v1
+### Similar Historical Cases v2
 
 `GET /api/analytics/work-orders/{id}/similar-cases`, yalnız canonical `core.WorkOrders` üzerinde read-only çalışır. Target identity database `Id` alanıdır; `WorkOrderNumber` unique kabul edilmez. Candidate kayıtlar target'tan kesin olarak daha eski olmalı, target ID ve canonical fingerprint ile self-match dışlanmalıdır.
 
@@ -129,7 +129,11 @@ Retrieval iki aşamalıdır: primary pool aynı `AssetId` + aynı `Discipline`, 
 
 Data-driven normalized-description frequency penalty generic template'lerin etkisini azaltır; aynı normalized description sonuç listesinde tek temsilciye collapse edilir. Response description'ın bounded, HTML-free ve temel email/telefon redaction uygulanmış snippet'ini taşır; requester/personel alanlarını taşımaz ve description text loglanmaz. Legacy `analytics.HistoricalWorkOrders`, SCADA ve future records hiçbir retrieval aşamasında kullanılmaz.
 
-Bu feature solution recommendation değildir. Gelecekte Solution Support değerlendirilecekse canonical source modelinde gerçek `ActionTaken`, `Resolution`, `Outcome` ve completion note alanları toplanıp kalite/audit sözleşmesiyle doğrulanmalıdır; mevcut description/failure alanlarından çözüm türetilmez.
+V2, bu V1 retrieval/ranking motorunu değiştirmeden dönen bounded adayların `WorkOrderId` değerleriyle `core.HistoricalInterventions` tablosuna tek ek sorgu yapar. Intervention metni similarity input'u değildir; yalnız çıktı olarak sunulur. Eşit similarity score ve text similarity durumunda `Informative > Generic > NoAction > missing` kalite sırası deterministic tie-break'tir; görüntülenen base similarity score değişmez. Bir WorkOrder için birden fazla intervention oluşursa aynı kalite sırası, completion/source zamanı ve kayıt ID'siyle tek temsilci seçilir; vaka çoğaltılmaz.
+
+Public DTO yalnız `RequestDescriptionSanitized`, `FailureReasonDescriptionSanitized` ve `WorkPerformedDescriptionSanitized` kaynaklı alanları taşır. Raw metinler, requester/personel, iletişim, source file/sheet/row ve audit alanları API sözleşmesine dahil değildir. Intervention olmayan vaka geçerli benzer vaka olarak kalır. `Generic` ve `NoAction` kalite durumları UI'da nötr ve açık biçimde gösterilir.
+
+Bu feature solution recommendation değildir. Intervention bilgisi, benzer bir geçmiş vakada gözlenmiş işlemdir; önerilen veya garanti edilen onarım değildir.
 
 ## Reliability semantics
 

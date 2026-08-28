@@ -1,7 +1,9 @@
 using System.Text.Json;
+using Microsoft.EntityFrameworkCore;
 using SmartFacility.Application.Analytics.Models;
 using SmartFacility.Application.Analytics.Services;
 using SmartFacility.Application.Tests.TestData;
+using SmartFacility.Domain;
 using SmartFacility.Domain.Entities;
 using SmartFacility.Infrastructure.Analytics;
 
@@ -130,7 +132,11 @@ public sealed class SimilarCasesTests
         Assert.Equal("REUSED-NUMBER", match.WorkOrderNumber);
         Assert.True(match.SimilarityScore >= SimilarCasesScoring.MinimumHybridScore);
         Assert.All(first.Items, item => Assert.True(item.ReportedDateTime < target.ReportedDateTime));
-        Assert.Equal(6, commandCapture.Commands.Count);
+        Assert.Equal(8, commandCapture.Commands.Count);
+        Assert.Equal(
+            2,
+            commandCapture.Commands.Count(command =>
+                command.Contains("HistoricalInterventions", StringComparison.OrdinalIgnoreCase)));
         Assert.DoesNotContain(
             commandCapture.Commands,
             command => command.Contains("HistoricalWorkOrders", StringComparison.OrdinalIgnoreCase));
@@ -210,6 +216,132 @@ public sealed class SimilarCasesTests
         Assert.Equal(29, result.Metadata.DuplicateTemplatesSuppressed);
         Assert.InRange(result.Items[0].SimilarityScore, 0m, 100m);
         Assert.True(result.Items[0].SimilarityScore < 100m);
+    }
+
+    [Fact]
+    public async Task Intervention_output_is_sanitized_quality_aware_deterministic_and_not_a_similarity_input()
+    {
+        var commandCapture = new CommandCaptureInterceptor();
+        await using var database = await SqliteTestDatabase.CreateAsync(commandCapture);
+        var group = new AssetGroup { Code = "PUMP", Name = "Pumps" };
+        var asset = Asset("P-1", "Pump", group);
+        var batch = ImportBatch();
+        database.Context.AddRange(asset, batch);
+
+        var informative = WorkOrder(
+            "INFORMATIVE",
+            new DateTime(2026, 8, 18, 10, 0, 0),
+            asset,
+            "Pompa motorunda aşırı ses ve titreşim var");
+        var generic = WorkOrder(
+            "GENERIC",
+            new DateTime(2026, 8, 21, 10, 0, 0),
+            asset,
+            "Titreşim ve aşırı ses pompa motorunda var");
+        var noAction = WorkOrder(
+            "NO-ACTION",
+            new DateTime(2026, 8, 22, 10, 0, 0),
+            asset,
+            "Aşırı titreşim ve ses pompa motorunda var");
+        var missing = WorkOrder(
+            "MISSING",
+            new DateTime(2026, 8, 23, 10, 0, 0),
+            asset,
+            "Ses ve titreşim var pompa motorunda aşırı");
+        var target = WorkOrder(
+            "TARGET",
+            new DateTime(2026, 8, 25, 10, 0, 0),
+            asset,
+            "Pompa motorunda aşırı ses ve titreşim var");
+        database.Context.WorkOrders.AddRange(informative, generic, noAction, missing, target);
+        database.Context.HistoricalInterventions.AddRange(
+            Intervention(
+                informative,
+                batch,
+                HistoricalInterventionQuality.Generic,
+                "Genel kontrol edildi.",
+                "RAW-GENERIC"),
+            Intervention(
+                informative,
+                batch,
+                HistoricalInterventionQuality.NoAction,
+                null,
+                "RAW-NO-ACTION"),
+            Intervention(
+                informative,
+                batch,
+                HistoricalInterventionQuality.Informative,
+                "Rulman değiştirilip fonksiyon testi yapıldı.",
+                "PERSON-RAW test@example.com +90 532 123 45 67"),
+            Intervention(
+                generic,
+                batch,
+                HistoricalInterventionQuality.Generic,
+                "Kontrol edildi.",
+                "GENERIC-RAW"),
+            Intervention(
+                noAction,
+                batch,
+                HistoricalInterventionQuality.NoAction,
+                null,
+                "NO-ACTION-RAW"));
+        await database.Context.SaveChangesAsync();
+        commandCapture.Commands.Clear();
+
+        var service = new EfAnalyticsQueryService(database.Context);
+        var first = await service.GetSimilarCasesAsync(target.Id, new SimilarCasesQuery { Top = 10 });
+
+        Assert.NotNull(first);
+        Assert.Equal(
+            [informative.Id, generic.Id, noAction.Id, missing.Id],
+            first.Items.Select(item => item.WorkOrderId));
+        var selected = Assert.Single(first.Items, item => item.WorkOrderId == informative.Id);
+        Assert.NotNull(selected.HistoricalIntervention);
+        Assert.Equal(SimilarCaseInterventionQuality.Informative, selected.HistoricalIntervention.Quality);
+        Assert.Equal(
+            "Rulman değiştirilip fonksiyon testi yapıldı.",
+            selected.HistoricalIntervention.WorkPerformedDescription);
+        Assert.Equal("Talep açıklaması temizlendi.", selected.HistoricalIntervention.RequestDescription);
+        Assert.Equal("Rulman aşınması", selected.HistoricalIntervention.FailureReasonDescription);
+        Assert.Equal(
+            SimilarCaseInterventionQuality.Generic,
+            Assert.Single(first.Items, item => item.WorkOrderId == generic.Id)
+                .HistoricalIntervention!.Quality);
+        Assert.Equal(
+            SimilarCaseInterventionQuality.NoAction,
+            Assert.Single(first.Items, item => item.WorkOrderId == noAction.Id)
+                .HistoricalIntervention!.Quality);
+        Assert.Null(Assert.Single(first.Items, item => item.WorkOrderId == missing.Id).HistoricalIntervention);
+        Assert.Equal(4, first.Items.Select(item => item.WorkOrderId).Distinct().Count());
+        var payload = JsonSerializer.Serialize(first);
+        Assert.DoesNotContain("PERSON-RAW", payload, StringComparison.Ordinal);
+        Assert.DoesNotContain("test@example.com", payload, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("532 123 45 67", payload, StringComparison.Ordinal);
+        Assert.DoesNotContain("RequestDescriptionRaw", payload, StringComparison.Ordinal);
+        Assert.DoesNotContain("SourceFileName", payload, StringComparison.Ordinal);
+        Assert.Equal(
+            1,
+            commandCapture.Commands.Count(command =>
+                command.Contains("HistoricalInterventions", StringComparison.OrdinalIgnoreCase)));
+
+        var initialOrderAndScores = first.Items
+            .Select(item => (item.WorkOrderId, item.SimilarityScore))
+            .ToArray();
+        var informativeRow = await database.Context.HistoricalInterventions
+            .SingleAsync(item =>
+                item.WorkOrderId == informative.Id
+                && item.InterventionQuality == HistoricalInterventionQuality.Informative);
+        informativeRow.WorkPerformedDescriptionSanitized = "Tamamen farklı gözlenen işlem metni.";
+        await database.Context.SaveChangesAsync();
+        var second = await service.GetSimilarCasesAsync(target.Id, new SimilarCasesQuery { Top = 10 });
+
+        Assert.NotNull(second);
+        Assert.Equal(
+            initialOrderAndScores,
+            second.Items.Select(item => (item.WorkOrderId, item.SimilarityScore)).ToArray());
+        Assert.Equal(
+            "Tamamen farklı gözlenen işlem metni.",
+            second.Items[0].HistoricalIntervention!.WorkPerformedDescription);
     }
 
     [Fact]
@@ -303,5 +435,45 @@ public sealed class SimilarCasesTests
             IsInCanonicalSnapshot = true,
             CreatedAt = DateTimeOffset.UtcNow,
             UpdatedAt = DateTimeOffset.UtcNow
+        };
+
+    private static ImportBatch ImportBatch() =>
+        new()
+        {
+            SourceType = "HistoricalIntervention",
+            FileName = "synthetic.xls",
+            StartedAt = DateTimeOffset.UtcNow,
+            CompletedAt = DateTimeOffset.UtcNow,
+            Status = "Succeeded"
+        };
+
+    private static HistoricalIntervention Intervention(
+        WorkOrder workOrder,
+        ImportBatch batch,
+        HistoricalInterventionQuality quality,
+        string? sanitizedAction,
+        string rawAction) =>
+        new()
+        {
+            WorkOrder = workOrder,
+            ImportBatch = batch,
+            SourceYear = 2026,
+            SourceWorkOrderNumber = workOrder.WorkOrderNumber,
+            ReportedDateTime = workOrder.ReportedDateTime!.Value,
+            AssetCodeRaw = workOrder.AssetCodeRaw!,
+            CompletionDateTime = workOrder.ReportedDateTime.Value.AddHours(2),
+            RequestDescriptionRaw = "REQUESTER-RAW employee@example.com",
+            RequestDescriptionSanitized = "Talep açıklaması temizlendi.",
+            WorkPerformedDescriptionRaw = rawAction,
+            WorkPerformedDescriptionSanitized = sanitizedAction,
+            FailureReasonDescriptionRaw = "TECHNICIAN-RAW",
+            FailureReasonDescriptionSanitized = "Rulman aşınması",
+            InterventionQuality = quality,
+            SourceRowFingerprint = Guid.NewGuid().ToString("N"),
+            FingerprintAlgorithm = "historical-intervention/v1",
+            SourceFileName = "synthetic.xls",
+            SourceSheet = "Varlık Tarihçesi",
+            SourceRowNumber = 2,
+            ImportedAt = DateTimeOffset.UtcNow
         };
 }

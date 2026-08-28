@@ -156,8 +156,16 @@ public sealed class AnalyticsApiTests(AnalyticsApiFactory factory) :
             "SAME_ASSET_DISCIPLINE",
             document.RootElement.GetProperty("metadata").GetProperty("retrievalMode").GetString());
         Assert.Equal(1, document.RootElement.GetProperty("items")[0].GetProperty("workOrderId").GetInt64());
+        var intervention = document.RootElement.GetProperty("items")[0]
+            .GetProperty("historicalIntervention");
+        Assert.Equal("INFORMATIVE", intervention.GetProperty("quality").GetString());
+        Assert.Equal(
+            "Motor rulmanı değiştirilerek test edildi.",
+            intervention.GetProperty("workPerformedDescription").GetString());
         Assert.DoesNotContain("requestedByName", payload, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("assignedPersonnelName", payload, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("raw", payload, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("sourceFile", payload, StringComparison.OrdinalIgnoreCase);
 
         using var missing = await _client.GetAsync(
             "/api/analytics/work-orders/404/similar-cases");
@@ -405,7 +413,13 @@ internal sealed class FakeAnalyticsServices :
                         "KONTROL",
                         85,
                         ["Aynı varlık", "Aynı disiplin", "Benzer açıklama (%80)"],
-                        "Pompa motorunda titreşim gözlendi.")
+                        "Pompa motorunda titreşim gözlendi.",
+                        new SimilarCaseHistoricalInterventionDto(
+                            "Motor titreşimi kontrol edilsin.",
+                            "Rulman aşınması",
+                            "Motor rulmanı değiştirilerek test edildi.",
+                            SimilarCaseInterventionQuality.Informative,
+                            new DateTime(2026, 8, 20, 12, 0, 0)))
                 ]));
 
     public Task<WorkOrderActivityResponse> GetActivityAsync(
