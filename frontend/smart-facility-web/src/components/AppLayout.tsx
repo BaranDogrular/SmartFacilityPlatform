@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from 'react'
-import { NavLink, Outlet, useLocation } from 'react-router-dom'
+import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
+import gursanLogo from '../assets/branding/gursan-logo-light.png'
 
 type NavigationIcon = 'overview' | 'assets' | 'orders' | 'priority' | 'warning' | 'scada' | 'quality'
 
@@ -67,8 +68,9 @@ export function AppLayout() {
     <div className="app-shell">
       <aside className={`sidebar${sidebarOpen ? ' sidebar--open' : ''}`} aria-label="Ana navigasyon">
         <div className="brand">
-          <strong className="brand__name">GÜRSAN</strong>
-          <span className="brand__company">TEKNİK HİZMETLER A.Ş.</span>
+          <Link className="brand__home" to="/">
+            <img className="brand__logo" src={gursanLogo} alt="Gürsan Teknik Hizmetler" />
+          </Link>
           <span className="brand__product">Bakım &amp; Güvenilirlik</span>
         </div>
         <nav className="sidebar-nav">

@@ -807,6 +807,10 @@ test('early warning navigation is exposed independently from inspection priority
   assert.match(html, /Karar destek/)
   assert.match(html, /Veri ve denetim/)
   assert.match(html, /sidebar-link__icon/)
+  assert.match(html, /alt="Gürsan Teknik Hizmetler"/)
+  assert.match(html, /gursan-logo-light\.png/)
+  assert.doesNotMatch(html, /brand__logo-surface/)
+  assert.match(html, /Bakım &amp; Güvenilirlik/)
 })
 
 test('work-order filters and reset control are present with exact raw options', () => {

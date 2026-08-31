@@ -119,38 +119,33 @@ select:focus-visible {
   border-bottom: 1px solid rgba(255, 255, 255, 0.09);
 }
 
-.brand__name,
-.brand__company,
 .brand__product {
   display: block;
 }
 
-.brand__name {
-  color: #ffffff;
-  font-family: var(--font-body);
-  font-size: 1.12rem;
-  font-weight: 800;
-  letter-spacing: 0.075em;
-  line-height: 1.1;
+.brand__home {
+  display: flex;
+  min-height: 49px;
+  align-items: center;
+  text-decoration: none;
 }
 
-.brand__company {
-  margin-top: 3px;
-  color: #c7c7c7;
-  font-size: 0.59rem;
-  font-weight: 600;
-  letter-spacing: 0.085em;
-  line-height: 1.3;
+.brand__logo {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-width: 212px;
+  object-fit: contain;
+  object-position: left center;
 }
 
 .brand__product {
-  margin-top: 12px;
-  padding-top: 9px;
-  border-top: 2px solid var(--brand-primary);
+  margin-top: 11px;
+  padding: 0 2px;
   color: #ffffff;
-  font-size: 0.67rem;
-  font-weight: 400;
-  letter-spacing: 0.015em;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
   line-height: 1.35;
 }
 
