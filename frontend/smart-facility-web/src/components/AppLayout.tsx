@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react'
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
-import gursanLogo from '../assets/branding/gursan-logo-light.png'
+import gursanLogo from '../assets/branding/gursan-logo-red-white.png'
 
 type NavigationIcon = 'overview' | 'assets' | 'orders' | 'priority' | 'warning' | 'scada' | 'quality'
 

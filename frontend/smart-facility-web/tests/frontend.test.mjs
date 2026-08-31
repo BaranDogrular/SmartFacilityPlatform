@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import { after, test } from 'node:test'
 import React from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
@@ -808,9 +809,19 @@ test('early warning navigation is exposed independently from inspection priority
   assert.match(html, /Veri ve denetim/)
   assert.match(html, /sidebar-link__icon/)
   assert.match(html, /alt="Gürsan Teknik Hizmetler"/)
-  assert.match(html, /gursan-logo-light\.png/)
+  assert.match(html, /gursan-logo-red-white\.png/)
   assert.doesNotMatch(html, /brand__logo-surface/)
   assert.match(html, /Bakım &amp; Güvenilirlik/)
+})
+
+test('official local Gürsan symbol favicons are configured without a runtime hotlink', () => {
+  const indexHtml = readFileSync(new URL('../index.html', import.meta.url), 'utf8')
+
+  assert.match(indexHtml, /href="\/favicon\.ico\?v=2"/)
+  assert.match(indexHtml, /href="\/favicon-48x48\.png\?v=2"/)
+  assert.match(indexHtml, /href="\/favicon-32x32\.png\?v=2"/)
+  assert.match(indexHtml, /href="\/favicon-16x16\.png\?v=2"/)
+  assert.doesNotMatch(indexHtml, /gursanteknik\.com/)
 })
 
 test('work-order filters and reset control are present with exact raw options', () => {
