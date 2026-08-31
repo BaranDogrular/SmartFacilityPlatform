@@ -40,6 +40,11 @@ export function InspectionPriorityPage() {
   }
 
   const { metadata, items } = priority.data
+  const visibleLevelCounts = {
+    high: items.filter((item) => item.priorityLevel === 'HIGH').length,
+    medium: items.filter((item) => item.priorityLevel === 'MEDIUM').length,
+    low: items.filter((item) => item.priorityLevel === 'LOW').length,
+  }
 
   return (
     <div className="page-stack page-stack--inspection-priority">
@@ -56,6 +61,10 @@ export function InspectionPriorityPage() {
       </InfoNote>
 
       <form className="filter-panel" onSubmit={applyFilters} aria-label="İnceleme önceliği filtreleri">
+        <header className="filter-panel__header">
+          <div><span>Analiz kapsamı</span><strong>Öncelik filtresi</strong></div>
+          <small>Tarih ve sonuç sayısını seçin</small>
+        </header>
         <div className="filter-grid filter-grid--inspection-priority">
           <label>
             <span>Analiz tarihi</span>
@@ -97,6 +106,23 @@ export function InspectionPriorityPage() {
         <KpiCard label="Dışlanan Unlinked" value={metadata.excludedUnlinkedWorkOrders} tone="amber" />
         <KpiCard label="Asset Linkage Coverage" value={formatPercent(metadata.coveragePercent)} tone="slate" />
         <KpiCard label="Analiz Tarihi" value={metadata.asOf ? formatDate(metadata.asOf) : '—'} tone="slate" />
+      </section>
+
+      <section className="signal-summary signal-summary--priority" aria-label="Görünen öncelik seviyeleri">
+        <div className="signal-summary__intro">
+          <span>Görünen sonuçlar</span>
+          <strong>Öncelik dağılımı</strong>
+          <small>Seçili Top-{metadata.appliedTop} kapsamı</small>
+        </div>
+        <div className="signal-summary__metric signal-summary__metric--high">
+          <span>HIGH</span><strong>{formatCount(visibleLevelCounts.high)}</strong><small>Öncelikli inceleme</small>
+        </div>
+        <div className="signal-summary__metric signal-summary__metric--medium">
+          <span>MEDIUM</span><strong>{formatCount(visibleLevelCounts.medium)}</strong><small>Yakın izleme</small>
+        </div>
+        <div className="signal-summary__metric signal-summary__metric--low">
+          <span>LOW</span><strong>{formatCount(visibleLevelCounts.low)}</strong><small>Düşük öncelik</small>
+        </div>
       </section>
 
       {items.length === 0 ? (

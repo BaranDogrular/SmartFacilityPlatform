@@ -54,7 +54,10 @@ function HistoricalInterventionPanel({
   if (intervention.quality === 'NO_ACTION') {
     return (
       <section className="similar-case-intervention" aria-label="Geçmiş vakada yapılan işlem">
-        <h3>Geçmiş Vakada Yapılan İşlem</h3>
+        <div className="similar-case-intervention__heading">
+          <h3>Geçmiş Vakada Yapılan İşlem</h3>
+          <span>Kayıt kalitesi: İşlem yok</span>
+        </div>
         <p className="similar-case-intervention__empty">
           Bu geçmiş kayıt için anlamlı müdahale açıklaması bulunmuyor.
         </p>
@@ -66,9 +69,11 @@ function HistoricalInterventionPanel({
     <section className="similar-case-intervention" aria-label="Geçmiş vakada yapılan işlem">
       <div className="similar-case-intervention__heading">
         <h3>Geçmiş Vakada Yapılan İşlem</h3>
-        {intervention.quality === 'GENERIC' ? (
-          <span>Kayıt kalitesi: Genel</span>
-        ) : null}
+        <span>
+          {intervention.quality === 'GENERIC'
+            ? 'Kayıt kalitesi: Genel'
+            : 'Kayıt kalitesi: Bilgilendirici'}
+        </span>
       </div>
       <p className="similar-case-intervention__action">
         {intervention.workPerformedDescription ?? 'Müdahale açıklaması bulunmuyor.'}
@@ -144,11 +149,20 @@ export function SimilarCasesPage() {
         Bu bölüm çözüm önerisi veya otomatik bakım talimatı değildir. Benzerlik yüzdesi olasılık ya da model güven skoru değildir.
       </InfoNote>
 
-      <section className="similar-cases-target" aria-label="Seçilen canonical iş emri">
-        <div><span>WorkOrder ID</span><strong>{metadata.targetWorkOrderId}</strong></div>
-        <div><span>Varlık</span><strong>{metadata.targetAsset.assetCode ?? 'Bağlı değil'}</strong><small>{metadata.targetAsset.assetName}</small></div>
-        <div><span>Disiplin</span><strong>{metadata.targetDiscipline ?? '—'}</strong></div>
-        <div><span>Bildirim tarihi</span><strong>{formatDateTime(metadata.targetReportedDateTime)}</strong></div>
+      <section className="current-work-order-panel" aria-labelledby="current-work-order-title">
+        <header>
+          <div>
+            <p className="page-eyebrow">Analiz hedefi</p>
+            <h2 id="current-work-order-title">Seçilen İş Emri</h2>
+          </div>
+          <span className="code-chip">Canonical WorkOrder</span>
+        </header>
+        <div className="similar-cases-target" aria-label="Seçilen canonical iş emri">
+          <div><span>WorkOrder ID</span><strong>{metadata.targetWorkOrderId}</strong></div>
+          <div><span>Varlık</span><strong>{metadata.targetAsset.assetCode ?? 'Bağlı değil'}</strong><small>{metadata.targetAsset.assetName}</small></div>
+          <div><span>Disiplin</span><strong>{metadata.targetDiscipline ?? '—'}</strong></div>
+          <div><span>Bildirim tarihi</span><strong>{formatDateTime(metadata.targetReportedDateTime)}</strong></div>
+        </div>
       </section>
 
       <form className="filter-panel similar-cases-filter" onSubmit={applyTop} aria-label="Benzer vaka filtreleri">
@@ -178,8 +192,17 @@ export function SimilarCasesPage() {
       {items.length === 0 ? (
         <EmptyState message={availabilityMessage(metadata.availabilityMessage)} />
       ) : (
-        <section className="similar-cases-results" aria-label="Benzer geçmiş vaka sonuçları">
-          {items.map((item) => (
+        <section className="similar-cases-result-section" aria-labelledby="similar-cases-results-title">
+          <header className="similar-cases-result-section__header">
+            <div>
+              <p className="page-eyebrow">Geçmiş vaka kanıtı</p>
+              <h2 id="similar-cases-results-title">Benzer Geçmiş Vaka Sonuçları</h2>
+              <p>Yalnız hedef iş emrinden önceki canonical kayıtlar listelenir.</p>
+            </div>
+            <span>{formatCount(metadata.returnedCount)} vaka</span>
+          </header>
+          <div className="similar-cases-results">
+            {items.map((item) => (
             <article className="similar-case-card" key={item.workOrderId}>
               <header>
                 <div>
@@ -200,7 +223,8 @@ export function SimilarCasesPage() {
                 {item.similarityReasons.map((reason) => <span key={reason}>{reason}</span>)}
               </div>
             </article>
-          ))}
+            ))}
+          </div>
         </section>
       )}
 

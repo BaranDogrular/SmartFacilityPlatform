@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { Link } from 'react-router-dom'
 import type { KpiReliability } from '../api/analyticsTypes'
 import { formatCount, getErrorMessage } from '../utils/format'
 
@@ -19,6 +20,60 @@ export function PageHeader({ eyebrow, title, description, actions }: PageHeaderP
       </div>
       {actions ? <div className="page-actions">{actions}</div> : null}
     </header>
+  )
+}
+
+interface SectionHeaderProps {
+  eyebrow?: string
+  title: string
+  description?: string
+  actions?: ReactNode
+}
+
+export function SectionHeader({ eyebrow, title, description, actions }: SectionHeaderProps) {
+  return (
+    <header className="section-header">
+      <div>
+        {eyebrow ? <p className="page-eyebrow">{eyebrow}</p> : null}
+        <h2>{title}</h2>
+        {description ? <p>{description}</p> : null}
+      </div>
+      {actions ? <div className="section-header__actions">{actions}</div> : null}
+    </header>
+  )
+}
+
+interface DecisionSupportCardProps {
+  eyebrow: string
+  title: string
+  description: string
+  to: string
+  actionLabel: string
+  tone: 'red' | 'amber' | 'slate'
+  icon: ReactNode
+}
+
+export function DecisionSupportCard({
+  eyebrow,
+  title,
+  description,
+  to,
+  actionLabel,
+  tone,
+  icon,
+}: DecisionSupportCardProps) {
+  return (
+    <article className={`decision-card decision-card--${tone}`}>
+      <div className="decision-card__icon" aria-hidden="true">{icon}</div>
+      <div className="decision-card__body">
+        <span className="decision-card__eyebrow">{eyebrow}</span>
+        <h3>{title}</h3>
+        <p>{description}</p>
+      </div>
+      <Link className="decision-card__link" to={to}>
+        {actionLabel}<span aria-hidden="true">→</span>
+      </Link>
+    </article>
   )
 }
 

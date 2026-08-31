@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import { ChartPanel, HorizontalBarChart } from '../components/AnalyticsCharts'
 import {
   DataTimestamp,
+  DecisionSupportCard,
   EmptyState,
   ErrorState,
   InfoNote,
@@ -9,6 +10,7 @@ import {
   LoadingState,
   PageHeader,
   ReliabilityBadge,
+  SectionHeader,
 } from '../components/DashboardUi'
 import { useAssetOverview, useImportQualityOverview, useScadaOverview, useWorkOrderOverview } from '../hooks/useAnalytics'
 import { formatCount } from '../utils/format'
@@ -21,6 +23,18 @@ function OperationalMetric({ label, value, note }: { label: string; value: numbe
       {note ? <small>{note}</small> : null}
     </div>
   )
+}
+
+function DecisionGlyph({ type }: { type: 'priority' | 'warning' | 'cases' }) {
+  if (type === 'priority') {
+    return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7"><circle cx="12" cy="12" r="8" /><circle cx="12" cy="12" r="3" /><path d="M12 2v3M22 12h-3M12 22v-3M2 12h3" /></svg>
+  }
+
+  if (type === 'warning') {
+    return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7"><path d="M4 18h16M6 15l4-4 3 2 5-7" /><circle cx="18" cy="6" r="2" /></svg>
+  }
+
+  return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7"><path d="M7 3h10v4H7zM5 5v16h14V5" /><path d="M8 12h8M8 16h5" /><circle cx="17.5" cy="17.5" r="3.5" /></svg>
 }
 
 export function OverviewPage() {
@@ -155,6 +169,43 @@ export function OverviewPage() {
               <span>Toplam canonical kayıt <strong>{formatCount(workOrders.data.totalWorkOrders)}</strong></span>
             </div>
           </ChartPanel>
+        </div>
+      </section>
+
+      <section className="overview-section" aria-label="Karar destek modülleri">
+        <SectionHeader
+          eyebrow="Açıklanabilir operasyon karar desteği"
+          title="Karar Destek Modülleri"
+          description="Canonical bakım kayıtlarından üretilen üç ayrı operasyon sorusuna güvenli ve izlenebilir yanıtlar."
+        />
+        <div className="decision-support-grid">
+          <DecisionSupportCard
+            eyebrow="Önceliklendirme sinyali"
+            title="İnceleme Önceliği"
+            description="Risk ve bakım yoğunluğuna göre önce incelenmesi gereken varlıkları belirleyin."
+            to="/inspection-priority"
+            actionLabel="Öncelik listesini aç"
+            tone="red"
+            icon={<DecisionGlyph type="priority" />}
+          />
+          <DecisionSupportCard
+            eyebrow="Davranış sapması"
+            title="Erken Uyarı"
+            description="Varlıkların kendi normal davranışlarından anlamlı sapmaları takip edin."
+            to="/early-warning"
+            actionLabel="Sapmaları incele"
+            tone="amber"
+            icon={<DecisionGlyph type="warning" />}
+          />
+          <DecisionSupportCard
+            eyebrow="Geçmiş vaka kanıtı"
+            title="Benzer Geçmiş Vakalar"
+            description="İş emirlerine benzeyen geçmiş vakaları ve gerçekleştirilen müdahaleleri inceleyin."
+            to="/work-orders"
+            actionLabel="İş emri seç"
+            tone="slate"
+            icon={<DecisionGlyph type="cases" />}
+          />
         </div>
       </section>
 

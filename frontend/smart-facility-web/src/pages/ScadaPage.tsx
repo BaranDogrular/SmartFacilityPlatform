@@ -58,7 +58,7 @@ export function ScadaPage() {
   const data = overview.data
 
   return (
-    <div className="page-stack">
+    <div className="page-stack page-stack--scada">
       <PageHeader
         eyebrow="SCADA kaynak kayıtları"
         title="SCADA Operasyon Görünümü"
@@ -67,6 +67,10 @@ export function ScadaPage() {
       />
 
       <form className="filter-panel" onSubmit={applyFilters} aria-label="SCADA filtreleri">
+        <header className="filter-panel__header">
+          <div><span>Occurrence kapsamı</span><strong>SCADA filtreleri</strong></div>
+          <small>Tarih ve kaynak sayfa</small>
+        </header>
         <div className="filter-grid filter-grid--three">
           <label>
             <span>Başlangıç tarihi</span>

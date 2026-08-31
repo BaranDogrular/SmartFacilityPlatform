@@ -78,6 +78,14 @@ export function HorizontalBarChart({
     plugins: {
       legend: { display: false },
       tooltip: {
+        backgroundColor: '#202124',
+        borderColor: '#42454a',
+        borderWidth: 1,
+        cornerRadius: 5,
+        displayColors: false,
+        padding: 10,
+        titleFont: { family: chartFontFamily, size: 11, weight: 600 },
+        bodyFont: { family: chartFontFamily, size: 11 },
         callbacks: {
           label: (context) => formatCount(Number(context.raw)),
         },
@@ -146,6 +154,14 @@ export function TrendLineChart({ points }: { points: TrendPoint[] }) {
     plugins: {
       legend: { display: false },
       tooltip: {
+        backgroundColor: '#202124',
+        borderColor: '#42454a',
+        borderWidth: 1,
+        cornerRadius: 5,
+        displayColors: false,
+        padding: 10,
+        titleFont: { family: chartFontFamily, size: 11, weight: 600 },
+        bodyFont: { family: chartFontFamily, size: 11 },
         callbacks: {
           label: (context) => formatCount(Number(context.raw)),
         },

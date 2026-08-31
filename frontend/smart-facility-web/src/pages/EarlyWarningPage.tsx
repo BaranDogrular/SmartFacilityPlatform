@@ -40,6 +40,12 @@ export function EarlyWarningPage() {
   }
 
   const { metadata, items } = warning.data
+  const visibleLevelCounts = {
+    high: items.filter((item) => item.warningLevel === 'HIGH').length,
+    medium: items.filter((item) => item.warningLevel === 'MEDIUM').length,
+    normal: items.filter((item) => item.warningLevel === 'NORMAL').length,
+    insufficient: items.filter((item) => item.baselineStatus === 'INSUFFICIENT_BASELINE').length,
+  }
 
   return (
     <div className="page-stack page-stack--early-warning">
@@ -56,6 +62,10 @@ export function EarlyWarningPage() {
       </InfoNote>
 
       <form className="filter-panel" onSubmit={applyFilters} aria-label="Erken uyarı filtreleri">
+        <header className="filter-panel__header">
+          <div><span>Analiz kapsamı</span><strong>Sapma filtresi</strong></div>
+          <small>Tarih ve sonuç sayısını seçin</small>
+        </header>
         <div className="filter-grid filter-grid--early-warning">
           <label>
             <span>Analiz tarihi</span>
@@ -97,6 +107,26 @@ export function EarlyWarningPage() {
         <KpiCard label="Baseline Yetersiz" value={metadata.insufficientBaselineAssets} tone="amber" />
         <KpiCard label="Asset Linkage Coverage" value={formatPercent(metadata.coveragePercent)} tone="slate" />
         <KpiCard label="Analiz Tarihi" value={metadata.asOf ? formatDate(metadata.asOf) : '—'} tone="slate" />
+      </section>
+
+      <section className="signal-summary signal-summary--warning" aria-label="Görünen erken uyarı seviyeleri">
+        <div className="signal-summary__intro">
+          <span>Görünen sonuçlar</span>
+          <strong>Uyarı dağılımı</strong>
+          <small>Seçili Top-{metadata.appliedTop} kapsamı</small>
+        </div>
+        <div className="signal-summary__metric signal-summary__metric--high">
+          <span>HIGH</span><strong>{formatCount(visibleLevelCounts.high)}</strong><small>Yüksek sapma</small>
+        </div>
+        <div className="signal-summary__metric signal-summary__metric--medium">
+          <span>MEDIUM</span><strong>{formatCount(visibleLevelCounts.medium)}</strong><small>İzle</small>
+        </div>
+        <div className="signal-summary__metric signal-summary__metric--normal">
+          <span>NORMAL</span><strong>{formatCount(visibleLevelCounts.normal)}</strong><small>Normal davranış</small>
+        </div>
+        <div className="signal-summary__metric signal-summary__metric--insufficient">
+          <span>YETERSİZ</span><strong>{formatCount(visibleLevelCounts.insufficient)}</strong><small>Baseline yok</small>
+        </div>
       </section>
 
       {items.length === 0 ? (

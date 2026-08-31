@@ -75,7 +75,7 @@ export function WorkOrdersPage() {
   const data = overview.data
 
   return (
-    <div className="page-stack">
+    <div className="page-stack page-stack--work-orders">
       <PageHeader
         eyebrow="Canonical iş emri verisi"
         title="İş Emirleri"
@@ -85,6 +85,10 @@ export function WorkOrdersPage() {
 
       <section className="dataset-section" aria-label="Canonical iş emri veri seti">
       <form className="filter-panel" onSubmit={applyFilters} aria-label="İş emri filtreleri">
+        <header className="filter-panel__header">
+          <div><span>Canonical kapsam</span><strong>İş emri filtreleri</strong></div>
+          <small>Tarih, disiplin ve workflow statüsü</small>
+        </header>
         <div className="filter-grid">
           <label>
             <span>Başlangıç tarihi</span>
@@ -202,7 +206,7 @@ export function WorkOrdersPage() {
               placeholder="Örn. 54838"
             />
           </label>
-          <button className="btn btn-primary" type="submit">Benzer vakaları aç</button>
+          <button className="btn btn-primary" type="submit">Benzer Vakaları Gör</button>
         </form>
         {similarCaseError ? <p className="filter-error" role="alert">{similarCaseError}</p> : null}
         <InfoNote>
