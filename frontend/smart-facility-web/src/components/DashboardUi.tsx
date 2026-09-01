@@ -109,11 +109,18 @@ export function KpiCard({
 interface ReliabilityBadgeProps {
   reliability: KpiReliability
   compact?: boolean
+  localized?: boolean
 }
 
-export function ReliabilityBadge({ reliability, compact = false }: ReliabilityBadgeProps) {
+export function ReliabilityBadge({
+  reliability,
+  compact = false,
+  localized = false,
+}: ReliabilityBadgeProps) {
   const isYellow = reliability === 'Yellow'
-  const label = isYellow ? 'YELLOW · Veri kalitesi notu' : 'GREEN · Doğrulanmış metrik'
+  const label = localized
+    ? (isYellow ? 'VERİ KALİTESİ NOTU' : 'DOĞRULANMIŞ')
+    : (isYellow ? 'YELLOW · Veri kalitesi notu' : 'GREEN · Doğrulanmış metrik')
   const detail = isYellow
     ? 'Bu gösterge kaynak veri kapsamı veya eşleştirme kalitesi nedeniyle dikkatle yorumlanmalıdır.'
     : 'Bu gösterge doğrulanmış production veri sözleşmesini kullanır.'

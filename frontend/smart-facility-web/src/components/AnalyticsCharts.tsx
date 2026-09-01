@@ -35,10 +35,17 @@ interface ChartPanelProps {
   title: string
   subtitle?: string
   reliability?: KpiReliability
+  localizedReliability?: boolean
   children: React.ReactNode
 }
 
-export function ChartPanel({ title, subtitle, reliability, children }: ChartPanelProps) {
+export function ChartPanel({
+  title,
+  subtitle,
+  reliability,
+  localizedReliability = false,
+  children,
+}: ChartPanelProps) {
   return (
     <section className="chart-panel">
       <header className="chart-panel__header">
@@ -46,7 +53,9 @@ export function ChartPanel({ title, subtitle, reliability, children }: ChartPane
           <h2>{title}</h2>
           {subtitle ? <p>{subtitle}</p> : null}
         </div>
-        {reliability ? <ReliabilityBadge reliability={reliability} /> : null}
+        {reliability ? (
+          <ReliabilityBadge reliability={reliability} localized={localizedReliability} />
+        ) : null}
       </header>
       {children}
     </section>
@@ -142,7 +151,23 @@ export function HorizontalBarChart({
   )
 }
 
-export function TrendLineChart({ points }: { points: TrendPoint[] }) {
+const fullMonthFormatter = new Intl.DateTimeFormat('tr-TR', {
+  month: 'long',
+  year: 'numeric',
+})
+
+function formatFullMonth(value: string): string {
+  const date = new Date(`${value.slice(0, 10)}T00:00:00`)
+  return Number.isNaN(date.getTime()) ? value : fullMonthFormatter.format(date)
+}
+
+export function TrendLineChart({
+  points,
+  reduceTickDensity = false,
+}: {
+  points: TrendPoint[]
+  reduceTickDensity?: boolean
+}) {
   if (points.length === 0) {
     return <EmptyState />
   }
@@ -163,6 +188,12 @@ export function TrendLineChart({ points }: { points: TrendPoint[] }) {
         titleFont: { family: chartFontFamily, size: 11, weight: 600 },
         bodyFont: { family: chartFontFamily, size: 11 },
         callbacks: {
+          title: reduceTickDensity
+            ? (items) => {
+                const dataIndex = items[0]?.dataIndex
+                return dataIndex === undefined ? '' : formatFullMonth(points[dataIndex].period)
+              }
+            : undefined,
           label: (context) => formatCount(Number(context.raw)),
         },
       },
@@ -171,7 +202,17 @@ export function TrendLineChart({ points }: { points: TrendPoint[] }) {
       x: {
         border: { display: false },
         grid: { display: false },
-        ticks: { color: '#595858', font: { family: chartFontFamily, size: 10 } },
+        ticks: reduceTickDensity
+          ? {
+              autoSkip: true,
+              autoSkipPadding: 18,
+              maxRotation: 0,
+              minRotation: 0,
+              maxTicksLimit: 14,
+              color: '#595858',
+              font: { family: chartFontFamily, size: 10 },
+            }
+          : { color: '#595858', font: { family: chartFontFamily, size: 10 } },
       },
       y: {
         beginAtZero: true,

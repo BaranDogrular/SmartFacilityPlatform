@@ -785,11 +785,16 @@ test('Asset 360 route, typed client and hook use canonical numeric AssetId witho
   const typesSource = readFileSync(new URL('../src/api/analyticsTypes.ts', import.meta.url), 'utf8')
   const hooksSource = readFileSync(new URL('../src/hooks/useAnalytics.ts', import.meta.url), 'utf8')
   const pageSource = readFileSync(new URL('../src/pages/Asset360Page.tsx', import.meta.url), 'utf8')
+  const chartSource = readFileSync(new URL('../src/components/AnalyticsCharts.tsx', import.meta.url), 'utf8')
+  const styleSource = readFileSync(new URL('../src/index.css', import.meta.url), 'utf8')
 
   assert.match(appSource, /path="assets\/:assetId"/)
   assert.match(clientSource, /getAsset360Summary/)
   assert.match(clientSource, /\/api\/analytics\/assets\/\$\{assetId\}\/summary/)
   assert.match(hooksSource, /\['analytics', 'assets', assetId, 'summary'\]/)
+  assert.match(chartSource, /reduceTickDensity[\s\S]*maxTicksLimit: 14/)
+  assert.match(chartSource, /formatFullMonth\(points\[dataIndex\]\.period\)/)
+  assert.match(styleSource, /\.kpi-grid--six \{[\s\S]*repeat\(3, minmax\(0, 1fr\)\)/)
   assert.doesNotMatch([clientSource, typesSource, hooksSource, pageSource].join('\n'), /\bany\b/)
 })
 
@@ -797,6 +802,7 @@ test('Asset 360 renders identity, KPIs, explainable decisions, trend and scope s
   const html = renderAsset360Page()
 
   assert.match(html, /Ana Soğutma Pompası/)
+  assert.match(html, /Varlık 360/)
   assert.match(html, /A-360/)
   assert.match(html, /A Blok → Mekanik Oda → Mekanik/)
   assert.match(html, /Toplam İş Emri/)
@@ -805,21 +811,32 @@ test('Asset 360 renders identity, KPIs, explainable decisions, trend and scope s
   assert.match(html, /Son 30 Gün/)
   assert.match(html, /Son 90 Gün/)
   assert.match(html, /24 Ağu 2026/)
-  assert.match(html, /HIGH · Öncelikli inceleme/)
+  assert.match(html, /YÜKSEK · Öncelikli inceleme/)
   assert.match(html, /62,5/)
   assert.match(html, /Son 30 günde 8 iş emri/)
   assert.match(html, /arıza olasılığı değildir/)
-  assert.match(html, /MEDIUM · İzle/)
+  assert.match(html, /ORTA · İzle/)
   assert.match(html, /48,75/)
   assert.match(html, /Median \/ MAD/)
   assert.match(html, /Puan katkıları/)
-  assert.match(html, /Aylık Canonical İş Emri Trendi/)
-  assert.match(html, /YELLOW · Veri kalitesi notu/)
+  assert.match(html, /İnceleme Önceliği bakım iş yüküne göre hangi varlıklara önce bakılması gerektiğini/)
+  assert.match(html, /iki sonuç farklı seviyelerde olabilir/)
+  assert.match(html, /Aylık İş Emri Trendi/)
+  assert.match(html, /Yalnızca bu varlıkla doğrulanmış şekilde eşleşen güncel iş emirleri/)
+  assert.match(html, /DOĞRULANMIŞ/)
+  assert.match(html, /VERİ KALİTESİ NOTU/)
   assert.match(html, /162\.907/)
   assert.match(html, /8\.546/)
   assert.match(html, /95,02%/)
-  assert.match(html, /HistoricalWorkOrders current analytics ile birleştirilmez/)
+  assert.match(html, /Varlıkla eşleşen kayıt/)
+  assert.match(html, /Varlıkla eşleşmeyen kayıt/)
+  assert.match(html, /Eşleşme oranı/)
+  assert.match(html, /Doğrulanmış varlık ve güncel iş emri verileri/)
+  assert.match(html, /Eski tarihsel veri seti güncel analiz sonuçlarına dahil edilmez/)
   assert.match(html, /SCADA ve outage verileri gösterilmez/)
+  assert.match(html, /Varlık kaydındaki son bakım/)
+  assert.match(html, /Son kayıtlı iş emri/)
+  assert.doesNotMatch(html, />HIGH ·|>MEDIUM ·|>LOW ·|>GREEN ·|>YELLOW ·/)
   assert.doesNotMatch(html, /failure probability|predictive failure|health score|MTTR|raw intervention/i)
 })
 
@@ -867,7 +884,7 @@ test('Asset 360 preserves zero-activity and insufficient-baseline states', () =>
     },
   })
 
-  assert.match(html, /LOW · Düşük öncelik/)
+  assert.match(html, /DÜŞÜK · Düşük öncelik/)
   assert.match(html, /İnceleme önceliğini yükselten aktivite sinyali yok/)
   assert.match(html, /YETERSİZ GEÇMİŞ VERİ/)
   assert.match(html, /Yetersiz geçmiş veri/)
@@ -947,7 +964,7 @@ test('Asset 360 renders loading, retryable error, deterministic 404 and invalid-
     ),
   )
   assert.match(notFoundHtml, /Varlık bulunamadı/)
-  assert.match(notFoundHtml, /canonical varlık bulunamadı/)
+  assert.match(notFoundHtml, /doğrulanmış varlık bulunamadı/)
 
   const invalidHtml = renderToStaticMarkup(
     React.createElement(
@@ -963,7 +980,7 @@ test('Asset 360 renders loading, retryable error, deterministic 404 and invalid-
       ),
     ),
   )
-  assert.match(invalidHtml, /Geçerli bir canonical AssetId belirtilmedi/)
+  assert.match(invalidHtml, /Geçerli bir varlık kimliği belirtilmedi/)
 })
 
 test('inspection priority renders ranked signals, reasons, coverage and safe semantics', () => {

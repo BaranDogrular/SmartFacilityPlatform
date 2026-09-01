@@ -15,14 +15,14 @@ import { useAsset360Summary, useWorkOrderTrend } from '../hooks/useAnalytics'
 import { formatCount, formatDecimal, formatPercent } from '../utils/format'
 
 const priorityLabels: Record<InspectionPriorityLevel, string> = {
-  HIGH: 'HIGH · Öncelikli inceleme',
-  MEDIUM: 'MEDIUM · Yakın izleme',
-  LOW: 'LOW · Düşük öncelik',
+  HIGH: 'YÜKSEK · Öncelikli inceleme',
+  MEDIUM: 'ORTA · Yakın izleme',
+  LOW: 'DÜŞÜK · Düşük öncelik',
 }
 
 const warningLabels: Record<EarlyWarningLevel, string> = {
-  HIGH: 'HIGH · Yüksek sapma',
-  MEDIUM: 'MEDIUM · İzle',
+  HIGH: 'YÜKSEK · Yüksek sapma',
+  MEDIUM: 'ORTA · İzle',
   NORMAL: 'NORMAL · Beklenen aralık',
 }
 
@@ -37,7 +37,7 @@ export function Asset360Page() {
   )
 
   if (!hasValidAssetId) {
-    return <AssetNotFound message="Geçerli bir canonical AssetId belirtilmedi." />
+    return <AssetNotFound message="Geçerli bir varlık kimliği belirtilmedi." />
   }
 
   if (summary.isPending || trend.isPending) {
@@ -45,7 +45,7 @@ export function Asset360Page() {
   }
 
   if (summary.error instanceof AnalyticsApiError && summary.error.status === 404) {
-    return <AssetNotFound message="Bu kimlikle eşleşen canonical varlık bulunamadı." />
+    return <AssetNotFound message="Bu kimlikle eşleşen doğrulanmış varlık bulunamadı." />
   }
 
   if (summary.error) {
@@ -72,7 +72,7 @@ export function Asset360Page() {
   return (
     <div className="page-stack page-stack--asset360">
       <PageHeader
-        eyebrow="Canonical varlık görünümü"
+        eyebrow="Varlık 360"
         title={identity.assetName}
         description={`${identity.assetCode}${contextPath ? ` · ${contextPath}` : ''}`}
         actions={(
@@ -98,7 +98,7 @@ export function Asset360Page() {
           <IdentityField label="Durum" value={identity.status} />
           <IdentityField label="Seri numarası" value={identity.serialNumber} />
           <IdentityField
-            label="Kaynak son bakım tarihi"
+            label="Varlık kaydındaki son bakım"
             value={identity.lastMaintenanceDate ? formatDate(identity.lastMaintenanceDate) : null}
           />
           <div>
@@ -115,17 +115,26 @@ export function Asset360Page() {
       </section>
 
       <section className="kpi-grid kpi-grid--six" aria-label="Canonical bakım aktivitesi">
-        <KpiCard label="Toplam İş Emri" value={maintenance.totalWorkOrders} note="AssetId bağlı canonical kayıt" />
+        <KpiCard
+          label="Toplam İş Emri"
+          value={maintenance.totalWorkOrders}
+          note="Varlıkla eşleşen güncel iş emri kaydı"
+        />
         <KpiCard label="Açık İş Emri" value={maintenance.openWorkOrders} tone="amber" />
         <KpiCard label="Son 7 Gün" value={maintenance.last7Count} tone="teal" />
         <KpiCard label="Son 30 Gün" value={maintenance.last30Count} />
         <KpiCard label="Son 90 Gün" value={maintenance.last90Count} tone="slate" />
         <KpiCard
-          label="Son İş Emri Tarihi"
+          label="Son kayıtlı iş emri"
           value={maintenance.lastWorkOrderDate ? formatDate(maintenance.lastWorkOrderDate) : 'Bilgi bulunmuyor'}
           tone="slate"
         />
       </section>
+
+      <p className="asset360-decision-note">
+        İnceleme Önceliği bakım iş yüküne göre hangi varlıklara önce bakılması gerektiğini; Erken Uyarı ise
+        varlığın kendi tarihsel düzeninden sapıp sapmadığını gösterir. Bu nedenle iki sonuç farklı seviyelerde olabilir.
+      </p>
 
       <section className="asset360-decision-grid" aria-label="Açıklanabilir karar desteği">
         <article className="asset360-decision-card asset360-decision-card--priority">
@@ -199,11 +208,12 @@ export function Asset360Page() {
       </section>
 
       <ChartPanel
-        title="Aylık Canonical İş Emri Trendi"
-        subtitle="Yalnız bu varlığa AssetId ile bağlı canonical WorkOrder kayıtları"
+        title="Aylık İş Emri Trendi"
+        subtitle="Yalnızca bu varlıkla doğrulanmış şekilde eşleşen güncel iş emirleri"
         reliability={trend.data.metadata.reliability}
+        localizedReliability
       >
-        <TrendLineChart points={trend.data.points} />
+        <TrendLineChart points={trend.data.points} reduceTickDensity />
         <InfoNote>Trend, aktivite değişimini gösterir; arıza olasılığı veya nedensellik göstermez.</InfoNote>
       </ChartPanel>
 
@@ -213,18 +223,21 @@ export function Asset360Page() {
             <span>Veri kapsamı</span>
             <h2 id="asset360-scope-title">Bağlantı ve Güvenilirlik Notu</h2>
           </div>
-          <ReliabilityBadge reliability={data.scope.reliability} />
+          <ReliabilityBadge reliability={data.scope.reliability} localized />
         </header>
         <div className="asset360-scope__metrics">
-          <span>Bağlı canonical kayıt <strong>{formatCount(data.scope.linkedCanonicalWorkOrders)}</strong></span>
-          <span>Dışlanan unlinked kayıt <strong>{formatCount(data.scope.excludedUnlinkedCanonicalWorkOrders)}</strong></span>
-          <span>Linkage coverage <strong>{formatPercent(data.scope.linkageCoveragePercent)}</strong></span>
-          <span>Kaynak <strong>{data.scope.sourceDataset}</strong></span>
+          <span>Varlıkla eşleşen kayıt <strong>{formatCount(data.scope.linkedCanonicalWorkOrders)}</strong></span>
+          <span>Varlıkla eşleşmeyen kayıt <strong>{formatCount(data.scope.excludedUnlinkedCanonicalWorkOrders)}</strong></span>
+          <span>Eşleşme oranı <strong>{formatPercent(data.scope.linkageCoveragePercent)}</strong></span>
+          <span>
+            Kaynak
+            <strong title={data.scope.sourceDataset}>Doğrulanmış varlık ve güncel iş emri verileri</strong>
+          </span>
         </div>
         <ul>
-          <li>Asset-level sonuçlar yalnız AssetId bağlı canonical WorkOrders kullanır.</li>
-          <li>Unlinked canonical WorkOrders varlık hesaplarına dahil edilmez.</li>
-          <li>HistoricalWorkOrders current analytics ile birleştirilmez.</li>
+          <li>Varlık bazlı sonuçlar yalnızca doğrulanmış şekilde eşleşen güncel iş emirlerini kullanır.</li>
+          <li>Varlıkla eşleşmeyen iş emirleri varlık bazlı hesaplamalara dahil edilmez.</li>
+          <li>Eski tarihsel veri seti güncel analiz sonuçlarına dahil edilmez.</li>
           <li>Güvenilir asset bağlantısı olmadığı için SCADA ve outage verileri gösterilmez.</li>
         </ul>
       </section>
