@@ -4,6 +4,10 @@ namespace SmartFacility.Application.Analytics.Abstractions;
 
 public interface IAssetAnalyticsService
 {
+    Task<Asset360SummaryResponse?> GetAsset360SummaryAsync(
+        long assetId,
+        CancellationToken cancellationToken = default);
+
     Task<AssetOverviewResponse> GetOverviewAsync(
         AssetOverviewQuery query,
         CancellationToken cancellationToken = default);

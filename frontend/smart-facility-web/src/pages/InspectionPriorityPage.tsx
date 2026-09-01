@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react'
+import { Link } from 'react-router-dom'
 import type { InspectionPriorityLevel, InspectionPriorityQuery } from '../api/analyticsTypes'
 import { EmptyState, ErrorState, InfoNote, KpiCard, LoadingState, PageHeader } from '../components/DashboardUi'
 import { useInspectionPriority } from '../hooks/useAnalytics'
@@ -157,8 +158,14 @@ export function InspectionPriorityPage() {
                   <tr key={item.assetId}>
                     <td className="inspection-rank">{index + 1}</td>
                     <td className="inspection-asset">
-                      <strong>{item.assetCode}</strong>
-                      <span>{item.assetName}</span>
+                      <Link
+                        className="asset-detail-link"
+                        to={`/assets/${item.assetId}`}
+                        aria-label={`${item.assetCode} Asset 360 görünümünü aç`}
+                      >
+                        <strong>{item.assetCode}</strong>
+                        <span>{item.assetName}</span>
+                      </Link>
                     </td>
                     <td>
                       <span className={`priority-badge priority-badge--${item.priorityLevel.toLowerCase()}`}>

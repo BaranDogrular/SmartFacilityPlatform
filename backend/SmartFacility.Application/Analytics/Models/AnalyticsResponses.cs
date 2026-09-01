@@ -19,6 +19,94 @@ public sealed record AssetOverviewResponse(
     KpiReliability TopAssetsReliability,
     SnapshotAnalyticsMetadataDto Metadata);
 
+public sealed record Asset360ParentAssetDto(
+    long AssetId,
+    string AssetCode,
+    string AssetName);
+
+public sealed record Asset360IdentityDto(
+    long AssetId,
+    string AssetCode,
+    string AssetName,
+    string? AssetType,
+    string? Status,
+    long? BuildingId,
+    string? BuildingName,
+    long? LocationId,
+    string? LocationName,
+    long? AssetGroupId,
+    string? AssetGroupName,
+    Asset360ParentAssetDto? ParentAsset,
+    string? SerialNumber,
+    DateTime? LastMaintenanceDate);
+
+public sealed record Asset360MaintenanceSummaryDto(
+    long TotalWorkOrders,
+    long OpenWorkOrders,
+    long Last7Count,
+    long Last30Count,
+    long Last90Count,
+    DateTime? LastWorkOrderDate);
+
+public sealed record Asset360InspectionPriorityDto(
+    decimal Score,
+    InspectionPriorityLevel Level,
+    long Last7Count,
+    long Last30Count,
+    long Previous30Count,
+    long Last90Count,
+    long OpenCount,
+    long ActivityChange,
+    IReadOnlyList<string> Reasons,
+    InspectionPriorityAnalysisWindowDto? AnalysisWindow,
+    string ScoringVersion);
+
+public sealed record Asset360EarlyWarningComponentsDto(
+    decimal Acceleration,
+    decimal ShortTermSpike,
+    decimal HistoricalDeviation,
+    decimal RecurrenceBurst,
+    decimal OpenEmergence);
+
+public sealed record Asset360EarlyWarningDto(
+    decimal? Score,
+    EarlyWarningLevel? Level,
+    EarlyWarningBaselineStatus BaselineStatus,
+    long Last7Count,
+    long Previous7Count,
+    long Last30Count,
+    long Previous30Count,
+    long Last90Count,
+    long Previous90Count,
+    decimal? BaselineMedian,
+    decimal? BaselineMad,
+    int BaselineActiveMonths,
+    decimal? Deviation,
+    long OpenCount,
+    IReadOnlyList<string> Reasons,
+    Asset360EarlyWarningComponentsDto? Components,
+    EarlyWarningBaselineWindowDto? BaselineWindow,
+    string ScoringVersion);
+
+public sealed record Asset360ScopeDto(
+    KpiReliability Reliability,
+    long LinkedCanonicalWorkOrders,
+    long ExcludedUnlinkedCanonicalWorkOrders,
+    decimal LinkageCoveragePercent,
+    bool HistoricalWorkOrdersExcluded,
+    bool ScadaAndOutagesExcluded,
+    string SourceDataset,
+    IReadOnlyList<string> Notes);
+
+public sealed record Asset360SummaryResponse(
+    DateOnly? AsOf,
+    Asset360IdentityDto Identity,
+    Asset360MaintenanceSummaryDto Maintenance,
+    Asset360InspectionPriorityDto InspectionPriority,
+    Asset360EarlyWarningDto EarlyWarning,
+    Asset360ScopeDto Scope,
+    DateTimeOffset GeneratedAt);
+
 public sealed record AssetMaintenanceActivityParetoItemDto(
     long AssetId,
     string AssetCode,

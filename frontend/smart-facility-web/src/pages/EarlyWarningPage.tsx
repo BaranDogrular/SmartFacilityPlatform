@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react'
+import { Link } from 'react-router-dom'
 import type { EarlyWarningLevel, EarlyWarningQuery } from '../api/analyticsTypes'
 import { EmptyState, ErrorState, InfoNote, KpiCard, LoadingState, PageHeader } from '../components/DashboardUi'
 import { useEarlyWarning } from '../hooks/useAnalytics'
@@ -162,8 +163,14 @@ export function EarlyWarningPage() {
                   <tr key={item.assetId}>
                     <td className="early-warning-rank">{index + 1}</td>
                     <td className="early-warning-asset">
-                      <strong>{item.assetCode}</strong>
-                      <span>{item.assetName}</span>
+                      <Link
+                        className="asset-detail-link"
+                        to={`/assets/${item.assetId}`}
+                        aria-label={`${item.assetCode} Asset 360 görünümünü aç`}
+                      >
+                        <strong>{item.assetCode}</strong>
+                        <span>{item.assetName}</span>
+                      </Link>
                     </td>
                     <td>
                       {item.baselineStatus === 'INSUFFICIENT_BASELINE' || !item.warningLevel ? (

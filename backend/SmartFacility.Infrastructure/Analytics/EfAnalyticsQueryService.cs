@@ -85,6 +85,349 @@ public sealed class EfAnalyticsQueryService(SmartFacilityDbContext dbContext) :
 
     private readonly SmartFacilityDbContext _dbContext = dbContext;
 
+    public async Task<Asset360SummaryResponse?> GetAsset360SummaryAsync(
+        long assetId,
+        CancellationToken cancellationToken = default)
+    {
+        var asset = await _dbContext.Assets
+            .AsNoTracking()
+            .Where(item => item.Id == assetId)
+            .Select(item => new Asset360IdentityProjection(
+                item.Id,
+                item.AssetCode,
+                item.Name,
+                item.AssetType,
+                item.Status,
+                item.BuildingId,
+                item.Building == null ? null : item.Building.Name,
+                item.LocationId,
+                item.Location == null ? null : item.Location.Name,
+                item.AssetGroupId,
+                item.AssetGroup == null ? null : item.AssetGroup.Name,
+                item.ParentAssetId,
+                item.ParentAsset == null ? null : item.ParentAsset.AssetCode,
+                item.ParentAsset == null ? null : item.ParentAsset.Name,
+                item.SerialNumber,
+                item.LastMaintenanceDate))
+            .SingleOrDefaultAsync(cancellationToken);
+
+        if (asset is null)
+        {
+            return null;
+        }
+
+        var canonicalWorkOrders = _dbContext.WorkOrders
+            .AsNoTracking()
+            .Where(item => item.IsInCanonicalSnapshot);
+        var latestSourceDateTime = await canonicalWorkOrders
+            .Where(item => item.ReportedDateTime.HasValue)
+            .MaxAsync(item => (DateTime?)item.ReportedDateTime, cancellationToken);
+        DateOnly? asOf = latestSourceDateTime.HasValue
+            ? DateOnly.FromDateTime(latestSourceDateTime.Value)
+            : null;
+
+        var counts = await GetAsset360SignalCountsAsync(
+            canonicalWorkOrders,
+            assetId,
+            asOf,
+            cancellationToken);
+
+        var prioritySignals = new InspectionPrioritySignals(
+            counts.Last7Count,
+            counts.Last30Count,
+            counts.Previous30Count,
+            counts.Last90Count,
+            counts.ScoringOpenCount);
+        var priorityResult = InspectionPriorityScoring.Calculate(prioritySignals);
+
+        InspectionPriorityAnalysisWindowDto? priorityWindow = null;
+        EarlyWarningBaselineWindowDto? baselineWindow = null;
+        Asset360EarlyWarningDto earlyWarning;
+        InspectionPriorityCoverageProjection coverage;
+
+        if (!asOf.HasValue)
+        {
+            coverage = new InspectionPriorityCoverageProjection(0, 0);
+            earlyWarning = CreateAsset360InsufficientEarlyWarning(
+                counts,
+                0,
+                null,
+                "Erken uyarı baseline'ı için tarihli canonical WorkOrder bulunamadı");
+        }
+        else
+        {
+            var exclusiveEnd = asOf.Value.AddDays(1).ToDateTime(TimeOnly.MinValue);
+            var baselineEnd = new DateOnly(
+                exclusiveEnd.AddDays(-30).Year,
+                exclusiveEnd.AddDays(-30).Month,
+                1);
+            var baselineStart = baselineEnd.AddMonths(-EarlyWarningScoring.BaselineMonthCount);
+            var baselineStartDateTime = baselineStart.ToDateTime(TimeOnly.MinValue);
+            var baselineEndDateTime = baselineEnd.ToDateTime(TimeOnly.MinValue);
+
+            priorityWindow = new InspectionPriorityAnalysisWindowDto(
+                asOf.Value.AddDays(-6),
+                asOf.Value.AddDays(-29),
+                asOf.Value.AddDays(-59),
+                asOf.Value.AddDays(-30),
+                asOf.Value.AddDays(-89),
+                asOf.Value);
+            baselineWindow = new EarlyWarningBaselineWindowDto(
+                baselineStart,
+                baselineEnd.AddDays(-1),
+                EarlyWarningScoring.BaselineMonthCount,
+                EarlyWarningScoring.MinimumActiveMonths);
+
+            coverage = await canonicalWorkOrders
+                .Where(item => item.ReportedDateTime.HasValue
+                    && item.ReportedDateTime < exclusiveEnd)
+                .GroupBy(_ => 1)
+                .Select(group => new InspectionPriorityCoverageProjection(
+                    group.LongCount(item => item.AssetId.HasValue),
+                    group.LongCount(item => !item.AssetId.HasValue)))
+                .SingleOrDefaultAsync(cancellationToken)
+                ?? new InspectionPriorityCoverageProjection(0, 0);
+
+            var baselineMonthlyCounts = await canonicalWorkOrders
+                .Where(item => item.AssetId == assetId
+                    && item.ReportedDateTime.HasValue
+                    && item.ReportedDateTime >= baselineStartDateTime
+                    && item.ReportedDateTime < baselineEndDateTime)
+                .GroupBy(item => new
+                {
+                    Year = item.ReportedDateTime!.Value.Year,
+                    Month = item.ReportedDateTime.Value.Month
+                })
+                .Select(group => new Asset360MonthlyCountProjection(
+                    group.Key.Year,
+                    group.Key.Month,
+                    group.LongCount()))
+                .ToListAsync(cancellationToken);
+
+            var monthlyCounts = new long[EarlyWarningScoring.BaselineMonthCount];
+            foreach (var count in baselineMonthlyCounts)
+            {
+                var monthIndex = ((count.Year - baselineStart.Year) * 12)
+                    + count.Month
+                    - baselineStart.Month;
+                if (monthIndex >= 0 && monthIndex < monthlyCounts.Length)
+                {
+                    monthlyCounts[monthIndex] = count.Count;
+                }
+            }
+
+            var activeMonths = monthlyCounts.Count(count => count > 0);
+            if (activeMonths < EarlyWarningScoring.MinimumActiveMonths)
+            {
+                earlyWarning = CreateAsset360InsufficientEarlyWarning(
+                    counts,
+                    activeMonths,
+                    baselineWindow,
+                    $"12 aylık baseline içinde en az 6 aktif ay gerekir; {activeMonths} aktif ay bulundu");
+            }
+            else
+            {
+                var baselineMedian = EarlyWarningScoring.Median(monthlyCounts);
+                var baselineMad = EarlyWarningScoring.MedianAbsoluteDeviation(
+                    monthlyCounts,
+                    baselineMedian);
+                var earlyWarningResult = EarlyWarningScoring.Calculate(new EarlyWarningSignals(
+                    counts.Last7Count,
+                    counts.Previous7Count,
+                    counts.Last30Count,
+                    counts.Previous30Count,
+                    counts.Last90Count,
+                    counts.ScoringOpenCount,
+                    counts.BaselineOpenCount,
+                    baselineMedian,
+                    baselineMad));
+
+                earlyWarning = new Asset360EarlyWarningDto(
+                    earlyWarningResult.Score,
+                    earlyWarningResult.Level,
+                    EarlyWarningBaselineStatus.Sufficient,
+                    counts.Last7Count,
+                    counts.Previous7Count,
+                    counts.Last30Count,
+                    counts.Previous30Count,
+                    counts.Last90Count,
+                    counts.Previous90Count,
+                    baselineMedian,
+                    baselineMad,
+                    activeMonths,
+                    earlyWarningResult.Deviation,
+                    counts.ScoringOpenCount,
+                    earlyWarningResult.Reasons,
+                    new Asset360EarlyWarningComponentsDto(
+                        earlyWarningResult.Components.Acceleration,
+                        earlyWarningResult.Components.ShortTermSpike,
+                        earlyWarningResult.Components.HistoricalDeviation,
+                        earlyWarningResult.Components.RecurrenceBurst,
+                        earlyWarningResult.Components.OpenEmergence),
+                    baselineWindow,
+                    EarlyWarningScoring.Version);
+            }
+        }
+
+        var coverageDenominator = coverage.EligibleWorkOrders
+            + coverage.ExcludedUnlinkedWorkOrders;
+        return new Asset360SummaryResponse(
+            asOf,
+            new Asset360IdentityDto(
+                asset.AssetId,
+                asset.AssetCode,
+                asset.AssetName,
+                asset.AssetType,
+                asset.Status,
+                asset.BuildingId,
+                asset.BuildingName,
+                asset.LocationId,
+                asset.LocationName,
+                asset.AssetGroupId,
+                asset.AssetGroupName,
+                asset.ParentAssetId.HasValue
+                    && asset.ParentAssetCode is not null
+                    && asset.ParentAssetName is not null
+                    ? new Asset360ParentAssetDto(
+                        asset.ParentAssetId.Value,
+                        asset.ParentAssetCode,
+                        asset.ParentAssetName)
+                    : null,
+                asset.SerialNumber,
+                asset.LastMaintenanceDate),
+            new Asset360MaintenanceSummaryDto(
+                counts.TotalWorkOrders,
+                counts.OpenWorkOrders,
+                counts.Last7Count,
+                counts.Last30Count,
+                counts.Last90Count,
+                counts.LastWorkOrderDate),
+            new Asset360InspectionPriorityDto(
+                priorityResult.Score,
+                priorityResult.Level,
+                counts.Last7Count,
+                counts.Last30Count,
+                counts.Previous30Count,
+                counts.Last90Count,
+                counts.ScoringOpenCount,
+                priorityResult.ActivityChange,
+                priorityResult.Reasons,
+                priorityWindow,
+                InspectionPriorityScoring.Version),
+            earlyWarning,
+            new Asset360ScopeDto(
+                KpiReliability.Yellow,
+                coverage.EligibleWorkOrders,
+                coverage.ExcludedUnlinkedWorkOrders,
+                CalculatePercent(
+                    coverage.EligibleWorkOrders,
+                    coverageDenominator,
+                    4),
+                true,
+                true,
+                "core.Assets + core.WorkOrders",
+                [
+                    "Asset-level results use only linked canonical WorkOrders.",
+                    "Unlinked canonical WorkOrders are excluded from asset-level calculations.",
+                    "The legacy HistoricalWorkOrders dataset is not queried or combined.",
+                    "SCADA alarms and outages are excluded because no verified asset linkage exists."
+                ]),
+            DateTimeOffset.UtcNow);
+    }
+
+    private static async Task<Asset360SignalCountProjection> GetAsset360SignalCountsAsync(
+        IQueryable<WorkOrder> canonicalWorkOrders,
+        long assetId,
+        DateOnly? asOf,
+        CancellationToken cancellationToken)
+    {
+        if (!asOf.HasValue)
+        {
+            return await canonicalWorkOrders
+                .Where(item => item.AssetId == assetId)
+                .GroupBy(_ => 1)
+                .Select(group => new Asset360SignalCountProjection(
+                    group.LongCount(),
+                    group.LongCount(item => item.RawStatusCode == WorkOrderSourceState.Open),
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    group.Max(item => item.ReportedDateTime)))
+                .SingleOrDefaultAsync(cancellationToken)
+                ?? Asset360SignalCountProjection.Empty;
+        }
+
+        var exclusiveEnd = asOf.Value.AddDays(1).ToDateTime(TimeOnly.MinValue);
+        var last7Start = exclusiveEnd.AddDays(-7);
+        var previous7Start = exclusiveEnd.AddDays(-14);
+        var last30Start = exclusiveEnd.AddDays(-30);
+        var previous30Start = exclusiveEnd.AddDays(-60);
+        var last90Start = exclusiveEnd.AddDays(-90);
+        var previous90Start = exclusiveEnd.AddDays(-180);
+        var baselineEnd = new DateOnly(last30Start.Year, last30Start.Month, 1);
+        var baselineStart = baselineEnd.AddMonths(-EarlyWarningScoring.BaselineMonthCount);
+        var baselineStartDateTime = baselineStart.ToDateTime(TimeOnly.MinValue);
+        var baselineEndDateTime = baselineEnd.ToDateTime(TimeOnly.MinValue);
+
+        return await canonicalWorkOrders
+            .Where(item => item.AssetId == assetId)
+            .GroupBy(_ => 1)
+            .Select(group => new Asset360SignalCountProjection(
+                group.LongCount(),
+                group.LongCount(item => item.RawStatusCode == WorkOrderSourceState.Open),
+                group.LongCount(item => item.ReportedDateTime >= last7Start
+                    && item.ReportedDateTime < exclusiveEnd),
+                group.LongCount(item => item.ReportedDateTime >= previous7Start
+                    && item.ReportedDateTime < last7Start),
+                group.LongCount(item => item.ReportedDateTime >= last30Start
+                    && item.ReportedDateTime < exclusiveEnd),
+                group.LongCount(item => item.ReportedDateTime >= previous30Start
+                    && item.ReportedDateTime < last30Start),
+                group.LongCount(item => item.ReportedDateTime >= last90Start
+                    && item.ReportedDateTime < exclusiveEnd),
+                group.LongCount(item => item.ReportedDateTime >= previous90Start
+                    && item.ReportedDateTime < last90Start),
+                group.LongCount(item => item.ReportedDateTime.HasValue
+                    && item.ReportedDateTime < exclusiveEnd
+                    && item.RawStatusCode == WorkOrderSourceState.Open),
+                group.LongCount(item => item.ReportedDateTime >= baselineStartDateTime
+                    && item.ReportedDateTime < baselineEndDateTime
+                    && item.RawStatusCode == WorkOrderSourceState.Open),
+                group.Max(item => item.ReportedDateTime)))
+            .SingleOrDefaultAsync(cancellationToken)
+            ?? Asset360SignalCountProjection.Empty;
+    }
+
+    private static Asset360EarlyWarningDto CreateAsset360InsufficientEarlyWarning(
+        Asset360SignalCountProjection counts,
+        int activeMonths,
+        EarlyWarningBaselineWindowDto? baselineWindow,
+        string reason) =>
+        new(
+            null,
+            null,
+            EarlyWarningBaselineStatus.InsufficientBaseline,
+            counts.Last7Count,
+            counts.Previous7Count,
+            counts.Last30Count,
+            counts.Previous30Count,
+            counts.Last90Count,
+            counts.Previous90Count,
+            null,
+            null,
+            activeMonths,
+            null,
+            counts.ScoringOpenCount,
+            [reason],
+            null,
+            baselineWindow,
+            EarlyWarningScoring.Version);
+
     public async Task<AssetOverviewResponse> GetOverviewAsync(
         AssetOverviewQuery query,
         CancellationToken cancellationToken = default)
@@ -1745,6 +2088,46 @@ public sealed class EfAnalyticsQueryService(SmartFacilityDbContext dbContext) :
         long ValidRecordCount,
         DateTime? ActualMinDate,
         DateTime? ActualMaxDate);
+
+    private sealed record Asset360IdentityProjection(
+        long AssetId,
+        string AssetCode,
+        string AssetName,
+        string? AssetType,
+        string? Status,
+        long? BuildingId,
+        string? BuildingName,
+        long? LocationId,
+        string? LocationName,
+        long? AssetGroupId,
+        string? AssetGroupName,
+        long? ParentAssetId,
+        string? ParentAssetCode,
+        string? ParentAssetName,
+        string? SerialNumber,
+        DateTime? LastMaintenanceDate);
+
+    private sealed record Asset360SignalCountProjection(
+        long TotalWorkOrders,
+        long OpenWorkOrders,
+        long Last7Count,
+        long Previous7Count,
+        long Last30Count,
+        long Previous30Count,
+        long Last90Count,
+        long Previous90Count,
+        long ScoringOpenCount,
+        long BaselineOpenCount,
+        DateTime? LastWorkOrderDate)
+    {
+        public static Asset360SignalCountProjection Empty { get; } =
+            new(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, null);
+    }
+
+    private sealed record Asset360MonthlyCountProjection(
+        int Year,
+        int Month,
+        long Count);
 
     private sealed record InspectionPriorityCoverageProjection(
         long EligibleWorkOrders,

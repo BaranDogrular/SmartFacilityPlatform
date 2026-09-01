@@ -24,6 +24,12 @@ public static class AnalyticsEndpoints
             .Produces<AssetOverviewResponse>()
             .ProducesValidationProblem();
 
+        group.MapGet("/assets/{assetId:long}/summary", GetAsset360SummaryAsync)
+            .WithName("GetAsset360Summary")
+            .WithSummary("Returns a bounded canonical maintenance and decision-support summary for one asset.")
+            .Produces<Asset360SummaryResponse>()
+            .Produces<ProblemDetails>(StatusCodes.Status404NotFound);
+
         group.MapGet("/assets/maintenance-activity-pareto", GetAssetMaintenanceActivityParetoAsync)
             .WithName("GetAssetMaintenanceActivityPareto")
             .WithSummary("Returns the concentration of canonical work-order records by asset.")
@@ -105,6 +111,23 @@ public static class AnalyticsEndpoints
         }
 
         return TypedResults.Ok(await service.GetOverviewAsync(query, cancellationToken));
+    }
+
+    private static async Task<Results<Ok<Asset360SummaryResponse>, NotFound<ProblemDetails>>>
+        GetAsset360SummaryAsync(
+            long assetId,
+            IAssetAnalyticsService service,
+            CancellationToken cancellationToken)
+    {
+        var result = await service.GetAsset360SummaryAsync(assetId, cancellationToken);
+        return result is null
+            ? TypedResults.NotFound(new ProblemDetails
+            {
+                Status = StatusCodes.Status404NotFound,
+                Title = "Canonical asset not found.",
+                Detail = $"No canonical asset exists with Id {assetId}."
+            })
+            : TypedResults.Ok(result);
     }
 
     private static async Task<Results<Ok<AssetMaintenanceActivityParetoResponse>, ValidationProblem>>

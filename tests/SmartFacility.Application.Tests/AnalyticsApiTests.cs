@@ -18,6 +18,7 @@ public sealed class AnalyticsApiTests(AnalyticsApiFactory factory) :
     [Theory]
     [InlineData("/api/analytics/import-quality/overview")]
     [InlineData("/api/analytics/assets/overview")]
+    [InlineData("/api/analytics/assets/1/summary")]
     [InlineData("/api/analytics/assets/maintenance-activity-pareto")]
     [InlineData("/api/analytics/assets/inspection-priority")]
     [InlineData("/api/analytics/assets/early-warning")]
@@ -144,6 +145,34 @@ public sealed class AnalyticsApiTests(AnalyticsApiFactory factory) :
     }
 
     [Fact]
+    public async Task Asset_360_contract_is_typed_privacy_safe_and_returns_problem_details_for_unknown_asset()
+    {
+        using var response = await _client.GetAsync("/api/analytics/assets/1/summary");
+        var payload = await response.Content.ReadAsStringAsync();
+        using var document = JsonDocument.Parse(payload);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(1, document.RootElement.GetProperty("identity").GetProperty("assetId").GetInt64());
+        Assert.Equal("LOW", document.RootElement.GetProperty("inspectionPriority").GetProperty("level").GetString());
+        Assert.Equal(
+            "INSUFFICIENT_BASELINE",
+            document.RootElement.GetProperty("earlyWarning").GetProperty("baselineStatus").GetString());
+        Assert.Equal(
+            "Yellow",
+            document.RootElement.GetProperty("scope").GetProperty("reliability").GetString());
+        Assert.DoesNotContain("requestedByName", payload, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("assignedPersonnelName", payload, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("raw", payload, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("historicalIntervention", payload, StringComparison.OrdinalIgnoreCase);
+
+        using var missing = await _client.GetAsync("/api/analytics/assets/404/summary");
+        using var problem = JsonDocument.Parse(await missing.Content.ReadAsStreamAsync());
+        Assert.Equal(HttpStatusCode.NotFound, missing.StatusCode);
+        Assert.Equal(404, problem.RootElement.GetProperty("status").GetInt32());
+        Assert.Equal("Canonical asset not found.", problem.RootElement.GetProperty("title").GetString());
+    }
+
+    [Fact]
     public async Task Similar_cases_contract_serializes_mode_excludes_pii_and_returns_problem_details_for_missing_target()
     {
         using var response = await _client.GetAsync(
@@ -182,6 +211,7 @@ public sealed class AnalyticsApiTests(AnalyticsApiFactory factory) :
 
         Assert.Contains("/api/analytics/import-quality/overview", swagger, StringComparison.Ordinal);
         Assert.Contains("/api/analytics/assets/overview", swagger, StringComparison.Ordinal);
+        Assert.Contains("/api/analytics/assets/{assetId}/summary", swagger, StringComparison.Ordinal);
         Assert.Contains(
             "/api/analytics/assets/maintenance-activity-pareto",
             swagger,
@@ -250,6 +280,75 @@ internal sealed class FakeAnalyticsServices :
     IImportQualityAnalyticsService
 {
     private static readonly DateTimeOffset DataAsOf = new(2026, 8, 18, 0, 0, 0, TimeSpan.Zero);
+
+    public Task<Asset360SummaryResponse?> GetAsset360SummaryAsync(
+        long assetId,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult<Asset360SummaryResponse?>(assetId == 404
+            ? null
+            : new Asset360SummaryResponse(
+                new DateOnly(2026, 8, 25),
+                new Asset360IdentityDto(
+                    assetId,
+                    "A-1",
+                    "Asset",
+                    "Equipment",
+                    "In Use",
+                    1,
+                    "Building",
+                    1,
+                    "Location",
+                    1,
+                    "Group",
+                    null,
+                    null,
+                    null),
+                new Asset360MaintenanceSummaryDto(1, 0, 0, 1, 1, new DateTime(2026, 8, 20)),
+                new Asset360InspectionPriorityDto(
+                    10,
+                    InspectionPriorityLevel.Low,
+                    0,
+                    1,
+                    0,
+                    1,
+                    0,
+                    1,
+                    ["Son 30 günde 1 iş emri"],
+                    null,
+                    "inspection-priority/v1"),
+                new Asset360EarlyWarningDto(
+                    null,
+                    null,
+                    EarlyWarningBaselineStatus.InsufficientBaseline,
+                    0,
+                    0,
+                    1,
+                    0,
+                    1,
+                    0,
+                    null,
+                    null,
+                    1,
+                    null,
+                    0,
+                    ["Yetersiz geçmiş veri"],
+                    null,
+                    new EarlyWarningBaselineWindowDto(
+                        new DateOnly(2025, 7, 1),
+                        new DateOnly(2026, 6, 30),
+                        12,
+                        6),
+                    "early-warning/v1"),
+                new Asset360ScopeDto(
+                    KpiReliability.Yellow,
+                    1,
+                    0,
+                    100,
+                    true,
+                    true,
+                    "core.Assets + core.WorkOrders",
+                    []),
+                DataAsOf));
 
     public Task<AssetOverviewResponse> GetOverviewAsync(
         AssetOverviewQuery query,

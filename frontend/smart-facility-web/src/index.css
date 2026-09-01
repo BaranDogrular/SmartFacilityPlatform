@@ -415,6 +415,10 @@ select:focus-visible {
   grid-template-columns: repeat(5, minmax(0, 1fr));
 }
 
+.kpi-grid--six {
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+}
+
 .kpi-grid--one {
   grid-template-columns: minmax(220px, 320px);
 }
@@ -1982,6 +1986,256 @@ select:focus-visible {
   display: none;
 }
 
+.asset-detail-link {
+  color: inherit;
+  text-decoration: none;
+}
+
+.asset-detail-link:hover {
+  color: var(--brand-primary-dark);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.inspection-asset .asset-detail-link,
+.early-warning-asset .asset-detail-link {
+  display: grid;
+  gap: 2px;
+}
+
+.asset360-identity,
+.asset360-decision-card,
+.asset360-scope,
+.asset360-not-found {
+  min-width: 0;
+  padding: 18px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.asset360-identity > header,
+.asset360-decision-card > header,
+.asset360-scope > header {
+  display: flex;
+  min-width: 0;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.asset360-identity > header > div,
+.asset360-decision-card > header > div,
+.asset360-scope > header > div {
+  min-width: 0;
+}
+
+.asset360-identity h2,
+.asset360-decision-card h2,
+.asset360-scope h2,
+.asset360-not-found h1 {
+  margin: 5px 0 0;
+  color: var(--navy-900);
+  font-family: var(--font-heading);
+  font-size: 1.05rem;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.asset360-identity__grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1px;
+  margin: 16px 0 0;
+  overflow: hidden;
+  border: 1px solid var(--slate-200);
+  border-radius: 5px;
+  background: var(--slate-200);
+}
+
+.asset360-identity__grid > div {
+  min-width: 0;
+  padding: 11px 12px;
+  background: #ffffff;
+}
+
+.asset360-identity__grid dt,
+.asset360-signal-grid dt {
+  color: var(--slate-500);
+  font-size: 0.62rem;
+  font-weight: 600;
+}
+
+.asset360-identity__grid dd,
+.asset360-signal-grid dd {
+  margin: 4px 0 0;
+  overflow-wrap: anywhere;
+  color: var(--navy-900);
+  font-size: 0.73rem;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.asset360-decision-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.asset360-decision-card {
+  display: grid;
+  align-content: start;
+  gap: 16px;
+  border-top: 3px solid var(--brand-primary);
+}
+
+.asset360-decision-card--warning {
+  border-top-color: #bf811f;
+}
+
+.asset360-decision-card > header span:first-child,
+.asset360-scope > header span:first-child {
+  display: block;
+  color: var(--slate-500);
+  font-size: 0.61rem;
+  font-weight: 700;
+  letter-spacing: 0.045em;
+  text-transform: uppercase;
+}
+
+.asset360-score {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: 8px;
+  padding: 13px;
+  border-radius: 5px;
+  background: #f7f6f6;
+}
+
+.asset360-score strong {
+  color: var(--navy-900);
+  font-family: var(--font-heading);
+  font-size: 2rem;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.asset360-score span,
+.asset360-score small {
+  color: var(--slate-500);
+  font-size: 0.64rem;
+}
+
+.asset360-score small {
+  overflow-wrap: anywhere;
+  text-align: right;
+}
+
+.asset360-signal-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0;
+}
+
+.asset360-signal-grid > div {
+  min-width: 0;
+  padding: 9px;
+  border: 1px solid var(--slate-200);
+  border-radius: 4px;
+}
+
+.asset360-reasons h3 {
+  margin: 0 0 7px;
+  color: var(--navy-900);
+  font-family: var(--font-heading);
+  font-size: 0.78rem;
+}
+
+.asset360-reasons p,
+.asset360-reasons ul,
+.asset360-scope ul {
+  margin: 0;
+  color: var(--slate-500);
+  font-size: 0.69rem;
+  line-height: 1.55;
+}
+
+.asset360-reasons ul,
+.asset360-scope ul {
+  padding-left: 18px;
+}
+
+.asset360-reasons li,
+.asset360-scope li {
+  overflow-wrap: anywhere;
+}
+
+.asset360-components {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.asset360-components span,
+.asset360-components small {
+  padding: 4px 7px;
+  border-radius: 4px;
+  font-size: 0.61rem;
+}
+
+.asset360-components span {
+  color: var(--navy-900);
+  font-weight: 700;
+}
+
+.asset360-components small {
+  color: var(--slate-500);
+  background: #f3f2f2;
+}
+
+.asset360-scope {
+  display: grid;
+  gap: 14px;
+  border-left: 3px solid #bf811f;
+}
+
+.asset360-scope__metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.asset360-scope__metrics span {
+  min-width: 0;
+  padding: 9px;
+  border: 1px solid var(--slate-200);
+  border-radius: 4px;
+  color: var(--slate-500);
+  font-size: 0.64rem;
+  overflow-wrap: anywhere;
+}
+
+.asset360-scope__metrics strong {
+  display: block;
+  margin-top: 3px;
+  color: var(--navy-900);
+  font-size: 0.72rem;
+}
+
+.asset360-not-found {
+  max-width: 680px;
+}
+
+.asset360-not-found p:not(.page-eyebrow) {
+  margin: 8px 0 15px;
+  color: var(--slate-500);
+  font-size: 0.76rem;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .loading-spinner { animation-duration: 1.8s; }
   .sidebar-link { transition: none; }
@@ -1990,7 +2244,8 @@ select:focus-visible {
 @media (max-width: 1280px) {
   .kpi-grid,
   .kpi-grid--quality,
-  .kpi-grid--five {
+  .kpi-grid--five,
+  .kpi-grid--six {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
@@ -2051,6 +2306,9 @@ select:focus-visible {
   .similar-cases-results { grid-template-columns: 1fr; }
   .signal-summary,
   .signal-summary--warning { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .asset360-decision-grid { grid-template-columns: 1fr; }
+  .asset360-identity__grid,
+  .asset360-scope__metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 @media (max-width: 680px) {
@@ -2067,6 +2325,7 @@ select:focus-visible {
   .kpi-grid--three,
   .kpi-grid--quality,
   .kpi-grid--five,
+  .kpi-grid--six,
   .kpi-grid--one { grid-template-columns: 1fr; }
   .filter-grid,
   .filter-grid--three,
@@ -2092,6 +2351,18 @@ select:focus-visible {
   .similar-case-card dl { grid-template-columns: 1fr; }
   .signal-summary,
   .signal-summary--warning { grid-template-columns: 1fr; }
+  .asset360-identity,
+  .asset360-decision-card,
+  .asset360-scope,
+  .asset360-not-found { padding: 13px; }
+  .asset360-identity > header,
+  .asset360-decision-card > header,
+  .asset360-scope > header { flex-direction: column; }
+  .asset360-identity__grid,
+  .asset360-scope__metrics,
+  .asset360-signal-grid { grid-template-columns: 1fr; }
+  .asset360-score { grid-template-columns: auto minmax(0, 1fr); }
+  .asset360-score small { grid-column: 1 / -1; text-align: left; }
   .chart-canvas--line { height: 260px; }
   .operations-panel__metrics { grid-template-columns: 1fr; }
   .operational-metric,

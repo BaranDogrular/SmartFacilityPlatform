@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import {
   getAssetMaintenanceActivityPareto,
   getAssetOverview,
+  getAsset360Summary,
   getInspectionPriority,
   getEarlyWarning,
   getWorkOrderActivity,
@@ -31,6 +32,13 @@ export const useAssetOverview = (query: AssetOverviewQuery = {}) =>
     queryFn: () => getAssetOverview(query),
   })
 
+export const useAsset360Summary = (assetId: number, enabled = true) =>
+  useQuery({
+    queryKey: ['analytics', 'assets', assetId, 'summary'],
+    queryFn: () => getAsset360Summary(assetId),
+    enabled,
+  })
+
 export const useAssetMaintenanceActivityPareto = (
   query: AssetMaintenanceActivityParetoQuery = {},
 ) =>
@@ -57,10 +65,11 @@ export const useWorkOrderOverview = (query: WorkOrderAnalyticsQuery = {}) =>
     queryFn: () => getWorkOrderOverview(query),
   })
 
-export const useWorkOrderTrend = (query: WorkOrderAnalyticsQuery = {}) =>
+export const useWorkOrderTrend = (query: WorkOrderAnalyticsQuery = {}, enabled = true) =>
   useQuery({
     queryKey: ['analytics', 'work-orders', 'trend', query],
     queryFn: () => getWorkOrderTrend(query),
+    enabled,
   })
 
 export const useWorkOrderActivity = (

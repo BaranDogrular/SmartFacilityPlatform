@@ -62,7 +62,9 @@ export function AppLayout() {
   const location = useLocation()
   const page = location.pathname.startsWith('/work-orders/')
     ? { title: 'Benzer Geçmiş Vakalar', context: 'Canonical vaka karşılaştırması' }
-    : (pageDetails[location.pathname] ?? { title: 'Analytics', context: 'Teknik operasyon' })
+    : location.pathname.startsWith('/assets/')
+      ? { title: 'Asset 360', context: 'Varlık karar desteği' }
+      : (pageDetails[location.pathname] ?? { title: 'Analytics', context: 'Teknik operasyon' })
 
   return (
     <div className="app-shell">

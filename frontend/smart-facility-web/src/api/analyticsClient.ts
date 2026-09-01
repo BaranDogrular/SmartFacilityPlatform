@@ -4,6 +4,7 @@ import type {
   AssetMaintenanceActivityParetoResponse,
   AssetOverviewQuery,
   AssetOverviewResponse,
+  Asset360SummaryResponse,
   InspectionPriorityQuery,
   InspectionPriorityResponse,
   EarlyWarningQuery,
@@ -102,6 +103,9 @@ async function get<T>(path: string, query: QueryParameters = {}): Promise<T> {
 
 export const getAssetOverview = (query: AssetOverviewQuery = {}) =>
   get<AssetOverviewResponse>('/api/analytics/assets/overview', query as QueryParameters)
+
+export const getAsset360Summary = (assetId: number) =>
+  get<Asset360SummaryResponse>(`/api/analytics/assets/${assetId}/summary`)
 
 export const getAssetMaintenanceActivityPareto = (
   query: AssetMaintenanceActivityParetoQuery = {},

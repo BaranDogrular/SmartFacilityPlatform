@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom'
 import { ChartPanel, HorizontalBarChart } from './AnalyticsCharts'
 import { EmptyState, ErrorState, InfoNote, LoadingState } from './DashboardUi'
 import { useAssetMaintenanceActivityPareto } from '../hooks/useAnalytics'
@@ -61,8 +62,20 @@ export function AssetMaintenanceActivityPareto() {
                 {data.topAssets.map((item, index) => (
                   <tr key={item.assetId}>
                     <td>{index + 1}</td>
-                    <td><span className="code-chip">{item.assetCode}</span></td>
-                    <td>{item.assetName}</td>
+                    <td>
+                      <Link
+                        className="asset-detail-link code-chip"
+                        to={`/assets/${item.assetId}`}
+                        aria-label={`${item.assetCode} Asset 360 görünümünü aç`}
+                      >
+                        {item.assetCode}
+                      </Link>
+                    </td>
+                    <td>
+                      <Link className="asset-detail-link" to={`/assets/${item.assetId}`}>
+                        {item.assetName}
+                      </Link>
+                    </td>
                     <td className="text-end"><strong>{formatCount(item.workOrderCount)}</strong></td>
                     <td className="text-end">{formatPercent(item.sharePercent)}</td>
                     <td className="text-end"><strong>{formatPercent(item.cumulativeSharePercent)}</strong></td>

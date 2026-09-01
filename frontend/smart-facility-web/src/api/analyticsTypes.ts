@@ -67,6 +67,102 @@ export interface AssetOverviewResponse {
   metadata: SnapshotAnalyticsMetadata
 }
 
+export interface Asset360ParentAsset {
+  assetId: number
+  assetCode: string
+  assetName: string
+}
+
+export interface Asset360Identity {
+  assetId: number
+  assetCode: string
+  assetName: string
+  assetType: string | null
+  status: string | null
+  buildingId: number | null
+  buildingName: string | null
+  locationId: number | null
+  locationName: string | null
+  assetGroupId: number | null
+  assetGroupName: string | null
+  parentAsset: Asset360ParentAsset | null
+  serialNumber: string | null
+  lastMaintenanceDate: string | null
+}
+
+export interface Asset360MaintenanceSummary {
+  totalWorkOrders: number
+  openWorkOrders: number
+  last7Count: number
+  last30Count: number
+  last90Count: number
+  lastWorkOrderDate: string | null
+}
+
+export interface Asset360InspectionPriority {
+  score: number
+  level: InspectionPriorityLevel
+  last7Count: number
+  last30Count: number
+  previous30Count: number
+  last90Count: number
+  openCount: number
+  activityChange: number
+  reasons: string[]
+  analysisWindow: InspectionPriorityAnalysisWindow | null
+  scoringVersion: string
+}
+
+export interface Asset360EarlyWarningComponents {
+  acceleration: number
+  shortTermSpike: number
+  historicalDeviation: number
+  recurrenceBurst: number
+  openEmergence: number
+}
+
+export interface Asset360EarlyWarning {
+  score: number | null
+  level: EarlyWarningLevel | null
+  baselineStatus: EarlyWarningBaselineStatus
+  last7Count: number
+  previous7Count: number
+  last30Count: number
+  previous30Count: number
+  last90Count: number
+  previous90Count: number
+  baselineMedian: number | null
+  baselineMad: number | null
+  baselineActiveMonths: number
+  deviation: number | null
+  openCount: number
+  reasons: string[]
+  components: Asset360EarlyWarningComponents | null
+  baselineWindow: EarlyWarningBaselineWindow | null
+  scoringVersion: string
+}
+
+export interface Asset360Scope {
+  reliability: KpiReliability
+  linkedCanonicalWorkOrders: number
+  excludedUnlinkedCanonicalWorkOrders: number
+  linkageCoveragePercent: number
+  historicalWorkOrdersExcluded: boolean
+  scadaAndOutagesExcluded: boolean
+  sourceDataset: string
+  notes: string[]
+}
+
+export interface Asset360SummaryResponse {
+  asOf: string | null
+  identity: Asset360Identity
+  maintenance: Asset360MaintenanceSummary
+  inspectionPriority: Asset360InspectionPriority
+  earlyWarning: Asset360EarlyWarning
+  scope: Asset360Scope
+  generatedAt: string
+}
+
 export interface AssetMaintenanceActivityParetoItem {
   assetId: number
   assetCode: string

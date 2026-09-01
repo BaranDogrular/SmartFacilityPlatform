@@ -19,6 +19,7 @@ const analytics = await vite.ssrLoadModule('/src/api/analyticsClient.ts')
 const dashboardUi = await vite.ssrLoadModule('/src/components/DashboardUi.tsx')
 const { OverviewPage } = await vite.ssrLoadModule('/src/pages/OverviewPage.tsx')
 const { AssetsPage } = await vite.ssrLoadModule('/src/pages/AssetsPage.tsx')
+const { Asset360Page } = await vite.ssrLoadModule('/src/pages/Asset360Page.tsx')
 const { WorkOrdersPage } = await vite.ssrLoadModule('/src/pages/WorkOrdersPage.tsx')
 const { SimilarCasesPage } = await vite.ssrLoadModule('/src/pages/SimilarCasesPage.tsx')
 const { InspectionPriorityPage } = await vite.ssrLoadModule('/src/pages/InspectionPriorityPage.tsx')
@@ -92,6 +93,89 @@ const assetPareto = {
     matchedRecordCount: 171136,
     validRecordCount: 171136,
   },
+}
+
+const asset360 = {
+  asOf: '2026-08-25',
+  identity: {
+    assetId: 360,
+    assetCode: 'A-360',
+    assetName: 'Ana Soğutma Pompası',
+    assetType: 'Pompa',
+    status: 'Kullanımda',
+    buildingId: 1,
+    buildingName: 'A Blok',
+    locationId: 2,
+    locationName: 'Mekanik Oda',
+    assetGroupId: 3,
+    assetGroupName: 'Mekanik',
+    parentAsset: null,
+    serialNumber: 'SER-360',
+    lastMaintenanceDate: '2026-07-01T00:00:00',
+  },
+  maintenance: {
+    totalWorkOrders: 42,
+    openWorkOrders: 2,
+    last7Count: 3,
+    last30Count: 8,
+    last90Count: 20,
+    lastWorkOrderDate: '2026-08-24T10:00:00',
+  },
+  inspectionPriority: {
+    score: 62.5,
+    level: 'HIGH',
+    last7Count: 3,
+    last30Count: 8,
+    previous30Count: 4,
+    last90Count: 20,
+    openCount: 2,
+    activityChange: 4,
+    reasons: ['Son 30 günde 8 iş emri', '2 açık iş emri bulunuyor'],
+    analysisWindow: null,
+    scoringVersion: 'inspection-priority/v1',
+  },
+  earlyWarning: {
+    score: 48.75,
+    level: 'MEDIUM',
+    baselineStatus: 'SUFFICIENT',
+    last7Count: 3,
+    previous7Count: 1,
+    last30Count: 8,
+    previous30Count: 4,
+    last90Count: 20,
+    previous90Count: 14,
+    baselineMedian: 3,
+    baselineMad: 1,
+    baselineActiveMonths: 9,
+    deviation: 5,
+    openCount: 2,
+    reasons: ['Son 30 günlük aktivite önceki döneme göre 4 kayıt arttı'],
+    components: {
+      acceleration: 20,
+      shortTermSpike: 10,
+      historicalDeviation: 12.5,
+      recurrenceBurst: 6.25,
+      openEmergence: 0,
+    },
+    baselineWindow: {
+      from: '2025-07-01',
+      through: '2026-06-30',
+      monthCount: 12,
+      minimumActiveMonths: 6,
+    },
+    scoringVersion: 'early-warning/v1',
+  },
+  scope: {
+    reliability: 'Yellow',
+    linkedCanonicalWorkOrders: 162907,
+    excludedUnlinkedCanonicalWorkOrders: 8546,
+    linkageCoveragePercent: 95.0155,
+    historicalWorkOrdersExcluded: true,
+    scadaAndOutagesExcluded: true,
+    sourceDataset: 'core.Assets + core.WorkOrders',
+    notes: [],
+  },
+  generatedAt: '2026-08-25T12:00:00Z',
 }
 
 const inspectionPriority = {
@@ -421,6 +505,10 @@ function createQueryClient(overrides = {}) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity } } })
   client.setQueryData(['analytics', 'assets', 'overview', {}], asset)
   client.setQueryData(
+    ['analytics', 'assets', 360, 'summary'],
+    overrides.asset360 ?? asset360,
+  )
+  client.setQueryData(
     ['analytics', 'assets', 'maintenance-activity-pareto', { top: 10 }],
     overrides.assetPareto ?? assetPareto,
   )
@@ -434,6 +522,10 @@ function createQueryClient(overrides = {}) {
   )
   client.setQueryData(['analytics', 'work-orders', 'overview', {}], workOrders)
   client.setQueryData(['analytics', 'work-orders', 'trend', { grain: 'Month' }], workOrderTrend)
+  client.setQueryData(
+    ['analytics', 'work-orders', 'trend', { assetId: 360, grain: 'Month' }],
+    overrides.asset360Trend ?? workOrderTrend,
+  )
   client.setQueryData(
     ['analytics', 'work-orders', 54838, 'similar-cases', { top: 10 }],
     overrides.similarCases ?? similarCases,
@@ -487,6 +579,27 @@ function renderSimilarCasesPage(overrides) {
   )
 }
 
+function renderAsset360Page(overrides) {
+  return renderToStaticMarkup(
+    React.createElement(
+      MemoryRouter,
+      { initialEntries: ['/assets/360'] },
+      React.createElement(
+        QueryClientProvider,
+        { client: createQueryClient(overrides) },
+        React.createElement(
+          Routes,
+          null,
+          React.createElement(Route, {
+            path: '/assets/:assetId',
+            element: React.createElement(Asset360Page),
+          }),
+        ),
+      ),
+    ),
+  )
+}
+
 test('API query values are serialized exactly and empty values are omitted', () => {
   assert.equal(
     analytics.serializeAnalyticsParams({
@@ -520,6 +633,7 @@ test('new analytics clients call the accepted backend routes with serialized que
   }
 
   try {
+    await analytics.getAsset360Summary(360)
     await analytics.getAssetMaintenanceActivityPareto({ dateFrom: '2025-01-01', top: 5 })
     await analytics.getInspectionPriority({ asOf: '2026-08-25', top: 25 })
     await analytics.getEarlyWarning({ asOf: '2026-08-25', top: 10 })
@@ -531,6 +645,10 @@ test('new analytics clients call the accepted backend routes with serialized que
   }
 
   assert.deepEqual(requests, [
+    {
+      url: '/api/analytics/assets/360/summary',
+      params: {},
+    },
     {
       url: '/api/analytics/assets/maintenance-activity-pareto',
       params: { dateFrom: '2025-01-01', top: 5 },
@@ -636,6 +754,7 @@ test('asset Pareto renders Top-N counts, shares, cumulative values and Yellow gu
   assert.match(html, /İş Emri Aktivitesi En Yoğun Asset&#x27;ler/)
   assert.match(html, /Top-10 asset&#x27;in toplam canonical iş emri kayıtlarındaki payı/)
   assert.match(html, /2001KBL00009/)
+  assert.match(html, /href="\/assets\/651"/)
   assert.match(html, /12\.372/)
   assert.match(html, /22,57%/)
   assert.match(html, /30,26%/)
@@ -660,11 +779,199 @@ test('asset Pareto renders a scoped empty state', () => {
   assert.match(html, /YELLOW · Veri kalitesi notu/)
 })
 
+test('Asset 360 route, typed client and hook use canonical numeric AssetId without any', () => {
+  const appSource = readFileSync(new URL('../src/App.tsx', import.meta.url), 'utf8')
+  const clientSource = readFileSync(new URL('../src/api/analyticsClient.ts', import.meta.url), 'utf8')
+  const typesSource = readFileSync(new URL('../src/api/analyticsTypes.ts', import.meta.url), 'utf8')
+  const hooksSource = readFileSync(new URL('../src/hooks/useAnalytics.ts', import.meta.url), 'utf8')
+  const pageSource = readFileSync(new URL('../src/pages/Asset360Page.tsx', import.meta.url), 'utf8')
+
+  assert.match(appSource, /path="assets\/:assetId"/)
+  assert.match(clientSource, /getAsset360Summary/)
+  assert.match(clientSource, /\/api\/analytics\/assets\/\$\{assetId\}\/summary/)
+  assert.match(hooksSource, /\['analytics', 'assets', assetId, 'summary'\]/)
+  assert.doesNotMatch([clientSource, typesSource, hooksSource, pageSource].join('\n'), /\bany\b/)
+})
+
+test('Asset 360 renders identity, KPIs, explainable decisions, trend and scope safeguards', () => {
+  const html = renderAsset360Page()
+
+  assert.match(html, /Ana Soğutma Pompası/)
+  assert.match(html, /A-360/)
+  assert.match(html, /A Blok → Mekanik Oda → Mekanik/)
+  assert.match(html, /Toplam İş Emri/)
+  assert.match(html, /Açık İş Emri/)
+  assert.match(html, /Son 7 Gün/)
+  assert.match(html, /Son 30 Gün/)
+  assert.match(html, /Son 90 Gün/)
+  assert.match(html, /24 Ağu 2026/)
+  assert.match(html, /HIGH · Öncelikli inceleme/)
+  assert.match(html, /62,5/)
+  assert.match(html, /Son 30 günde 8 iş emri/)
+  assert.match(html, /arıza olasılığı değildir/)
+  assert.match(html, /MEDIUM · İzle/)
+  assert.match(html, /48,75/)
+  assert.match(html, /Median \/ MAD/)
+  assert.match(html, /Puan katkıları/)
+  assert.match(html, /Aylık Canonical İş Emri Trendi/)
+  assert.match(html, /YELLOW · Veri kalitesi notu/)
+  assert.match(html, /162\.907/)
+  assert.match(html, /8\.546/)
+  assert.match(html, /95,02%/)
+  assert.match(html, /HistoricalWorkOrders current analytics ile birleştirilmez/)
+  assert.match(html, /SCADA ve outage verileri gösterilmez/)
+  assert.doesNotMatch(html, /failure probability|predictive failure|health score|MTTR|raw intervention/i)
+})
+
+test('Asset 360 preserves zero-activity and insufficient-baseline states', () => {
+  const html = renderAsset360Page({
+    asset360: {
+      ...asset360,
+      maintenance: {
+        totalWorkOrders: 0,
+        openWorkOrders: 0,
+        last7Count: 0,
+        last30Count: 0,
+        last90Count: 0,
+        lastWorkOrderDate: null,
+      },
+      inspectionPriority: {
+        ...asset360.inspectionPriority,
+        score: 0,
+        level: 'LOW',
+        last7Count: 0,
+        last30Count: 0,
+        previous30Count: 0,
+        last90Count: 0,
+        openCount: 0,
+        activityChange: 0,
+        reasons: [],
+      },
+      earlyWarning: {
+        ...asset360.earlyWarning,
+        score: null,
+        level: null,
+        baselineStatus: 'INSUFFICIENT_BASELINE',
+        baselineMedian: null,
+        baselineMad: null,
+        baselineActiveMonths: 0,
+        deviation: null,
+        components: null,
+        reasons: ['12 aylık baseline içinde en az 6 aktif ay gerekir; 0 aktif ay bulundu'],
+      },
+    },
+    asset360Trend: {
+      ...workOrderTrend,
+      points: [],
+      metadata: { ...workOrderTrend.metadata, matchedRecordCount: 0, validRecordCount: 0 },
+    },
+  })
+
+  assert.match(html, /LOW · Düşük öncelik/)
+  assert.match(html, /İnceleme önceliğini yükselten aktivite sinyali yok/)
+  assert.match(html, /YETERSİZ GEÇMİŞ VERİ/)
+  assert.match(html, /Yetersiz geçmiş veri/)
+  assert.match(html, /Bilgi bulunmuyor/)
+  assert.match(html, /Seçilen filtrelerle eşleşen kayıt bulunamadı/)
+})
+
+test('Asset 360 renders loading, retryable error, deterministic 404 and invalid-route states', () => {
+  const pendingClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  const pendingHtml = renderToStaticMarkup(
+    React.createElement(
+      MemoryRouter,
+      { initialEntries: ['/assets/360'] },
+      React.createElement(
+        QueryClientProvider,
+        { client: pendingClient },
+        React.createElement(Routes, null, React.createElement(Route, {
+          path: '/assets/:assetId',
+          element: React.createElement(Asset360Page),
+        })),
+      ),
+    ),
+  )
+  assert.match(pendingHtml, /Asset 360 özeti hazırlanıyor/)
+
+  const errorClient = createQueryClient()
+  const errorQuery = errorClient.getQueryCache().find({
+    queryKey: ['analytics', 'assets', 360, 'summary'],
+    exact: true,
+  })
+  errorQuery.setState({
+    ...errorQuery.state,
+    status: 'error',
+    fetchStatus: 'idle',
+    error: new Error('Asset özeti kullanılamıyor'),
+  })
+  const errorHtml = renderToStaticMarkup(
+    React.createElement(
+      MemoryRouter,
+      { initialEntries: ['/assets/360'] },
+      React.createElement(
+        QueryClientProvider,
+        { client: errorClient },
+        React.createElement(Routes, null, React.createElement(Route, {
+          path: '/assets/:assetId',
+          element: React.createElement(Asset360Page),
+        })),
+      ),
+    ),
+  )
+  assert.match(errorHtml, /Asset özeti kullanılamıyor/)
+  assert.match(errorHtml, /Yeniden dene/)
+
+  const notFoundClient = createQueryClient()
+  const notFoundQuery = notFoundClient.getQueryCache().find({
+    queryKey: ['analytics', 'assets', 360, 'summary'],
+    exact: true,
+  })
+  notFoundQuery.setState({
+    ...notFoundQuery.state,
+    status: 'error',
+    fetchStatus: 'idle',
+    error: new analytics.AnalyticsApiError('Canonical asset not found.', 404),
+  })
+  const notFoundHtml = renderToStaticMarkup(
+    React.createElement(
+      MemoryRouter,
+      { initialEntries: ['/assets/360'] },
+      React.createElement(
+        QueryClientProvider,
+        { client: notFoundClient },
+        React.createElement(Routes, null, React.createElement(Route, {
+          path: '/assets/:assetId',
+          element: React.createElement(Asset360Page),
+        })),
+      ),
+    ),
+  )
+  assert.match(notFoundHtml, /Varlık bulunamadı/)
+  assert.match(notFoundHtml, /canonical varlık bulunamadı/)
+
+  const invalidHtml = renderToStaticMarkup(
+    React.createElement(
+      MemoryRouter,
+      { initialEntries: ['/assets/not-a-number'] },
+      React.createElement(
+        QueryClientProvider,
+        { client: new QueryClient() },
+        React.createElement(Routes, null, React.createElement(Route, {
+          path: '/assets/:assetId',
+          element: React.createElement(Asset360Page),
+        })),
+      ),
+    ),
+  )
+  assert.match(invalidHtml, /Geçerli bir canonical AssetId belirtilmedi/)
+})
+
 test('inspection priority renders ranked signals, reasons, coverage and safe semantics', () => {
   const html = renderPage(InspectionPriorityPage)
 
   assert.match(html, /İnceleme Önceliği/)
   assert.match(html, /ASSET-HIGH/)
+  assert.match(html, /href="\/assets\/1"/)
   assert.match(html, /ASSET-MEDIUM/)
   assert.match(html, /ASSET-LOW/)
   assert.match(html, /HIGH · Öncelikli inceleme/)
@@ -730,6 +1037,7 @@ test('early warning renders levels, reasons, baseline coverage and safe semantic
 
   assert.match(html, /Erken Uyarı/)
   assert.match(html, /WARNING-HIGH/)
+  assert.match(html, /href="\/assets\/1"/)
   assert.match(html, /WARNING-MEDIUM/)
   assert.match(html, /WARNING-NORMAL/)
   assert.match(html, /NO-BASELINE/)
