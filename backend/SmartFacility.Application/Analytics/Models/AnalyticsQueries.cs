@@ -18,6 +18,18 @@ public sealed record AssetMaintenanceActivityParetoQuery
     public int? Top { get; init; }
 }
 
+public sealed record AssetActivityQuery
+{
+    public int? PageSize { get; init; }
+    public string? Cursor { get; init; }
+}
+
+public sealed record AssetSearchQuery
+{
+    public string? Q { get; init; }
+    public int? Limit { get; init; }
+}
+
 public sealed record InspectionPriorityQuery
 {
     public int? Top { get; init; }

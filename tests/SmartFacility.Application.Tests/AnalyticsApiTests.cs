@@ -18,7 +18,9 @@ public sealed class AnalyticsApiTests(AnalyticsApiFactory factory) :
     [Theory]
     [InlineData("/api/analytics/import-quality/overview")]
     [InlineData("/api/analytics/assets/overview")]
+    [InlineData("/api/analytics/assets/search?q=A-1")]
     [InlineData("/api/analytics/assets/1/summary")]
+    [InlineData("/api/analytics/assets/1/activity")]
     [InlineData("/api/analytics/assets/maintenance-activity-pareto")]
     [InlineData("/api/analytics/assets/inspection-priority")]
     [InlineData("/api/analytics/assets/early-warning")]
@@ -47,6 +49,11 @@ public sealed class AnalyticsApiTests(AnalyticsApiFactory factory) :
     [InlineData("/api/analytics/assets/inspection-priority?top=101")]
     [InlineData("/api/analytics/assets/early-warning?top=0")]
     [InlineData("/api/analytics/assets/early-warning?top=101")]
+    [InlineData("/api/analytics/assets/1/activity?pageSize=0")]
+    [InlineData("/api/analytics/assets/1/activity?pageSize=51")]
+    [InlineData("/api/analytics/assets/search?q=A")]
+    [InlineData("/api/analytics/assets/search?q=ASSET&limit=0")]
+    [InlineData("/api/analytics/assets/search?q=ASSET&limit=21")]
     [InlineData("/api/analytics/work-orders/1/similar-cases?top=0")]
     [InlineData("/api/analytics/work-orders/1/similar-cases?top=51")]
     [InlineData("/api/analytics/assets/maintenance-activity-pareto?dateFrom=2026-02-01&dateTo=2026-01-01")]
@@ -173,6 +180,71 @@ public sealed class AnalyticsApiTests(AnalyticsApiFactory factory) :
     }
 
     [Fact]
+    public async Task Asset_activity_contract_is_bounded_private_and_maps_cursor_failures()
+    {
+        using var response = await _client.GetAsync("/api/analytics/assets/1/activity?pageSize=50");
+        var payload = await response.Content.ReadAsStringAsync();
+        using var document = JsonDocument.Parse(payload);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(50, document.RootElement.GetProperty("pageSize").GetInt32());
+        Assert.Single(document.RootElement.GetProperty("items").EnumerateArray());
+        var item = document.RootElement.GetProperty("items")[0];
+        Assert.Equal("OPEN", item.GetProperty("state").GetString());
+        Assert.Equal(
+            "INFORMATIVE",
+            item.GetProperty("historicalIntervention").GetProperty("quality").GetString());
+        Assert.DoesNotContain("requestedByName", payload, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("assignedPersonnelName", payload, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("descriptionRaw", payload, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("sourceFile", payload, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("fingerprint", payload, StringComparison.OrdinalIgnoreCase);
+
+        using var missing = await _client.GetAsync("/api/analytics/assets/404/activity");
+        Assert.Equal(HttpStatusCode.NotFound, missing.StatusCode);
+
+        using var malformed = await _client.GetAsync(
+            "/api/analytics/assets/1/activity?cursor=invalid");
+        Assert.Equal(HttpStatusCode.BadRequest, malformed.StatusCode);
+
+        using var stale = await _client.GetAsync(
+            "/api/analytics/assets/1/activity?cursor=stale");
+        Assert.Equal(HttpStatusCode.Conflict, stale.StatusCode);
+    }
+
+    [Fact]
+    public async Task Asset_search_contract_returns_only_bounded_canonical_identity_fields()
+    {
+        using var response = await _client.GetAsync("/api/analytics/assets/search?q=A-1&limit=20");
+        var payload = await response.Content.ReadAsStringAsync();
+        using var document = JsonDocument.Parse(payload);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Single(document.RootElement.EnumerateArray());
+        Assert.Equal(1, document.RootElement[0].GetProperty("assetId").GetInt64());
+        Assert.Equal("A-1", document.RootElement[0].GetProperty("assetCode").GetString());
+        Assert.DoesNotContain("serialNumber", payload, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("fingerprint", payload, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task Asset_search_enforces_query_length_and_returns_empty_array_for_no_match()
+    {
+        using var maximum = await _client.GetAsync(
+            $"/api/analytics/assets/search?q={new string('A', 100)}");
+        using var tooLong = await _client.GetAsync(
+            $"/api/analytics/assets/search?q={new string('A', 101)}");
+        using var noMatch = await _client.GetAsync(
+            "/api/analytics/assets/search?q=NO-MATCH");
+
+        Assert.Equal(HttpStatusCode.OK, maximum.StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, tooLong.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, noMatch.StatusCode);
+        using var payload = JsonDocument.Parse(await noMatch.Content.ReadAsStreamAsync());
+        Assert.Empty(payload.RootElement.EnumerateArray());
+    }
+
+    [Fact]
     public async Task Similar_cases_contract_serializes_mode_excludes_pii_and_returns_problem_details_for_missing_target()
     {
         using var response = await _client.GetAsync(
@@ -211,7 +283,9 @@ public sealed class AnalyticsApiTests(AnalyticsApiFactory factory) :
 
         Assert.Contains("/api/analytics/import-quality/overview", swagger, StringComparison.Ordinal);
         Assert.Contains("/api/analytics/assets/overview", swagger, StringComparison.Ordinal);
+        Assert.Contains("/api/analytics/assets/search", swagger, StringComparison.Ordinal);
         Assert.Contains("/api/analytics/assets/{assetId}/summary", swagger, StringComparison.Ordinal);
+        Assert.Contains("/api/analytics/assets/{assetId}/activity", swagger, StringComparison.Ordinal);
         Assert.Contains(
             "/api/analytics/assets/maintenance-activity-pareto",
             swagger,
@@ -349,6 +423,70 @@ internal sealed class FakeAnalyticsServices :
                     "core.Assets + core.WorkOrders",
                     []),
                 DataAsOf));
+
+    public Task<AssetActivityResult> GetAssetActivityAsync(
+        long assetId,
+        AssetActivityQuery query,
+        CancellationToken cancellationToken = default)
+    {
+        if (assetId == 404)
+        {
+            return Task.FromResult(new AssetActivityResult(
+                AssetActivityResultStatus.AssetNotFound,
+                null));
+        }
+
+        if (query.Cursor == "invalid")
+        {
+            return Task.FromResult(new AssetActivityResult(
+                AssetActivityResultStatus.InvalidCursor,
+                null));
+        }
+
+        if (query.Cursor == "stale")
+        {
+            return Task.FromResult(new AssetActivityResult(
+                AssetActivityResultStatus.StaleCursor,
+                null));
+        }
+
+        return Task.FromResult(new AssetActivityResult(
+            AssetActivityResultStatus.Success,
+            new AssetActivityResponse(
+                assetId,
+                [
+                    new AssetActivityItemDto(
+                        1,
+                        "WO-1",
+                        new DateTime(2026, 8, 20, 10, 0, 0),
+                        AssetActivityState.Open,
+                        "Open",
+                        "MEKANÄ°K",
+                        "KONTROL",
+                        "Ä°Å TALEBÄ°",
+                        "Pompa motorunda titreÅŸim gÃ¶zlendi.",
+                        new AssetActivityHistoricalInterventionDto(
+                            "Motor kontrol edilsin.",
+                            "Rulman aÅŸÄ±nmasÄ±",
+                            "Rulman deÄŸiÅŸtirildi.",
+                            AssetActivityInterventionQuality.Informative,
+                            new DateTime(2026, 8, 20, 12, 0, 0)),
+                        1)
+                ],
+                query.PageSize ?? 25,
+                false,
+                null,
+                "core.WorkOrders + core.HistoricalInterventions",
+                "privacy-redaction/email-turkish-mobile/v1")));
+    }
+
+    public Task<IReadOnlyList<AssetSearchItemDto>> SearchAssetsAsync(
+        AssetSearchQuery query,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<AssetSearchItemDto>>(
+            string.Equals(query.Q, "NO-MATCH", StringComparison.Ordinal)
+                ? []
+                : [new AssetSearchItemDto(1, "A-1", "Asset", "Building", "Location", "Group")]);
 
     public Task<AssetOverviewResponse> GetOverviewAsync(
         AssetOverviewQuery query,

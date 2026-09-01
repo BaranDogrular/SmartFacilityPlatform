@@ -107,6 +107,79 @@ public sealed record Asset360SummaryResponse(
     Asset360ScopeDto Scope,
     DateTimeOffset GeneratedAt);
 
+public enum AssetActivityState
+{
+    [JsonStringEnumMemberName("OPEN")]
+    Open,
+
+    [JsonStringEnumMemberName("CLOSED")]
+    Closed,
+
+    [JsonStringEnumMemberName("OTHER")]
+    Other
+}
+
+public enum AssetActivityInterventionQuality
+{
+    [JsonStringEnumMemberName("INFORMATIVE")]
+    Informative,
+
+    [JsonStringEnumMemberName("GENERIC")]
+    Generic,
+
+    [JsonStringEnumMemberName("NO_ACTION")]
+    NoAction
+}
+
+public sealed record AssetActivityHistoricalInterventionDto(
+    string? RequestDescription,
+    string? FailureReasonDescription,
+    string? WorkPerformedDescription,
+    AssetActivityInterventionQuality Quality,
+    DateTime? ObservedCompletionDateTime);
+
+public sealed record AssetActivityItemDto(
+    long WorkOrderId,
+    string WorkOrderNumber,
+    DateTime? ReportedDateTime,
+    AssetActivityState State,
+    string? Status,
+    string? Discipline,
+    string? WorkType,
+    string? FailureType,
+    string DescriptionSnippet,
+    AssetActivityHistoricalInterventionDto? HistoricalIntervention,
+    int InterventionCount);
+
+public sealed record AssetActivityResponse(
+    long AssetId,
+    IReadOnlyList<AssetActivityItemDto> Items,
+    int PageSize,
+    bool HasNextPage,
+    string? NextCursor,
+    string SourceDataset,
+    string PrivacyRuleVersion);
+
+public enum AssetActivityResultStatus
+{
+    Success,
+    AssetNotFound,
+    InvalidCursor,
+    StaleCursor
+}
+
+public sealed record AssetActivityResult(
+    AssetActivityResultStatus Status,
+    AssetActivityResponse? Response);
+
+public sealed record AssetSearchItemDto(
+    long AssetId,
+    string AssetCode,
+    string AssetName,
+    string? BuildingName,
+    string? LocationName,
+    string? AssetGroupName);
+
 public sealed record AssetMaintenanceActivityParetoItemDto(
     long AssetId,
     string AssetCode,

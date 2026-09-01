@@ -24,11 +24,25 @@ public static class AnalyticsEndpoints
             .Produces<AssetOverviewResponse>()
             .ProducesValidationProblem();
 
+        group.MapGet("/assets/search", SearchAssetsAsync)
+            .WithName("SearchAssets")
+            .WithSummary("Returns a bounded deterministic search over canonical assets.")
+            .Produces<IReadOnlyList<AssetSearchItemDto>>()
+            .ProducesValidationProblem();
+
         group.MapGet("/assets/{assetId:long}/summary", GetAsset360SummaryAsync)
             .WithName("GetAsset360Summary")
             .WithSummary("Returns a bounded canonical maintenance and decision-support summary for one asset.")
             .Produces<Asset360SummaryResponse>()
             .Produces<ProblemDetails>(StatusCodes.Status404NotFound);
+
+        group.MapGet("/assets/{assetId:long}/activity", GetAssetActivityAsync)
+            .WithName("GetAssetActivity")
+            .WithSummary("Returns a snapshot-aware cursor page of canonical asset WorkOrders.")
+            .Produces<AssetActivityResponse>()
+            .Produces<ProblemDetails>(StatusCodes.Status404NotFound)
+            .Produces<ProblemDetails>(StatusCodes.Status409Conflict)
+            .ProducesValidationProblem();
 
         group.MapGet("/assets/maintenance-activity-pareto", GetAssetMaintenanceActivityParetoAsync)
             .WithName("GetAssetMaintenanceActivityPareto")
@@ -128,6 +142,62 @@ public static class AnalyticsEndpoints
                 Detail = $"No canonical asset exists with Id {assetId}."
             })
             : TypedResults.Ok(result);
+    }
+
+    private static async Task<Results<
+        Ok<AssetActivityResponse>,
+        NotFound<ProblemDetails>,
+        ValidationProblem,
+        Conflict<ProblemDetails>>> GetAssetActivityAsync(
+        long assetId,
+        [AsParameters] AssetActivityQuery query,
+        IAssetAnalyticsService service,
+        CancellationToken cancellationToken)
+    {
+        var errors = AnalyticsQueryValidation.Validate(query);
+        if (errors.Count > 0)
+        {
+            return TypedResults.ValidationProblem(errors);
+        }
+
+        var result = await service.GetAssetActivityAsync(assetId, query, cancellationToken);
+        return result.Status switch
+        {
+            AssetActivityResultStatus.Success => TypedResults.Ok(result.Response!),
+            AssetActivityResultStatus.AssetNotFound => TypedResults.NotFound(new ProblemDetails
+            {
+                Status = StatusCodes.Status404NotFound,
+                Title = "Canonical asset not found.",
+                Detail = $"No canonical asset exists with Id {assetId}."
+            }),
+            AssetActivityResultStatus.InvalidCursor => TypedResults.ValidationProblem(
+                new Dictionary<string, string[]>(StringComparer.Ordinal)
+                {
+                    ["cursor"] = ["Cursor is malformed or does not belong to this asset."]
+                }),
+            AssetActivityResultStatus.StaleCursor => TypedResults.Conflict(new ProblemDetails
+            {
+                Status = StatusCodes.Status409Conflict,
+                Title = "Asset activity cursor is stale.",
+                Detail = "The canonical WorkOrder snapshot changed; restart pagination."
+            }),
+            _ => throw new InvalidOperationException("Unsupported asset activity result status.")
+        };
+    }
+
+    private static async Task<Results<Ok<IReadOnlyList<AssetSearchItemDto>>, ValidationProblem>>
+        SearchAssetsAsync(
+        [AsParameters] AssetSearchQuery query,
+        IAssetAnalyticsService service,
+        CancellationToken cancellationToken)
+    {
+        var errors = AnalyticsQueryValidation.Validate(query);
+        if (errors.Count > 0)
+        {
+            return TypedResults.ValidationProblem(errors);
+        }
+
+        return TypedResults.Ok(await service.SearchAssetsAsync(query, cancellationToken));
     }
 
     private static async Task<Results<Ok<AssetMaintenanceActivityParetoResponse>, ValidationProblem>>
@@ -291,6 +361,34 @@ public static class AnalyticsEndpoints
 
 internal static class AnalyticsQueryValidation
 {
+    public static Dictionary<string, string[]> Validate(AssetActivityQuery query)
+    {
+        var errors = new Dictionary<string, string[]>(StringComparer.Ordinal);
+        if (query.PageSize.HasValue && query.PageSize is < 1 or > 50)
+        {
+            errors["pageSize"] = ["PageSize must be between 1 and 50."];
+        }
+
+        return errors;
+    }
+
+    public static Dictionary<string, string[]> Validate(AssetSearchQuery query)
+    {
+        var errors = new Dictionary<string, string[]>(StringComparer.Ordinal);
+        var length = query.Q?.Trim().Length ?? 0;
+        if (length is < 2 or > 100)
+        {
+            errors["q"] = ["Q must contain between 2 and 100 characters after trimming."];
+        }
+
+        if (query.Limit.HasValue && query.Limit is < 1 or > 20)
+        {
+            errors["limit"] = ["Limit must be between 1 and 20."];
+        }
+
+        return errors;
+    }
+
     public static Dictionary<string, string[]> Validate(AssetOverviewQuery query)
     {
         var errors = ValidateDateRange(

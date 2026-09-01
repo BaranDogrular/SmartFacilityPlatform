@@ -1,4 +1,6 @@
 using System.Data;
+using System.Text;
+using System.Text.Json;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using SmartFacility.Application.Analytics.Abstractions;
@@ -22,6 +24,12 @@ public sealed class EfAnalyticsQueryService(SmartFacilityDbContext dbContext) :
     private const string TimeZoneAssumption = "UnspecifiedSourceLocal";
     private const int SimilarCasesCandidatePoolCap = 500;
     private const int SimilarCasesPrimaryPoolMinimum = 25;
+    private const int AssetActivityDefaultPageSize = 25;
+    private const int AssetActivityMaximumPageSize = 50;
+    private const int AssetActivityCursorVersion = 1;
+    private const int AssetActivityMaximumCursorLength = 512;
+    private const string AssetActivitySourceDataset =
+        "core.WorkOrders + core.HistoricalInterventions";
 
     private const string ScadaClearanceStatisticsSql = """
         WITH Matched AS
@@ -333,6 +341,241 @@ public sealed class EfAnalyticsQueryService(SmartFacilityDbContext dbContext) :
                     "SCADA alarms and outages are excluded because no verified asset linkage exists."
                 ]),
             DateTimeOffset.UtcNow);
+    }
+
+    public async Task<AssetActivityResult> GetAssetActivityAsync(
+        long assetId,
+        AssetActivityQuery query,
+        CancellationToken cancellationToken = default)
+    {
+        var assetExists = await _dbContext.Assets
+            .AsNoTracking()
+            .AnyAsync(item => item.Id == assetId, cancellationToken);
+        if (!assetExists)
+        {
+            return new AssetActivityResult(AssetActivityResultStatus.AssetNotFound, null);
+        }
+
+        var currentSnapshotBatchId = await _dbContext.WorkOrders
+            .AsNoTracking()
+            .Where(item => item.IsInCanonicalSnapshot)
+            .OrderByDescending(item => item.LastSeenImportBatchId)
+            .Select(item => item.LastSeenImportBatchId)
+            .FirstOrDefaultAsync(cancellationToken)
+            ?? 0;
+
+        AssetActivityCursorPayload? cursor = null;
+        if (!string.IsNullOrWhiteSpace(query.Cursor))
+        {
+            cursor = DecodeAssetActivityCursor(query.Cursor);
+            if (cursor is null || cursor.AssetId != assetId)
+            {
+                return new AssetActivityResult(AssetActivityResultStatus.InvalidCursor, null);
+            }
+
+            if (cursor.SnapshotBatchId != currentSnapshotBatchId)
+            {
+                return new AssetActivityResult(AssetActivityResultStatus.StaleCursor, null);
+            }
+        }
+
+        var pageSize = Math.Clamp(
+            query.PageSize ?? AssetActivityDefaultPageSize,
+            1,
+            AssetActivityMaximumPageSize);
+        var workOrders = _dbContext.WorkOrders
+            .AsNoTracking()
+            .Where(item => item.IsInCanonicalSnapshot && item.AssetId == assetId);
+
+        if (cursor is not null)
+        {
+            if (cursor.ReportedDateTimeTicks.HasValue)
+            {
+                var cursorDate = new DateTime(
+                    cursor.ReportedDateTimeTicks.Value,
+                    DateTimeKind.Unspecified);
+                workOrders = workOrders.Where(item =>
+                    !item.ReportedDateTime.HasValue
+                    || item.ReportedDateTime < cursorDate
+                    || (item.ReportedDateTime == cursorDate
+                        && item.Id < cursor.WorkOrderId));
+            }
+            else
+            {
+                workOrders = workOrders.Where(item =>
+                    !item.ReportedDateTime.HasValue
+                    && item.Id < cursor.WorkOrderId);
+            }
+        }
+
+        var rows = await workOrders
+            .OrderByDescending(item => item.ReportedDateTime)
+            .ThenByDescending(item => item.Id)
+            .Take(pageSize + 1)
+            .Select(item => new AssetActivityProjection(
+                item.Id,
+                item.WorkOrderNumber,
+                item.ReportedDateTime,
+                item.RawStatusCode,
+                item.Status,
+                item.Discipline,
+                item.WorkType,
+                item.FailureType,
+                item.Description,
+                item.HistoricalInterventions.Count(),
+                item.HistoricalInterventions
+                    .OrderBy(intervention =>
+                        intervention.InterventionQuality == HistoricalInterventionQuality.Informative
+                            ? 0
+                            : intervention.InterventionQuality == HistoricalInterventionQuality.Generic
+                                ? 1
+                                : intervention.InterventionQuality == HistoricalInterventionQuality.NoAction
+                                    ? 2
+                                    : 3)
+                    .ThenByDescending(intervention => intervention.CompletionDateTime.HasValue)
+                    .ThenByDescending(intervention => intervention.CompletionDateTime)
+                    .ThenByDescending(intervention => intervention.SourceYear)
+                    .ThenByDescending(intervention => intervention.ReportedDateTime)
+                    .ThenBy(intervention => intervention.Id)
+                    .Select(intervention => new AssetActivityInterventionProjection(
+                        intervention.RequestDescriptionSanitized,
+                        intervention.FailureReasonDescriptionSanitized,
+                        intervention.WorkPerformedDescriptionSanitized,
+                        intervention.InterventionQuality,
+                        intervention.CompletionDateTime))
+                    .FirstOrDefault()))
+            .ToListAsync(cancellationToken);
+
+        var hasNextPage = rows.Count > pageSize;
+        var pageRows = rows.Take(pageSize).ToArray();
+        var items = pageRows
+            .Select(MapAssetActivityItem)
+            .ToArray();
+        var lastRow = hasNextPage ? pageRows[^1] : null;
+        var nextCursor = lastRow is null
+            ? null
+            : EncodeAssetActivityCursor(new AssetActivityCursorPayload(
+                AssetActivityCursorVersion,
+                assetId,
+                currentSnapshotBatchId,
+                lastRow.ReportedDateTime?.Ticks,
+                lastRow.WorkOrderId));
+
+        return new AssetActivityResult(
+            AssetActivityResultStatus.Success,
+            new AssetActivityResponse(
+                assetId,
+                items,
+                pageSize,
+                hasNextPage,
+                nextCursor,
+                AssetActivitySourceDataset,
+                SimilarCasesScoring.PrivacyRuleVersion));
+    }
+
+    public async Task<IReadOnlyList<AssetSearchItemDto>> SearchAssetsAsync(
+        AssetSearchQuery query,
+        CancellationToken cancellationToken = default)
+    {
+        var search = query.Q?.Trim() ?? string.Empty;
+        var limit = Math.Clamp(query.Limit ?? 10, 1, 20);
+
+        return await _dbContext.Assets
+            .AsNoTracking()
+            .Where(item => item.AssetCode.StartsWith(search) || item.Name.Contains(search))
+            .OrderBy(item => item.AssetCode == search
+                ? 0
+                : item.AssetCode.StartsWith(search)
+                    ? 1
+                    : 2)
+            .ThenBy(item => item.AssetCode)
+            .ThenBy(item => item.Id)
+            .Take(limit)
+            .Select(item => new AssetSearchItemDto(
+                item.Id,
+                item.AssetCode,
+                item.Name,
+                item.Building == null ? null : item.Building.Name,
+                item.Location == null ? null : item.Location.Name,
+                item.AssetGroup == null ? null : item.AssetGroup.Name))
+            .ToListAsync(cancellationToken);
+    }
+
+    private static AssetActivityItemDto MapAssetActivityItem(AssetActivityProjection item) =>
+        new(
+            item.WorkOrderId,
+            item.WorkOrderNumber,
+            item.ReportedDateTime,
+            WorkOrderSourceState.IsOpen(item.RawStatusCode)
+                ? AssetActivityState.Open
+                : WorkOrderSourceState.IsClosed(item.RawStatusCode)
+                    ? AssetActivityState.Closed
+                    : AssetActivityState.Other,
+            item.Status,
+            item.Discipline,
+            item.WorkType,
+            item.FailureType,
+            SimilarCasesScoring.CreatePrivacySafeSnippet(item.Description),
+            item.HistoricalIntervention is null
+                ? null
+                : new AssetActivityHistoricalInterventionDto(
+                    item.HistoricalIntervention.RequestDescriptionSanitized,
+                    item.HistoricalIntervention.FailureReasonDescriptionSanitized,
+                    item.HistoricalIntervention.WorkPerformedDescriptionSanitized,
+                    item.HistoricalIntervention.Quality switch
+                    {
+                        HistoricalInterventionQuality.Informative =>
+                            AssetActivityInterventionQuality.Informative,
+                        HistoricalInterventionQuality.Generic =>
+                            AssetActivityInterventionQuality.Generic,
+                        _ => AssetActivityInterventionQuality.NoAction
+                    },
+                    item.HistoricalIntervention.CompletionDateTime),
+            item.InterventionCount);
+
+    private static string EncodeAssetActivityCursor(AssetActivityCursorPayload payload)
+    {
+        var bytes = JsonSerializer.SerializeToUtf8Bytes(payload);
+        return Convert.ToBase64String(bytes)
+            .TrimEnd('=')
+            .Replace('+', '-')
+            .Replace('/', '_');
+    }
+
+    private static AssetActivityCursorPayload? DecodeAssetActivityCursor(string value)
+    {
+        if (value.Length is 0 or > AssetActivityMaximumCursorLength
+            || value.Any(character =>
+                !char.IsAsciiLetterOrDigit(character)
+                && character is not '-' and not '_'))
+        {
+            return null;
+        }
+
+        try
+        {
+            var base64 = value.Replace('-', '+').Replace('_', '/');
+            base64 = base64.PadRight(base64.Length + ((4 - base64.Length % 4) % 4), '=');
+            var payload = JsonSerializer.Deserialize<AssetActivityCursorPayload>(
+                Encoding.UTF8.GetString(Convert.FromBase64String(base64)));
+            if (payload is null
+                || payload.Version != AssetActivityCursorVersion
+                || payload.AssetId <= 0
+                || payload.SnapshotBatchId < 0
+                || payload.WorkOrderId <= 0
+                || payload.ReportedDateTimeTicks < 0
+                || payload.ReportedDateTimeTicks > DateTime.MaxValue.Ticks)
+            {
+                return null;
+            }
+
+            return payload;
+        }
+        catch (Exception exception) when (
+            exception is FormatException or JsonException or DecoderFallbackException)
+        {
+            return null;
+        }
     }
 
     private static async Task<Asset360SignalCountProjection> GetAsset360SignalCountsAsync(
@@ -2128,6 +2371,33 @@ public sealed class EfAnalyticsQueryService(SmartFacilityDbContext dbContext) :
         int Year,
         int Month,
         long Count);
+
+    private sealed record AssetActivityProjection(
+        long WorkOrderId,
+        string WorkOrderNumber,
+        DateTime? ReportedDateTime,
+        string? RawStatusCode,
+        string? Status,
+        string? Discipline,
+        string? WorkType,
+        string? FailureType,
+        string? Description,
+        int InterventionCount,
+        AssetActivityInterventionProjection? HistoricalIntervention);
+
+    private sealed record AssetActivityInterventionProjection(
+        string? RequestDescriptionSanitized,
+        string? FailureReasonDescriptionSanitized,
+        string? WorkPerformedDescriptionSanitized,
+        HistoricalInterventionQuality Quality,
+        DateTime? CompletionDateTime);
+
+    private sealed record AssetActivityCursorPayload(
+        int Version,
+        long AssetId,
+        long SnapshotBatchId,
+        long? ReportedDateTimeTicks,
+        long WorkOrderId);
 
     private sealed record InspectionPriorityCoverageProjection(
         long EligibleWorkOrders,

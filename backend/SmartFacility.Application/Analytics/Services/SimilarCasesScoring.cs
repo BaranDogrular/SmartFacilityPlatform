@@ -31,6 +31,7 @@ public static partial class SimilarCasesScoring
     public const decimal MinimumTextSimilarity = 25m;
     public const decimal MinimumHybridScore = 40m;
     public const int SnippetLength = 200;
+    public const string PrivacyRuleVersion = "privacy-redaction/email-turkish-mobile/v1";
 
     private static readonly CultureInfo TurkishCulture = CultureInfo.GetCultureInfo("tr-TR");
 

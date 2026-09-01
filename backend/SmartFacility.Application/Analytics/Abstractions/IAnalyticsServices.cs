@@ -8,6 +8,15 @@ public interface IAssetAnalyticsService
         long assetId,
         CancellationToken cancellationToken = default);
 
+    Task<AssetActivityResult> GetAssetActivityAsync(
+        long assetId,
+        AssetActivityQuery query,
+        CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<AssetSearchItemDto>> SearchAssetsAsync(
+        AssetSearchQuery query,
+        CancellationToken cancellationToken = default);
+
     Task<AssetOverviewResponse> GetOverviewAsync(
         AssetOverviewQuery query,
         CancellationToken cancellationToken = default);
