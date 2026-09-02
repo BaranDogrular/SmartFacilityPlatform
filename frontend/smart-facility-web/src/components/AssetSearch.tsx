@@ -40,7 +40,7 @@ export function AssetSearch({ initialQuery = '' }: { initialQuery?: string }) {
     <section className="asset-search" aria-labelledby="asset-search-title">
       <header>
         <div>
-          <p className="page-eyebrow">Canonical varlık keşfi</p>
+          <p className="page-eyebrow">Varlık keşfi</p>
           <h2 id="asset-search-title">Varlık Ara</h2>
           <p>Mevcut bir varlığa kodu veya adı üzerinden doğrudan ulaşın.</p>
         </div>

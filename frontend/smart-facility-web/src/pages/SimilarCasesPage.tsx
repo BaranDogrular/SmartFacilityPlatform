@@ -133,7 +133,7 @@ export function SimilarCasesPage() {
   }
 
   if (!validId) {
-    return <EmptyState message="Geçerli bir canonical WorkOrder ID belirtilmedi." />
+    return <EmptyState message="Geçerli bir güncel iş emri kimliği belirtilmedi." />
   }
 
   if (similarCases.isPending) {
@@ -153,7 +153,7 @@ export function SimilarCasesPage() {
   return (
     <div className="page-stack similar-cases-page">
       <PageHeader
-        eyebrow="Canonical WorkOrder geçmişi"
+        eyebrow="Güncel iş emri geçmişi"
         title="Benzer Geçmiş Vakalar"
         description="Seçilen iş emrine benzer geçmiş bakım/talep kayıtlarını gösterir."
         actions={originAssetId ? (
@@ -175,9 +175,9 @@ export function SimilarCasesPage() {
             <p className="page-eyebrow">Analiz hedefi</p>
             <h2 id="current-work-order-title">Seçilen İş Emri</h2>
           </div>
-          <span className="code-chip">Canonical WorkOrder</span>
+          <span className="code-chip">Güncel iş emri</span>
         </header>
-        <div className="similar-cases-target" aria-label="Seçilen canonical iş emri">
+        <div className="similar-cases-target" aria-label="Seçilen güncel iş emri">
           <div><span>WorkOrder ID</span><strong>{metadata.targetWorkOrderId}</strong></div>
           <div><span>Varlık</span><strong>{metadata.targetAsset.assetCode ?? 'Bağlı değil'}</strong><small>{metadata.targetAsset.assetName}</small></div>
           <div><span>Disiplin</span><strong>{metadata.targetDiscipline ?? '—'}</strong></div>
@@ -217,7 +217,7 @@ export function SimilarCasesPage() {
             <div>
               <p className="page-eyebrow">Geçmiş vaka kanıtı</p>
               <h2 id="similar-cases-results-title">Benzer Geçmiş Vaka Sonuçları</h2>
-              <p>Yalnız hedef iş emrinden önceki canonical kayıtlar listelenir.</p>
+              <p>Yalnız hedef iş emrinden önce kaydedilmiş iş emirleri listelenir.</p>
             </div>
             <span>{formatCount(metadata.returnedCount)} vaka</span>
           </header>

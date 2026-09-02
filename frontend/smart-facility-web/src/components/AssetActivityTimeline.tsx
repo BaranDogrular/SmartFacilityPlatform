@@ -98,7 +98,7 @@ export function AssetActivityTimeline({ assetId }: { assetId: number }) {
     <section className="asset-activity" aria-labelledby="asset-activity-title">
       <header className="asset-activity__header">
         <div>
-          <p className="page-eyebrow">Canonical bakım aktivitesi</p>
+          <p className="page-eyebrow">Güncel bakım aktivitesi</p>
           <h2 id="asset-activity-title">Varlık İş Emri Geçmişi</h2>
           <p>
             Bu varlıkla doğrulanmış şekilde eşleşen güncel iş emirleri, en yeniden en eskiye
@@ -184,7 +184,7 @@ export function AssetActivityTimeline({ assetId }: { assetId: number }) {
       {visiblePage ? (
         <InfoNote>
           Yalnızca sistemin güvenli gösterim için hazırladığı iş emri ve müdahale alanları sunulur.
-          Toplam sayfa hesabı yapılmaz; aynı anda yalnız bir cursor sayfası gösterilir.
+          Kayıtlar sayfalar halinde gösterilir.
         </InfoNote>
       ) : null}
     </section>
@@ -208,51 +208,55 @@ function ActivityItem({
 
   return (
     <article className="asset-activity-item">
-      <header>
-        <div className="asset-activity-item__identity">
-          <time dateTime={item.reportedDateTime ?? undefined}>
-            {formatDateTime(item.reportedDateTime)}
-          </time>
-          <strong>{item.workOrderNumber}</strong>
+      <div className="asset-activity-item__summary">
+        <div className="asset-activity-item__main">
+          <header>
+            <div className="asset-activity-item__identity">
+              <time dateTime={item.reportedDateTime ?? undefined}>
+                {formatDateTime(item.reportedDateTime)}
+              </time>
+              <strong>{item.workOrderNumber}</strong>
+            </div>
+            <span className={`activity-state activity-state--${item.state.toLowerCase()}`}>
+              {stateLabels[item.state]}
+            </span>
+          </header>
+
+          {metadata.length > 0 ? (
+            <div className="asset-activity-item__metadata" aria-label="İş emri sınıflandırması">
+              {metadata.map((value, index) => <span key={`${value}-${index}`}>{value}</span>)}
+            </div>
+          ) : null}
+
+          {item.descriptionSnippet ? (
+            <p className="asset-activity-item__description">{item.descriptionSnippet}</p>
+          ) : null}
         </div>
-        <span className={`activity-state activity-state--${item.state.toLowerCase()}`}>
-          {stateLabels[item.state]}
-        </span>
-      </header>
 
-      {metadata.length > 0 ? (
-        <div className="asset-activity-item__metadata" aria-label="İş emri sınıflandırması">
-          {metadata.map((value, index) => <span key={`${value}-${index}`}>{value}</span>)}
-        </div>
-      ) : null}
-
-      {item.descriptionSnippet ? (
-        <p className="asset-activity-item__description">{item.descriptionSnippet}</p>
-      ) : null}
-
-      <div className="asset-activity-item__actions">
-        {item.historicalIntervention ? (
-          <button
-            className="asset-activity-item__toggle"
-            type="button"
-            aria-expanded={expanded}
-            aria-controls={interventionRegionId}
-            onClick={onToggle}
+        <div className="asset-activity-item__actions">
+          {item.historicalIntervention ? (
+            <button
+              className="asset-activity-item__toggle"
+              type="button"
+              aria-expanded={expanded}
+              aria-controls={interventionRegionId}
+              onClick={onToggle}
+            >
+              {expanded ? 'Müdahale detayını kapat' : 'Müdahale detayını göster'}
+            </button>
+          ) : (
+            <span className="asset-activity-item__missing-intervention">
+              Geçmiş müdahale kaydı bulunmuyor
+            </span>
+          )}
+          <Link
+            className="btn btn-sm btn-outline-primary"
+            to={`/work-orders/${item.workOrderId}/similar-cases`}
+            state={{ originAssetId: assetId }}
           >
-            {expanded ? 'Müdahale detayını kapat' : 'Müdahale detayını göster'}
-          </button>
-        ) : (
-          <span className="asset-activity-item__missing-intervention">
-            Geçmiş müdahale kaydı bulunmuyor
-          </span>
-        )}
-        <Link
-          className="btn btn-sm btn-outline-primary"
-          to={`/work-orders/${item.workOrderId}/similar-cases`}
-          state={{ originAssetId: assetId }}
-        >
-          Benzer Vakaları Gör
-        </Link>
+            Benzer Vakaları Gör
+          </Link>
+        </div>
       </div>
 
       {item.historicalIntervention ? (

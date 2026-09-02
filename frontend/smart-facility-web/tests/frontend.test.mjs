@@ -900,6 +900,7 @@ test('Phase 2B activity and search contracts are typed, bounded, keyed and cance
   const hooksSource = readFileSync(new URL('../src/hooks/useAnalytics.ts', import.meta.url), 'utf8')
   const timelineSource = readFileSync(new URL('../src/components/AssetActivityTimeline.tsx', import.meta.url), 'utf8')
   const searchSource = readFileSync(new URL('../src/components/AssetSearch.tsx', import.meta.url), 'utf8')
+  const styleSource = readFileSync(new URL('../src/index.css', import.meta.url), 'utf8')
 
   assert.match(typesSource, /interface AssetActivityResponse[\s\S]*items: AssetActivityItem\[\]/)
   assert.match(typesSource, /interface AssetSearchItem[\s\S]*assetId: number/)
@@ -916,6 +917,8 @@ test('Phase 2B activity and search contracts are typed, bounded, keyed and cance
   assert.match(timelineSource, /slice\(-maximumCursorHistory\)/)
   assert.match(searchSource, /const searchResultLimit = 10/)
   assert.match(searchSource, /const searchDebounceMilliseconds = 300/)
+  assert.match(styleSource, /\.asset-activity-item__summary \{[\s\S]*grid-template-columns: minmax\(0, 1fr\) minmax\(150px, auto\)/)
+  assert.match(styleSource, /@media \(max-width: 680px\)[\s\S]*\.asset-activity-item__summary \{ grid-template-columns: 1fr/)
   const activityContractSource = typesSource.slice(
     typesSource.indexOf('export type AssetActivityState'),
     typesSource.indexOf('export interface AssetMaintenanceActivityParetoItem'),
@@ -962,6 +965,8 @@ test('Asset 360 renders one privacy-safe activity page in the required section o
   assert.match(html, /href="\/work-orders\/54838\/similar-cases"/)
   assert.match(html, />Önceki</)
   assert.match(html, />Sonraki</)
+  assert.match(html, /Kayıtlar sayfalar halinde gösterilir/)
+  assert.doesNotMatch(html, /cursor sayfası|Canonical bakım aktivitesi/i)
   assert.doesNotMatch(html, />null<|descriptionRaw|requestedByName|assignedPersonnelName|sourceFileName|fingerprint/i)
 })
 
@@ -1047,6 +1052,8 @@ test('Assets page search renders bounded numeric links and preserves portfolio c
   const assetsHtml = renderPage(AssetsPage)
 
   assert.match(searchHtml, /Varlık Ara/)
+  assert.match(searchHtml, /Varlık keşfi/i)
+  assert.doesNotMatch(searchHtml, /Canonical varlık keşfi/i)
   assert.match(searchHtml, /Varlık kodu veya adıyla ara/)
   assert.match(searchHtml, /En fazla 10 sonuç/)
   assert.match(searchHtml, /2001KBL00009/)

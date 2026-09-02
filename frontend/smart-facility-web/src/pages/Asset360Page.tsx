@@ -115,7 +115,7 @@ export function Asset360Page() {
         </dl>
       </section>
 
-      <section className="kpi-grid kpi-grid--six" aria-label="Canonical bakım aktivitesi">
+      <section className="kpi-grid kpi-grid--six" aria-label="Güncel bakım aktivitesi">
         <KpiCard
           label="Toplam İş Emri"
           value={maintenance.totalWorkOrders}
