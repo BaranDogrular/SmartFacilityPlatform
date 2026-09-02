@@ -1,5 +1,6 @@
 import { ChartPanel, HorizontalBarChart } from '../components/AnalyticsCharts'
 import { AssetMaintenanceActivityPareto } from '../components/AssetMaintenanceActivityPareto'
+import { AssetSearch } from '../components/AssetSearch'
 import { DataTimestamp, EmptyState, ErrorState, InfoNote, KpiCard, LoadingState, PageHeader } from '../components/DashboardUi'
 import { useAssetOverview } from '../hooks/useAnalytics'
 
@@ -28,6 +29,8 @@ export function AssetsPage() {
         description="Operasyonel envanter dağılımı ve canonical iş emri aktivitesi."
         actions={<DataTimestamp value={data.metadata.dataAsOf} />}
       />
+
+      <AssetSearch />
 
       <section className="kpi-grid kpi-grid--three" aria-label="Varlık göstergeleri">
         <KpiCard label="Toplam Varlık" value={data.totalAssetCount} reliability={data.metadata.reliability} />

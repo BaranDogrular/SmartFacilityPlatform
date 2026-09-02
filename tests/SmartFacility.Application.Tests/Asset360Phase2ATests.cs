@@ -115,7 +115,20 @@ public sealed class Asset360Phase2ATests
         Assert.DoesNotContain("employee@example.com", result.Response.Items[0].DescriptionSnippet);
         Assert.DoesNotContain("532 123 45 67", result.Response.Items[0].DescriptionSnippet);
         Assert.Equal(AssetActivityState.Closed, result.Response.Items[0].State);
-        Assert.InRange(commands.Commands.Count, 1, 3);
+        Assert.Null(result.Response.Items[1].HistoricalIntervention);
+        Assert.Equal(0, result.Response.Items[1].InterventionCount);
+        Assert.Equal(4, commands.Commands.Count);
+        var interventionCommand = Assert.Single(
+            commands.Commands,
+            command => command.Contains(
+                "HistoricalInterventions",
+                StringComparison.OrdinalIgnoreCase));
+        Assert.Contains("WorkOrderId", interventionCommand, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(" IN ", interventionCommand, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(
+            "AssetActivity.InterventionPage",
+            interventionCommand,
+            StringComparison.Ordinal);
         Assert.DoesNotContain(
             commands.Commands,
             command => command.Contains("HistoricalWorkOrders", StringComparison.OrdinalIgnoreCase));
@@ -128,6 +141,67 @@ public sealed class Asset360Phase2ATests
         Assert.DoesNotContain("RAW-", payload, StringComparison.Ordinal);
         Assert.DoesNotContain("SourceFile", payload, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("Fingerprint", payload, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task Intervention_lookup_is_one_page_bounded_query_for_at_most_fifty_work_orders()
+    {
+        var commands = new CommandCaptureInterceptor();
+        await using var database = await SqliteTestDatabase.CreateAsync(commands);
+        var snapshotBatch = Batch("WorkOrder");
+        var interventionBatch = Batch("HistoricalIntervention");
+        var asset = Asset("A-1", "Main pump");
+        database.Context.AddRange(snapshotBatch, interventionBatch, asset);
+
+        var workOrders = Enumerable.Range(1, 55)
+            .Select(index => WorkOrder(
+                $"WO-{index:00}",
+                new DateTime(2026, 8, 20).AddMinutes(index),
+                asset,
+                snapshotBatch))
+            .ToArray();
+        database.Context.WorkOrders.AddRange(workOrders);
+        await database.Context.SaveChangesAsync();
+        database.Context.HistoricalInterventions.AddRange(workOrders.Select(item => Intervention(
+            item,
+            interventionBatch,
+            HistoricalInterventionQuality.Informative,
+            $"Sanitized action {item.WorkOrderNumber}",
+            $"RAW-{item.WorkOrderNumber}",
+            item.ReportedDateTime,
+            $"HI-{item.WorkOrderNumber}")));
+        await database.Context.SaveChangesAsync();
+        commands.Commands.Clear();
+
+        var result = await new EfAnalyticsQueryService(database.Context).GetAssetActivityAsync(
+            asset.Id,
+            new AssetActivityQuery { PageSize = 50 });
+
+        Assert.Equal(AssetActivityResultStatus.Success, result.Status);
+        Assert.NotNull(result.Response);
+        Assert.Equal(50, result.Response.Items.Count);
+        Assert.True(result.Response.HasNextPage);
+        Assert.All(result.Response.Items, item =>
+        {
+            Assert.Equal(1, item.InterventionCount);
+            Assert.NotNull(item.HistoricalIntervention);
+        });
+        Assert.Equal(50, result.Response.Items.Select(item => item.WorkOrderId).Distinct().Count());
+        Assert.Equal(4, commands.Commands.Count);
+        var interventionCommand = Assert.Single(
+            commands.Commands,
+            command => command.Contains(
+                "HistoricalInterventions",
+                StringComparison.OrdinalIgnoreCase));
+        Assert.Contains("WorkOrderId", interventionCommand, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(" IN ", interventionCommand, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(
+            "AssetActivity.InterventionPage",
+            interventionCommand,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain("Raw", interventionCommand, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("SourceFile", interventionCommand, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("Fingerprint", interventionCommand, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

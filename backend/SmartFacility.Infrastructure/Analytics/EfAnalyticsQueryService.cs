@@ -385,6 +385,7 @@ public sealed class EfAnalyticsQueryService(SmartFacilityDbContext dbContext) :
             AssetActivityMaximumPageSize);
         var workOrders = _dbContext.WorkOrders
             .AsNoTracking()
+            .TagWith("AssetActivity.WorkOrderPage")
             .Where(item => item.IsInCanonicalSnapshot && item.AssetId == assetId);
 
         if (cursor is not null)
@@ -421,35 +422,56 @@ public sealed class EfAnalyticsQueryService(SmartFacilityDbContext dbContext) :
                 item.Discipline,
                 item.WorkType,
                 item.FailureType,
-                item.Description,
-                item.HistoricalInterventions.Count(),
-                item.HistoricalInterventions
-                    .OrderBy(intervention =>
-                        intervention.InterventionQuality == HistoricalInterventionQuality.Informative
-                            ? 0
-                            : intervention.InterventionQuality == HistoricalInterventionQuality.Generic
-                                ? 1
-                                : intervention.InterventionQuality == HistoricalInterventionQuality.NoAction
-                                    ? 2
-                                    : 3)
-                    .ThenByDescending(intervention => intervention.CompletionDateTime.HasValue)
-                    .ThenByDescending(intervention => intervention.CompletionDateTime)
-                    .ThenByDescending(intervention => intervention.SourceYear)
-                    .ThenByDescending(intervention => intervention.ReportedDateTime)
-                    .ThenBy(intervention => intervention.Id)
-                    .Select(intervention => new AssetActivityInterventionProjection(
-                        intervention.RequestDescriptionSanitized,
-                        intervention.FailureReasonDescriptionSanitized,
-                        intervention.WorkPerformedDescriptionSanitized,
-                        intervention.InterventionQuality,
-                        intervention.CompletionDateTime))
-                    .FirstOrDefault()))
+                item.Description))
             .ToListAsync(cancellationToken);
 
         var hasNextPage = rows.Count > pageSize;
         var pageRows = rows.Take(pageSize).ToArray();
+        var pageWorkOrderIds = pageRows
+            .Select(item => item.WorkOrderId)
+            .ToArray();
+        var interventionRows = pageWorkOrderIds.Length == 0
+            ? []
+            : await _dbContext.HistoricalInterventions
+                .AsNoTracking()
+                .TagWith("AssetActivity.InterventionPage")
+                .Where(intervention => pageWorkOrderIds.Contains(intervention.WorkOrderId))
+                .GroupBy(intervention => intervention.WorkOrderId)
+                .Select(group => new AssetActivityInterventionSummaryProjection(
+                    group.Key,
+                    group.Count(),
+                    group
+                        .OrderBy(intervention =>
+                            intervention.InterventionQuality
+                                == HistoricalInterventionQuality.Informative
+                                ? 0
+                                : intervention.InterventionQuality
+                                    == HistoricalInterventionQuality.Generic
+                                    ? 1
+                                    : intervention.InterventionQuality
+                                        == HistoricalInterventionQuality.NoAction
+                                        ? 2
+                                        : 3)
+                        .ThenByDescending(intervention =>
+                            intervention.CompletionDateTime.HasValue)
+                        .ThenByDescending(intervention => intervention.CompletionDateTime)
+                        .ThenByDescending(intervention => intervention.SourceYear)
+                        .ThenByDescending(intervention => intervention.ReportedDateTime)
+                        .ThenBy(intervention => intervention.Id)
+                        .Select(intervention => new AssetActivityInterventionProjection(
+                            intervention.RequestDescriptionSanitized,
+                            intervention.FailureReasonDescriptionSanitized,
+                            intervention.WorkPerformedDescriptionSanitized,
+                            intervention.InterventionQuality,
+                            intervention.CompletionDateTime))
+                        .First()))
+                .ToListAsync(cancellationToken);
+        var interventionsByWorkOrderId = interventionRows
+            .ToDictionary(item => item.WorkOrderId);
         var items = pageRows
-            .Select(MapAssetActivityItem)
+            .Select(item => MapAssetActivityItem(
+                item,
+                interventionsByWorkOrderId.GetValueOrDefault(item.WorkOrderId)))
             .ToArray();
         var lastRow = hasNextPage ? pageRows[^1] : null;
         var nextCursor = lastRow is null
@@ -501,7 +523,9 @@ public sealed class EfAnalyticsQueryService(SmartFacilityDbContext dbContext) :
             .ToListAsync(cancellationToken);
     }
 
-    private static AssetActivityItemDto MapAssetActivityItem(AssetActivityProjection item) =>
+    private static AssetActivityItemDto MapAssetActivityItem(
+        AssetActivityProjection item,
+        AssetActivityInterventionSummaryProjection? interventionSummary) =>
         new(
             item.WorkOrderId,
             item.WorkOrderNumber,
@@ -516,13 +540,13 @@ public sealed class EfAnalyticsQueryService(SmartFacilityDbContext dbContext) :
             item.WorkType,
             item.FailureType,
             SimilarCasesScoring.CreatePrivacySafeSnippet(item.Description),
-            item.HistoricalIntervention is null
+            interventionSummary is null
                 ? null
                 : new AssetActivityHistoricalInterventionDto(
-                    item.HistoricalIntervention.RequestDescriptionSanitized,
-                    item.HistoricalIntervention.FailureReasonDescriptionSanitized,
-                    item.HistoricalIntervention.WorkPerformedDescriptionSanitized,
-                    item.HistoricalIntervention.Quality switch
+                    interventionSummary.HistoricalIntervention.RequestDescriptionSanitized,
+                    interventionSummary.HistoricalIntervention.FailureReasonDescriptionSanitized,
+                    interventionSummary.HistoricalIntervention.WorkPerformedDescriptionSanitized,
+                    interventionSummary.HistoricalIntervention.Quality switch
                     {
                         HistoricalInterventionQuality.Informative =>
                             AssetActivityInterventionQuality.Informative,
@@ -530,8 +554,8 @@ public sealed class EfAnalyticsQueryService(SmartFacilityDbContext dbContext) :
                             AssetActivityInterventionQuality.Generic,
                         _ => AssetActivityInterventionQuality.NoAction
                     },
-                    item.HistoricalIntervention.CompletionDateTime),
-            item.InterventionCount);
+                    interventionSummary.HistoricalIntervention.CompletionDateTime),
+            interventionSummary?.InterventionCount ?? 0);
 
     private static string EncodeAssetActivityCursor(AssetActivityCursorPayload payload)
     {
@@ -2381,9 +2405,12 @@ public sealed class EfAnalyticsQueryService(SmartFacilityDbContext dbContext) :
         string? Discipline,
         string? WorkType,
         string? FailureType,
-        string? Description,
+        string? Description);
+
+    private sealed record AssetActivityInterventionSummaryProjection(
+        long WorkOrderId,
         int InterventionCount,
-        AssetActivityInterventionProjection? HistoricalIntervention);
+        AssetActivityInterventionProjection HistoricalIntervention);
 
     private sealed record AssetActivityInterventionProjection(
         string? RequestDescriptionSanitized,

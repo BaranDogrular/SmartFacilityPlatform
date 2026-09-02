@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useLocation, useParams } from 'react-router-dom'
 import type {
   SimilarCaseHistoricalIntervention,
   SimilarCasesQuery,
@@ -33,6 +33,18 @@ function availabilityMessage(message: string | null): string {
   if (message.includes('no Discipline')) return 'Kayıtta disiplin bilgisi bulunmadığı için karşılaştırma yapılamıyor.'
   if (message.includes('no ReportedDateTime')) return 'Kayıtta bildirim tarihi bulunmadığı için temporal karşılaştırma yapılamıyor.'
   return 'Yeterince benzer geçmiş vaka bulunamadı.'
+}
+
+function parseOriginAssetId(state: unknown): number | null {
+  if (!state || typeof state !== 'object' || !('originAssetId' in state)) return null
+
+  const candidate = state.originAssetId
+  const parsed = typeof candidate === 'number'
+    ? candidate
+    : typeof candidate === 'string' && /^\d+$/.test(candidate)
+      ? Number(candidate)
+      : Number.NaN
+  return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : null
 }
 
 function HistoricalInterventionPanel({
@@ -99,8 +111,10 @@ function HistoricalInterventionPanel({
 
 export function SimilarCasesPage() {
   const { id } = useParams()
+  const location = useLocation()
   const workOrderId = Number(id)
   const validId = Number.isSafeInteger(workOrderId) && workOrderId > 0
+  const originAssetId = parseOriginAssetId(location.state)
   const [draftTop, setDraftTop] = useState('10')
   const [query, setQuery] = useState<SimilarCasesQuery>({ top: 10 })
   const [filterError, setFilterError] = useState('')
@@ -142,7 +156,13 @@ export function SimilarCasesPage() {
         eyebrow="Canonical WorkOrder geçmişi"
         title="Benzer Geçmiş Vakalar"
         description="Seçilen iş emrine benzer geçmiş bakım/talep kayıtlarını gösterir."
-        actions={<Link className="btn btn-outline-secondary" to="/work-orders">İş Emirlerine dön</Link>}
+        actions={originAssetId ? (
+          <Link className="btn btn-outline-secondary" to={`/assets/${originAssetId}`}>
+            Varlık 360’a dön
+          </Link>
+        ) : (
+          <Link className="btn btn-outline-secondary" to="/work-orders">İş Emirlerine dön</Link>
+        )}
       />
 
       <InfoNote>

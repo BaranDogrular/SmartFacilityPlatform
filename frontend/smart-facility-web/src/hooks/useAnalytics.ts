@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import {
+  getAssetActivity,
   getAssetMaintenanceActivityPareto,
   getAssetOverview,
   getAsset360Summary,
@@ -13,6 +14,7 @@ import {
   getScadaTrend,
   getWorkOrderOverview,
   getWorkOrderTrend,
+  searchAssets,
 } from '../api/analyticsClient'
 import type {
   AssetMaintenanceActivityParetoQuery,
@@ -38,6 +40,48 @@ export const useAsset360Summary = (assetId: number, enabled = true) =>
     queryFn: () => getAsset360Summary(assetId),
     enabled,
   })
+
+export const assetActivityQueryKey = (
+  assetId: number,
+  cursor: string | null,
+  pageSize: number,
+) => ['analytics', 'assets', assetId, 'activity', { cursor, pageSize }] as const
+
+export const useAssetActivity = (
+  assetId: number,
+  cursor: string | null,
+  pageSize = 25,
+  enabled = true,
+) =>
+  useQuery({
+    queryKey: assetActivityQueryKey(assetId, cursor, pageSize),
+    queryFn: ({ signal }) => getAssetActivity(
+      assetId,
+      { pageSize, ...(cursor ? { cursor } : {}) },
+      signal,
+    ),
+    enabled: enabled && Number.isSafeInteger(assetId) && assetId > 0,
+    retry: false,
+  })
+
+export const assetSearchQueryKey = (query: string, limit: number) =>
+  ['analytics', 'assets', 'search', { q: query.trim(), limit }] as const
+
+export const useAssetSearch = (
+  query: string,
+  requestedLimit = 10,
+  enabled = true,
+) => {
+  const normalizedQuery = query.trim()
+  const limit = Math.min(Math.max(requestedLimit, 1), 10)
+
+  return useQuery({
+    queryKey: assetSearchQueryKey(normalizedQuery, limit),
+    queryFn: ({ signal }) => searchAssets({ q: normalizedQuery, limit }, signal),
+    enabled: enabled && normalizedQuery.length >= 2 && normalizedQuery.length <= 100,
+    retry: false,
+  })
+}
 
 export const useAssetMaintenanceActivityPareto = (
   query: AssetMaintenanceActivityParetoQuery = {},

@@ -20,6 +20,7 @@ const dashboardUi = await vite.ssrLoadModule('/src/components/DashboardUi.tsx')
 const { OverviewPage } = await vite.ssrLoadModule('/src/pages/OverviewPage.tsx')
 const { AssetsPage } = await vite.ssrLoadModule('/src/pages/AssetsPage.tsx')
 const { Asset360Page } = await vite.ssrLoadModule('/src/pages/Asset360Page.tsx')
+const { AssetSearch } = await vite.ssrLoadModule('/src/components/AssetSearch.tsx')
 const { WorkOrdersPage } = await vite.ssrLoadModule('/src/pages/WorkOrdersPage.tsx')
 const { SimilarCasesPage } = await vite.ssrLoadModule('/src/pages/SimilarCasesPage.tsx')
 const { InspectionPriorityPage } = await vite.ssrLoadModule('/src/pages/InspectionPriorityPage.tsx')
@@ -177,6 +178,60 @@ const asset360 = {
   },
   generatedAt: '2026-08-25T12:00:00Z',
 }
+
+const assetActivity = {
+  assetId: 360,
+  items: [
+    {
+      workOrderId: 54838,
+      workOrderNumber: 'WO-54838',
+      reportedDateTime: '2026-08-24T10:00:00',
+      state: 'OPEN',
+      status: 'İşlemde',
+      discipline: 'MEKANİK',
+      workType: 'ARIZA',
+      failureType: 'MEKANİK ARIZA',
+      descriptionSnippet: 'Ana pompa hattında titreşim gözlendi.',
+      historicalIntervention: {
+        requestDescription: 'Pompa titreşimi kontrol edilsin.',
+        failureReasonDescription: 'Rulman aşınması',
+        workPerformedDescription: 'Rulman değiştirildi ve çalışma kontrolü yapıldı.',
+        quality: 'INFORMATIVE',
+        observedCompletionDateTime: '2026-08-24T12:30:00',
+      },
+      interventionCount: 2,
+    },
+    {
+      workOrderId: 54837,
+      workOrderNumber: 'WO-54837',
+      reportedDateTime: null,
+      state: 'CLOSED',
+      status: null,
+      discipline: null,
+      workType: null,
+      failureType: null,
+      descriptionSnippet: '',
+      historicalIntervention: null,
+      interventionCount: 0,
+    },
+  ],
+  pageSize: 25,
+  hasNextPage: true,
+  nextCursor: 'opaque-page-2',
+  sourceDataset: 'core.WorkOrders + core.HistoricalInterventions',
+  privacyRuleVersion: 'privacy-redaction/email-turkish-mobile/v1',
+}
+
+const assetSearchResults = [
+  {
+    assetId: 651,
+    assetCode: '2001KBL00009',
+    assetName: 'SCADA Lokasyon Kontrol Çalışması',
+    buildingName: 'Merkez Bina',
+    locationName: 'Teknik Alan',
+    assetGroupName: 'Kontrol Sistemleri',
+  },
+]
 
 const inspectionPriority = {
   metadata: {
@@ -527,6 +582,14 @@ function createQueryClient(overrides = {}) {
     overrides.asset360Trend ?? workOrderTrend,
   )
   client.setQueryData(
+    ['analytics', 'assets', 360, 'activity', { cursor: null, pageSize: 25 }],
+    overrides.assetActivity ?? assetActivity,
+  )
+  client.setQueryData(
+    ['analytics', 'assets', 'search', { q: '2001KBL00009', limit: 10 }],
+    overrides.assetSearch ?? assetSearchResults,
+  )
+  client.setQueryData(
     ['analytics', 'work-orders', 54838, 'similar-cases', { top: 10 }],
     overrides.similarCases ?? similarCases,
   )
@@ -558,11 +621,16 @@ function renderPage(Component, overrides) {
   )
 }
 
-function renderSimilarCasesPage(overrides) {
+function renderSimilarCasesPage(overrides, originAssetId = null) {
   return renderToStaticMarkup(
     React.createElement(
       MemoryRouter,
-      { initialEntries: ['/work-orders/54838/similar-cases'] },
+      {
+        initialEntries: [{
+          pathname: '/work-orders/54838/similar-cases',
+          state: originAssetId === null ? null : { originAssetId },
+        }],
+      },
       React.createElement(
         QueryClientProvider,
         { client: createQueryClient(overrides) },
@@ -574,6 +642,24 @@ function renderSimilarCasesPage(overrides) {
             element: React.createElement(SimilarCasesPage),
           }),
         ),
+      ),
+    ),
+  )
+}
+
+function renderAssetSearch(overrides) {
+  return renderAssetSearchWithClient(createQueryClient(overrides))
+}
+
+function renderAssetSearchWithClient(client, initialQuery = '2001KBL00009') {
+  return renderToStaticMarkup(
+    React.createElement(
+      MemoryRouter,
+      null,
+      React.createElement(
+        QueryClientProvider,
+        { client },
+        React.createElement(AssetSearch, { initialQuery }),
       ),
     ),
   )
@@ -634,6 +720,8 @@ test('new analytics clients call the accepted backend routes with serialized que
 
   try {
     await analytics.getAsset360Summary(360)
+    await analytics.getAssetActivity(360, { pageSize: 25, cursor: 'opaque-page-2' })
+    await analytics.searchAssets({ q: '2001KBL00009', limit: 10 })
     await analytics.getAssetMaintenanceActivityPareto({ dateFrom: '2025-01-01', top: 5 })
     await analytics.getInspectionPriority({ asOf: '2026-08-25', top: 25 })
     await analytics.getEarlyWarning({ asOf: '2026-08-25', top: 10 })
@@ -648,6 +736,14 @@ test('new analytics clients call the accepted backend routes with serialized que
     {
       url: '/api/analytics/assets/360/summary',
       params: {},
+    },
+    {
+      url: '/api/analytics/assets/360/activity',
+      params: { pageSize: 25, cursor: 'opaque-page-2' },
+    },
+    {
+      url: '/api/analytics/assets/search',
+      params: { q: '2001KBL00009', limit: 10 },
     },
     {
       url: '/api/analytics/assets/maintenance-activity-pareto',
@@ -796,6 +892,213 @@ test('Asset 360 route, typed client and hook use canonical numeric AssetId witho
   assert.match(chartSource, /formatFullMonth\(points\[dataIndex\]\.period\)/)
   assert.match(styleSource, /\.kpi-grid--six \{[\s\S]*repeat\(3, minmax\(0, 1fr\)\)/)
   assert.doesNotMatch([clientSource, typesSource, hooksSource, pageSource].join('\n'), /\bany\b/)
+})
+
+test('Phase 2B activity and search contracts are typed, bounded, keyed and cancellation-aware', async () => {
+  const clientSource = readFileSync(new URL('../src/api/analyticsClient.ts', import.meta.url), 'utf8')
+  const typesSource = readFileSync(new URL('../src/api/analyticsTypes.ts', import.meta.url), 'utf8')
+  const hooksSource = readFileSync(new URL('../src/hooks/useAnalytics.ts', import.meta.url), 'utf8')
+  const timelineSource = readFileSync(new URL('../src/components/AssetActivityTimeline.tsx', import.meta.url), 'utf8')
+  const searchSource = readFileSync(new URL('../src/components/AssetSearch.tsx', import.meta.url), 'utf8')
+
+  assert.match(typesSource, /interface AssetActivityResponse[\s\S]*items: AssetActivityItem\[\]/)
+  assert.match(typesSource, /interface AssetSearchItem[\s\S]*assetId: number/)
+  assert.match(clientSource, /getAssetActivity[\s\S]*\/activity/)
+  assert.match(clientSource, /searchAssets[\s\S]*\/api\/analytics\/assets\/search/)
+  assert.match(hooksSource, /assetActivityQueryKey[\s\S]*assetId[\s\S]*cursor[\s\S]*pageSize/)
+  assert.match(hooksSource, /assetSearchQueryKey[\s\S]*query\.trim\(\)[\s\S]*limit/)
+  assert.match(hooksSource, /queryFn: \(\{ signal \}\)[\s\S]*getAssetActivity/)
+  assert.match(hooksSource, /queryFn: \(\{ signal \}\)[\s\S]*searchAssets/)
+  assert.match(hooksSource, /normalizedQuery\.length >= 2/)
+  assert.match(hooksSource, /Math\.min\(Math\.max\(requestedLimit, 1\), 10\)/)
+  assert.match(timelineSource, /const activityPageSize = 25/)
+  assert.match(timelineSource, /visiblePage\.items\.slice\(0, activityPageSize\)/)
+  assert.match(timelineSource, /slice\(-maximumCursorHistory\)/)
+  assert.match(searchSource, /const searchResultLimit = 10/)
+  assert.match(searchSource, /const searchDebounceMilliseconds = 300/)
+  const activityContractSource = typesSource.slice(
+    typesSource.indexOf('export type AssetActivityState'),
+    typesSource.indexOf('export interface AssetMaintenanceActivityParetoItem'),
+  )
+  assert.doesNotMatch(
+    [activityContractSource, timelineSource, searchSource].join('\n'),
+    /\bany\b|descriptionRaw|requestDescriptionRaw|workPerformedDescriptionRaw|requestedByName|assignedPersonnelName|sourceFileName|sourceSheet|sourceRowNumber|fingerprint/i,
+  )
+
+  const originalAdapter = analytics.analyticsHttpClient.defaults.adapter
+  const controller = new AbortController()
+  const signals = []
+  analytics.analyticsHttpClient.defaults.adapter = async (config) => {
+    signals.push(config.signal)
+    return { data: {}, status: 200, statusText: 'OK', headers: {}, config }
+  }
+  try {
+    await analytics.getAssetActivity(360, { pageSize: 25 }, controller.signal)
+    await analytics.searchAssets({ q: 'A-360', limit: 10 }, controller.signal)
+  } finally {
+    analytics.analyticsHttpClient.defaults.adapter = originalAdapter
+  }
+  assert.deepEqual(signals, [controller.signal, controller.signal])
+})
+
+test('Asset 360 renders one privacy-safe activity page in the required section order', () => {
+  const html = renderAsset360Page()
+  const trendIndex = html.indexOf('Aylık İş Emri Trendi')
+  const activityIndex = html.indexOf('Varlık İş Emri Geçmişi')
+  const scopeIndex = html.indexOf('Bağlantı ve Güvenilirlik Notu')
+
+  assert.ok(trendIndex >= 0 && activityIndex > trendIndex && scopeIndex > activityIndex)
+  assert.match(html, /Sayfa 1 · En fazla 25 kayıt/)
+  assert.match(html, /WO-54838/)
+  assert.match(html, />AÇIK</)
+  assert.match(html, />KAPALI</)
+  assert.match(html, /Ana pompa hattında titreşim gözlendi/)
+  assert.match(html, /aria-expanded="false"/)
+  assert.match(html, /aria-controls="asset-360-work-order-54838-intervention"/)
+  assert.match(html, /Gözlenen müdahale tamamlanma zamanı/)
+  assert.match(html, /Rulman değiştirildi ve çalışma kontrolü yapıldı/)
+  assert.match(html, /Eşleşen müdahale kaydı/)
+  assert.match(html, /Geçmiş müdahale kaydı bulunmuyor/)
+  assert.match(html, /href="\/work-orders\/54838\/similar-cases"/)
+  assert.match(html, />Önceki</)
+  assert.match(html, />Sonraki</)
+  assert.doesNotMatch(html, />null<|descriptionRaw|requestedByName|assignedPersonnelName|sourceFileName|fingerprint/i)
+})
+
+test('Asset activity handles empty, loading and retryable failure without replacing Phase 1 summary', () => {
+  const emptyHtml = renderAsset360Page({
+    assetActivity: { ...assetActivity, items: [], hasNextPage: false, nextCursor: null },
+  })
+  assert.match(emptyHtml, /Bu varlıkla eşleşen güncel iş emri bulunmuyor/)
+  assert.match(emptyHtml, /Toplam İş Emri/)
+
+  const pendingClient = createQueryClient()
+  pendingClient.removeQueries({
+    queryKey: ['analytics', 'assets', 360, 'activity', { cursor: null, pageSize: 25 }],
+    exact: true,
+  })
+  const pendingHtml = renderToStaticMarkup(
+    React.createElement(
+      MemoryRouter,
+      { initialEntries: ['/assets/360'] },
+      React.createElement(
+        QueryClientProvider,
+        { client: pendingClient },
+        React.createElement(Routes, null, React.createElement(Route, {
+          path: '/assets/:assetId',
+          element: React.createElement(Asset360Page),
+        })),
+      ),
+    ),
+  )
+  assert.match(pendingHtml, /Varlık iş emri geçmişi yükleniyor/)
+  assert.match(pendingHtml, /Toplam İş Emri/)
+
+  const errorClient = createQueryClient()
+  errorClient.setDefaultOptions({
+    queries: { retry: false, retryOnMount: false, refetchOnMount: false, staleTime: Infinity },
+  })
+  const errorQuery = errorClient.getQueryCache().find({
+    queryKey: ['analytics', 'assets', 360, 'activity', { cursor: null, pageSize: 25 }],
+    exact: true,
+  })
+  errorQuery.setState({
+    ...errorQuery.state,
+    status: 'error',
+    fetchStatus: 'idle',
+    data: undefined,
+    error: new Error('Timeline servisi kullanılamıyor'),
+  })
+  const errorHtml = renderToStaticMarkup(
+    React.createElement(
+      MemoryRouter,
+      { initialEntries: ['/assets/360'] },
+      React.createElement(
+        QueryClientProvider,
+        { client: errorClient },
+        React.createElement(Routes, null, React.createElement(Route, {
+          path: '/assets/:assetId',
+          element: React.createElement(Asset360Page),
+        })),
+      ),
+    ),
+  )
+  assert.match(errorHtml, /Timeline servisi kullanılamıyor/)
+  assert.match(errorHtml, /Yeniden dene/)
+  assert.match(errorHtml, /Aylık İş Emri Trendi/)
+})
+
+test('Asset activity cursor source preserves rows on page error and resets stale snapshots safely', () => {
+  const source = readFileSync(new URL('../src/components/AssetActivityTimeline.tsx', import.meta.url), 'utf8')
+
+  assert.match(source, /const \[visiblePage, setVisiblePage\]/)
+  assert.match(source, /visiblePage && activity\.error/)
+  assert.match(source, /Mevcut kayıtlar korunuyor/)
+  assert.match(source, /activity\.error instanceof AnalyticsApiError && activity\.error\.status === 409/)
+  assert.match(source, /setCursorHistory\(\[\{ cursor: null, pageNumber: 1 \}\]\)/)
+  assert.match(source, /Veri seti yenilendi/)
+  assert.match(source, /cursorHistory\.length <= 1/)
+  assert.match(source, /visiblePage\.nextCursor/)
+  assert.doesNotMatch(source, /useInfiniteQuery|fetchNextPage|flatMap/)
+})
+
+test('Assets page search renders bounded numeric links and preserves portfolio content', () => {
+  const searchHtml = renderAssetSearch()
+  const assetsHtml = renderPage(AssetsPage)
+
+  assert.match(searchHtml, /Varlık Ara/)
+  assert.match(searchHtml, /Varlık kodu veya adıyla ara/)
+  assert.match(searchHtml, /En fazla 10 sonuç/)
+  assert.match(searchHtml, /2001KBL00009/)
+  assert.match(searchHtml, /SCADA Lokasyon Kontrol Çalışması/)
+  assert.match(searchHtml, /Merkez Bina · Teknik Alan · Kontrol Sistemleri/)
+  assert.match(searchHtml, /href="\/assets\/651"/)
+  assert.match(assetsHtml, /Varlık Ara/)
+  assert.match(assetsHtml, /Toplam Varlık/)
+  assert.match(assetsHtml, /İş Emri Aktivitesi En Yoğun Asset/)
+  assert.doesNotMatch(searchHtml, /serialNumber|fingerprint|sourceFile|AssetIdRaw/i)
+})
+
+test('Asset search handles helper, loading, error, no-result and clear/debounce contracts', () => {
+  const helperHtml = renderAssetSearchWithClient(createQueryClient(), 'A')
+  assert.match(helperHtml, /Arama yapmak için en az 2 karakter girin/)
+  assert.doesNotMatch(helperHtml, /Varlıklar aranıyor/)
+
+  const loadingClient = createQueryClient()
+  loadingClient.removeQueries({
+    queryKey: ['analytics', 'assets', 'search', { q: '2001KBL00009', limit: 10 }],
+    exact: true,
+  })
+  assert.match(renderAssetSearchWithClient(loadingClient), /Varlıklar aranıyor/)
+
+  const errorClient = createQueryClient()
+  errorClient.setDefaultOptions({
+    queries: { retry: false, retryOnMount: false, refetchOnMount: false, staleTime: Infinity },
+  })
+  const errorQuery = errorClient.getQueryCache().find({
+    queryKey: ['analytics', 'assets', 'search', { q: '2001KBL00009', limit: 10 }],
+    exact: true,
+  })
+  errorQuery.setState({
+    ...errorQuery.state,
+    status: 'error',
+    fetchStatus: 'idle',
+    data: undefined,
+    error: new Error('Arama servisi kullanılamıyor'),
+  })
+  const errorHtml = renderAssetSearchWithClient(errorClient)
+  assert.match(errorHtml, /Arama sonuçları alınamadı/)
+  assert.match(errorHtml, /Yeniden dene/)
+
+  const noResultHtml = renderAssetSearch({ assetSearch: [] })
+  assert.match(noResultHtml, /Aramanızla eşleşen varlık bulunamadı/)
+
+  const source = readFileSync(new URL('../src/components/AssetSearch.tsx', import.meta.url), 'utf8')
+  assert.match(source, /normalizedInput\.length >= 2/)
+  assert.match(source, /window\.setTimeout/)
+  assert.match(source, /setDebouncedQuery\(''\)/)
+  assert.match(source, /setInput\(''\)/)
+  assert.match(source, /disabled=\{!canSearch/)
 })
 
 test('Asset 360 renders identity, KPIs, explainable decisions, trend and scope safeguards', () => {
@@ -1199,6 +1502,26 @@ test('similar historical cases render bounded evidence without solution or perso
   assert.match(html, /Requester ve sorumlu personel alanları gösterilmez/)
   assert.match(html, /çözüm önerisi veya otomatik bakım talimatı değildir/)
   assert.doesNotMatch(html, /failure probability|çözüm adımı|önerilen çözüm|RequestedBy|AssignedPerson|dangerouslySetInnerHTML/i)
+})
+
+test('Similar Cases uses validated Asset 360 origin navigation and preserves fallback', () => {
+  const fromAssetHtml = renderSimilarCasesPage(undefined, 360)
+  const fallbackHtml = renderSimilarCasesPage()
+  const invalidOriginHtml = renderSimilarCasesPage(undefined, '/assets/999')
+  const timelineSource = readFileSync(new URL('../src/components/AssetActivityTimeline.tsx', import.meta.url), 'utf8')
+  const similarSource = readFileSync(new URL('../src/pages/SimilarCasesPage.tsx', import.meta.url), 'utf8')
+
+  assert.match(fromAssetHtml, /href="\/assets\/360"/)
+  assert.match(fromAssetHtml, /Varlık 360’a dön/)
+  assert.doesNotMatch(fromAssetHtml, /İş Emirlerine dön/)
+  assert.match(fallbackHtml, /href="\/work-orders"/)
+  assert.match(fallbackHtml, /İş Emirlerine dön/)
+  assert.match(invalidOriginHtml, /href="\/work-orders"/)
+  assert.doesNotMatch(invalidOriginHtml, /href="\/assets\/999"/)
+  assert.match(timelineSource, /state=\{\{ originAssetId: assetId \}\}/)
+  assert.match(timelineSource, /to=\{`\/work-orders\/\$\{item\.workOrderId\}\/similar-cases`\}/)
+  assert.match(similarSource, /Number\.isSafeInteger\(parsed\) && parsed > 0/)
+  assert.doesNotMatch(similarSource, /location\.state.*to=|window\.location|navigate\(location\.state/)
 })
 
 test('similar historical cases render generic, no-action and missing intervention states safely', () => {

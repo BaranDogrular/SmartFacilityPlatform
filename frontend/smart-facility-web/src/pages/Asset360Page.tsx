@@ -2,6 +2,7 @@ import { Link, useParams } from 'react-router-dom'
 import { AnalyticsApiError } from '../api/analyticsClient'
 import type { EarlyWarningLevel, InspectionPriorityLevel } from '../api/analyticsTypes'
 import { ChartPanel, TrendLineChart } from '../components/AnalyticsCharts'
+import { AssetActivityTimeline } from '../components/AssetActivityTimeline'
 import {
   EmptyState,
   ErrorState,
@@ -216,6 +217,8 @@ export function Asset360Page() {
         <TrendLineChart points={trend.data.points} reduceTickDensity />
         <InfoNote>Trend, aktivite değişimini gösterir; arıza olasılığı veya nedensellik göstermez.</InfoNote>
       </ChartPanel>
+
+      <AssetActivityTimeline key={assetId} assetId={assetId} />
 
       <section className="asset360-scope" aria-labelledby="asset360-scope-title">
         <header>

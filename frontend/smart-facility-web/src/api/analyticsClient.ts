@@ -1,10 +1,14 @@
 import axios from 'axios'
 import type {
+  AssetActivityQuery,
+  AssetActivityResponse,
   AssetMaintenanceActivityParetoQuery,
   AssetMaintenanceActivityParetoResponse,
   AssetOverviewQuery,
   AssetOverviewResponse,
   Asset360SummaryResponse,
+  AssetSearchItem,
+  AssetSearchQuery,
   InspectionPriorityQuery,
   InspectionPriorityResponse,
   EarlyWarningQuery,
@@ -90,9 +94,14 @@ analyticsHttpClient.interceptors.response.use(
   (error: unknown) => Promise.reject(toAnalyticsApiError(error)),
 )
 
-async function get<T>(path: string, query: QueryParameters = {}): Promise<T> {
+async function get<T>(
+  path: string,
+  query: QueryParameters = {},
+  signal?: AbortSignal,
+): Promise<T> {
   const response = await analyticsHttpClient.get<T>(path, {
     params: query,
+    signal,
     paramsSerializer: {
       serialize: (parameters) => serializeAnalyticsParams(parameters as QueryParameters),
     },
@@ -106,6 +115,27 @@ export const getAssetOverview = (query: AssetOverviewQuery = {}) =>
 
 export const getAsset360Summary = (assetId: number) =>
   get<Asset360SummaryResponse>(`/api/analytics/assets/${assetId}/summary`)
+
+export const getAssetActivity = (
+  assetId: number,
+  query: AssetActivityQuery = {},
+  signal?: AbortSignal,
+) =>
+  get<AssetActivityResponse>(
+    `/api/analytics/assets/${assetId}/activity`,
+    query as QueryParameters,
+    signal,
+  )
+
+export const searchAssets = (
+  query: AssetSearchQuery,
+  signal?: AbortSignal,
+) =>
+  get<AssetSearchItem[]>(
+    '/api/analytics/assets/search',
+    { q: query.q, limit: query.limit },
+    signal,
+  )
 
 export const getAssetMaintenanceActivityPareto = (
   query: AssetMaintenanceActivityParetoQuery = {},

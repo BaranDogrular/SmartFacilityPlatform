@@ -163,6 +163,50 @@ export interface Asset360SummaryResponse {
   generatedAt: string
 }
 
+export type AssetActivityState = 'OPEN' | 'CLOSED' | 'OTHER'
+export type AssetActivityInterventionQuality = 'INFORMATIVE' | 'GENERIC' | 'NO_ACTION'
+
+export interface AssetActivityHistoricalIntervention {
+  requestDescription: string | null
+  failureReasonDescription: string | null
+  workPerformedDescription: string | null
+  quality: AssetActivityInterventionQuality
+  observedCompletionDateTime: string | null
+}
+
+export interface AssetActivityItem {
+  workOrderId: number
+  workOrderNumber: string
+  reportedDateTime: string | null
+  state: AssetActivityState
+  status: string | null
+  discipline: string | null
+  workType: string | null
+  failureType: string | null
+  descriptionSnippet: string
+  historicalIntervention: AssetActivityHistoricalIntervention | null
+  interventionCount: number
+}
+
+export interface AssetActivityResponse {
+  assetId: number
+  items: AssetActivityItem[]
+  pageSize: number
+  hasNextPage: boolean
+  nextCursor: string | null
+  sourceDataset: string
+  privacyRuleVersion: string
+}
+
+export interface AssetSearchItem {
+  assetId: number
+  assetCode: string
+  assetName: string
+  buildingName: string | null
+  locationName: string | null
+  assetGroupName: string | null
+}
+
 export interface AssetMaintenanceActivityParetoItem {
   assetId: number
   assetCode: string
@@ -430,6 +474,16 @@ export interface AssetOverviewQuery {
   workOrderDateFrom?: string
   workOrderDateTo?: string
   top?: number
+}
+
+export interface AssetActivityQuery {
+  pageSize?: number
+  cursor?: string
+}
+
+export interface AssetSearchQuery {
+  q: string
+  limit?: number
 }
 
 export interface AssetMaintenanceActivityParetoQuery {
