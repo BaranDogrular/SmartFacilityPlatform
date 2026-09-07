@@ -21,6 +21,9 @@ const { OverviewPage } = await vite.ssrLoadModule('/src/pages/OverviewPage.tsx')
 const { AssetsPage } = await vite.ssrLoadModule('/src/pages/AssetsPage.tsx')
 const { Asset360Page } = await vite.ssrLoadModule('/src/pages/Asset360Page.tsx')
 const { AssetSearch } = await vite.ssrLoadModule('/src/components/AssetSearch.tsx')
+const { AssetComparisonPage } = await vite.ssrLoadModule('/src/pages/AssetComparisonPage.tsx')
+const { asset360SummaryQueryOptions } = await vite.ssrLoadModule('/src/hooks/useAnalytics.ts')
+const assetComparison = await vite.ssrLoadModule('/src/utils/assetComparison.ts')
 const { WorkOrdersPage } = await vite.ssrLoadModule('/src/pages/WorkOrdersPage.tsx')
 const { SimilarCasesPage } = await vite.ssrLoadModule('/src/pages/SimilarCasesPage.tsx')
 const { InspectionPriorityPage } = await vite.ssrLoadModule('/src/pages/InspectionPriorityPage.tsx')
@@ -681,6 +684,64 @@ function renderAsset360Page(overrides) {
             element: React.createElement(Asset360Page),
           }),
         ),
+      ),
+    ),
+  )
+}
+
+function createComparisonClient(entries = [651, 652, 653]) {
+  const client = createQueryClient()
+  entries.forEach((assetId, index) => {
+    client.setQueryData(
+      ['analytics', 'assets', assetId, 'summary'],
+      {
+        ...asset360,
+        asOf: index === 1 ? '2026-08-26' : '2026-08-25',
+        identity: {
+          ...asset360.identity,
+          assetId,
+          assetCode: `A-${assetId}`,
+          assetName: `Karşılaştırma Varlığı ${assetId}`,
+          buildingName: index === 2 ? null : `Bina ${index + 1}`,
+          locationName: index === 2 ? null : `Lokasyon ${index + 1}`,
+          assetGroupName: index === 2 ? null : 'Mekanik',
+          status: index === 2 ? null : 'Kullanımda',
+          assetType: index === 2 ? null : 'Pompa',
+        },
+        maintenance: {
+          ...asset360.maintenance,
+          totalWorkOrders: 40 + index,
+          lastWorkOrderDate: index === 2 ? null : asset360.maintenance.lastWorkOrderDate,
+        },
+        earlyWarning: index === 2
+          ? {
+              ...asset360.earlyWarning,
+              score: null,
+              level: null,
+              baselineStatus: 'INSUFFICIENT_BASELINE',
+            }
+          : asset360.earlyWarning,
+      },
+    )
+  })
+  return client
+}
+
+function renderAssetComparisonPage(
+  entry = '/assets/compare?ids=651,652,653',
+  client = createComparisonClient(),
+) {
+  return renderToStaticMarkup(
+    React.createElement(
+      MemoryRouter,
+      { initialEntries: [entry] },
+      React.createElement(
+        QueryClientProvider,
+        { client },
+        React.createElement(Routes, null, React.createElement(Route, {
+          path: '/assets/compare',
+          element: React.createElement(AssetComparisonPage),
+        })),
       ),
     ),
   )
@@ -1709,4 +1770,183 @@ test('SCADA clearance renders null-percentile no-match state', () => {
   assert.match(html, /clearance aralığı hesaplanabilecek occurrence bulunamadı/)
   assert.match(html, /YELLOW · Veri kalitesi notu/)
   assert.doesNotMatch(html, /Median Clearance<\/span>[\s\S]*10 dk/)
+})
+
+test('Asset comparison route is lazy, specific and titled before the dynamic Asset 360 route', () => {
+  const appSource = readFileSync(new URL('../src/App.tsx', import.meta.url), 'utf8')
+  const layoutSource = readFileSync(new URL('../src/components/AppLayout.tsx', import.meta.url), 'utf8')
+  const assetsSource = readFileSync(new URL('../src/pages/AssetsPage.tsx', import.meta.url), 'utf8')
+
+  assert.match(appSource, /lazy[\s\S]*pages\/AssetComparisonPage/)
+  assert.ok(appSource.indexOf('path="assets/compare"') < appSource.indexOf('path="assets/:assetId"'))
+  assert.match(layoutSource, /location\.pathname === '\/assets\/compare'[\s\S]*Varlık Karşılaştırma/)
+  assert.match(assetsSource, /to="\/assets\/compare"[\s\S]*Varlıkları karşılaştır/)
+})
+
+test('Asset comparison URL parser normalizes, deduplicates and bounds hostile input', () => {
+  assert.deepEqual(
+    assetComparison.parseAssetComparisonSearch('?ids=000651,652,00651,653,654').ids,
+    [651, 652, 653],
+  )
+
+  const rejected = assetComparison.parseAssetComparisonSearch(
+    '?ids=0,-1,1.5,1e3,0x10,text,,9007199254740992,42',
+  )
+  assert.deepEqual(rejected.ids, [42])
+  assert.equal(rejected.invalidCount, 8)
+
+  const repeated = assetComparison.parseAssetComparisonSearch('?ids=1,2&ids=3,4')
+  assert.deepEqual(repeated.ids, [1, 2])
+  assert.equal(repeated.ignoredParameterCount, 1)
+
+  const hostile = assetComparison.parseAssetComparisonSearch(`?ids=${'9'.repeat(700)},1,2,3,4`)
+  assert.ok(hostile.inputWasTruncated)
+  assert.ok(hostile.ids.length <= 3)
+  assert.match(assetComparison.getAssetComparisonValidationMessage(hostile), /çok uzun giriş/)
+  assert.equal(assetComparison.serializeAssetComparisonIds([651, 652, 653, 654]), '651,652,653')
+})
+
+test('Asset comparison pure selection operations preserve order and enforce duplicate and max rules', () => {
+  assert.deepEqual(assetComparison.addAssetComparisonId([651, 652], 653), [651, 652, 653])
+  assert.deepEqual(assetComparison.addAssetComparisonId([651, 652], 651), [651, 652])
+  assert.deepEqual(assetComparison.addAssetComparisonId([651, 652, 653], 654), [651, 652, 653])
+  assert.deepEqual(assetComparison.addAssetComparisonId([651], 0), [651])
+  assert.deepEqual(assetComparison.removeAssetComparisonId([651, 652, 653], 652), [651, 653])
+  assert.deepEqual(assetComparison.clearAssetComparisonIds(), [])
+})
+
+test('Asset comparison restores two and three URL selections in original order', () => {
+  const twoHtml = renderAssetComparisonPage('/assets/compare?ids=652,651')
+  assert.ok(twoHtml.indexOf('A-652') < twoHtml.indexOf('A-651'))
+  assert.match(twoHtml, /2 \/ 3 varlık seçildi/)
+
+  const threeHtml = renderAssetComparisonPage()
+  assert.ok(threeHtml.indexOf('A-651') < threeHtml.indexOf('A-652'))
+  assert.ok(threeHtml.indexOf('A-652') < threeHtml.indexOf('A-653'))
+  assert.match(threeHtml, /3 \/ 3 varlık seçildi/)
+  assert.match(threeHtml, /Seçim limiti doldu: en fazla 3 varlık karşılaştırılabilir/)
+  assert.doesNotMatch(threeHtml, /Karşılaştırmayı başlatmak için/)
+})
+
+test('Asset comparison cards render approved fields, Turkish levels, nulls and snapshot warning', () => {
+  const html = renderAssetComparisonPage()
+
+  assert.match(html, /Varlık Karşılaştırma/)
+  assert.match(html, /Karşılaştırma Varlığı 651/)
+  assert.match(html, /Toplam iş emri/)
+  assert.match(html, /Açık iş emri/)
+  assert.match(html, /Son 7 gün/)
+  assert.match(html, /Son 30 gün/)
+  assert.match(html, /Son 90 gün/)
+  assert.match(html, /YÜKSEK · Öncelikli inceleme/)
+  assert.match(html, /ORTA · İzle/)
+  assert.match(html, /YETERSİZ GEÇMİŞ VERİ/)
+  assert.match(html, /Bilgi bulunmuyor/)
+  assert.match(html, /Kartların analiz tarihleri farklıdır/)
+  assert.match(html, /URL yalnız varlık seçimlerini korur/)
+  assert.match(html, /arıza olasılığı değildir/)
+  assert.match(html, /href="\/assets\/651"/)
+  assert.match(html, /aria-label="A-651 varlığını karşılaştırmadan kaldır"/)
+  assert.doesNotMatch(html, /kazanan|en iyi|en sağlıklı|combined score/i)
+  assert.doesNotMatch(html, /linkedCanonicalWorkOrders|sourceDataset|serialNumber|fingerprint|personnel|sourceFile/i)
+})
+
+test('Asset comparison keeps loading, 404 and partial error states isolated per card', () => {
+  const client = createComparisonClient([651, 652, 653])
+  client.setDefaultOptions({
+    queries: { retry: false, retryOnMount: false, refetchOnMount: false, staleTime: Infinity },
+  })
+  const notFound = client.getQueryCache().find({
+    queryKey: ['analytics', 'assets', 652, 'summary'],
+    exact: true,
+  })
+  notFound.setState({
+    ...notFound.state,
+    status: 'error',
+    fetchStatus: 'idle',
+    data: undefined,
+    error: new analytics.AnalyticsApiError('Varlık yok.', 404),
+  })
+  const failed = client.getQueryCache().find({
+    queryKey: ['analytics', 'assets', 653, 'summary'],
+    exact: true,
+  })
+  failed.setState({
+    ...failed.state,
+    status: 'error',
+    fetchStatus: 'idle',
+    data: undefined,
+    error: new Error('Özet servisi kullanılamıyor'),
+  })
+
+  const partialHtml = renderAssetComparisonPage('/assets/compare?ids=651,652,653', client)
+  assert.match(partialHtml, /A-651/)
+  assert.match(partialHtml, /Varlık bulunamadı/)
+  assert.match(partialHtml, /Özet servisi kullanılamıyor/)
+  assert.equal((partialHtml.match(/Tekrar dene/g) ?? []).length, 2)
+  assert.equal((partialHtml.match(/seçimini kaldır/g) ?? []).length, 2)
+
+  const pendingClient = createComparisonClient([651])
+  pendingClient.removeQueries({ queryKey: ['analytics', 'assets', 652, 'summary'], exact: true })
+  const loadingHtml = renderAssetComparisonPage('/assets/compare?ids=651,652', pendingClient)
+  assert.match(loadingHtml, /A-651/)
+  assert.match(loadingHtml, /Varlık özeti yükleniyor/)
+  assert.match(loadingHtml, /aria-busy="true"/)
+})
+
+test('Asset comparison uses at most three non-retrying cache-compatible cancellable summary queries', async () => {
+  const parsed = assetComparison.parseAssetComparisonSearch('?ids=1,2,3,4')
+  const options = parsed.ids.map(asset360SummaryQueryOptions)
+  assert.equal(options.length, 3)
+  assert.deepEqual(options[0].queryKey, ['analytics', 'assets', 1, 'summary'])
+
+  const originalAdapter = analytics.analyticsHttpClient.defaults.adapter
+  const controller = new AbortController()
+  let receivedSignal
+  analytics.analyticsHttpClient.defaults.adapter = async (config) => {
+    receivedSignal = config.signal
+    return { data: asset360, status: 200, statusText: 'OK', headers: {}, config }
+  }
+  try {
+    await options[0].queryFn({ signal: controller.signal })
+  } finally {
+    analytics.analyticsHttpClient.defaults.adapter = originalAdapter
+  }
+  assert.equal(receivedSignal, controller.signal)
+
+  const pageSource = readFileSync(new URL('../src/pages/AssetComparisonPage.tsx', import.meta.url), 'utf8')
+  assert.match(pageSource, /useQueries/)
+  assert.match(pageSource, /retry: false/)
+  assert.match(pageSource, /onRetry=\{\(\) => void summary\.refetch\(\)\}/)
+  assert.doesNotMatch(pageSource, /\.map\(useAsset360Summary\)|prefetch|refetchInterval/)
+})
+
+test('Asset Search selection mode is explicit while existing link behavior remains unchanged', () => {
+  const linkHtml = renderAssetSearch()
+  assert.match(linkHtml, /href="\/assets\/651"/)
+
+  const selectionHtml = renderToStaticMarkup(
+    React.createElement(
+      MemoryRouter,
+      null,
+      React.createElement(
+        QueryClientProvider,
+        { client: createQueryClient() },
+        React.createElement(AssetSearch, {
+          initialQuery: '2001KBL00009',
+          onSelect: () => {},
+          selectedAssetIds: [651],
+          selectionLimit: 3,
+        }),
+      ),
+    ),
+  )
+  assert.match(selectionHtml, />Seçildi</)
+  assert.doesNotMatch(selectionHtml, /href="\/assets\/651"/)
+  assert.match(selectionHtml, /disabled=""/)
+
+  const searchSource = readFileSync(new URL('../src/components/AssetSearch.tsx', import.meta.url), 'utf8')
+  assert.match(searchSource, /Karşılaştırmaya ekle/)
+  assert.match(searchSource, /En fazla \$\{selectionLimit\} varlık/)
+  assert.match(searchSource, /onSelect \? \(/)
 })

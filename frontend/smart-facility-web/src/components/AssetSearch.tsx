@@ -1,11 +1,24 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
+import type { AssetSearchItem } from '../api/analyticsTypes'
 import { useAssetSearch } from '../hooks/useAnalytics'
 
 const searchResultLimit = 10
 const searchDebounceMilliseconds = 300
 
-export function AssetSearch({ initialQuery = '' }: { initialQuery?: string }) {
+interface AssetSearchProps {
+  initialQuery?: string
+  onSelect?: (asset: AssetSearchItem) => void
+  selectedAssetIds?: readonly number[]
+  selectionLimit?: number
+}
+
+export function AssetSearch({
+  initialQuery = '',
+  onSelect,
+  selectedAssetIds = [],
+  selectionLimit = 3,
+}: AssetSearchProps) {
   const [input, setInput] = useState(initialQuery)
   const [debouncedQuery, setDebouncedQuery] = useState(initialQuery.trim())
   const normalizedInput = input.trim()
@@ -96,13 +109,36 @@ export function AssetSearch({ initialQuery = '' }: { initialQuery?: string }) {
           {search.data.map((item) => {
             const context = [item.buildingName, item.locationName, item.assetGroupName]
               .filter((value): value is string => Boolean(value?.trim()))
+            const isSelected = selectedAssetIds.includes(item.assetId)
+            const selectionLimitReached = selectedAssetIds.length >= selectionLimit
+            const content = (
+              <>
+                <span className="code-chip">{item.assetCode}</span>
+                <strong>{item.assetName}</strong>
+                {context.length > 0 ? <small>{context.join(' · ')}</small> : null}
+              </>
+            )
             return (
               <li key={item.assetId}>
-                <Link to={`/assets/${item.assetId}`}>
-                  <span className="code-chip">{item.assetCode}</span>
-                  <strong>{item.assetName}</strong>
-                  {context.length > 0 ? <small>{context.join(' · ')}</small> : null}
-                </Link>
+                {onSelect ? (
+                  <div className="asset-search__selection-result">
+                    <div>{content}</div>
+                    <button
+                      className="btn btn-sm btn-outline-primary"
+                      type="button"
+                      disabled={isSelected || selectionLimitReached}
+                      onClick={() => onSelect(item)}
+                    >
+                      {isSelected
+                        ? 'Seçildi'
+                        : selectionLimitReached
+                          ? `En fazla ${selectionLimit} varlık`
+                          : 'Karşılaştırmaya ekle'}
+                    </button>
+                  </div>
+                ) : (
+                  <Link to={`/assets/${item.assetId}`}>{content}</Link>
+                )}
               </li>
             )
           })}

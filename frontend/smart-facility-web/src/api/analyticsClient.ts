@@ -113,8 +113,8 @@ async function get<T>(
 export const getAssetOverview = (query: AssetOverviewQuery = {}) =>
   get<AssetOverviewResponse>('/api/analytics/assets/overview', query as QueryParameters)
 
-export const getAsset360Summary = (assetId: number) =>
-  get<Asset360SummaryResponse>(`/api/analytics/assets/${assetId}/summary`)
+export const getAsset360Summary = (assetId: number, signal?: AbortSignal) =>
+  get<Asset360SummaryResponse>(`/api/analytics/assets/${assetId}/summary`, {}, signal)
 
 export const getAssetActivity = (
   assetId: number,

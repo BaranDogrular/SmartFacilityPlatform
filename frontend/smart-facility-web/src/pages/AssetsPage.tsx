@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom'
 import { ChartPanel, HorizontalBarChart } from '../components/AnalyticsCharts'
 import { AssetMaintenanceActivityPareto } from '../components/AssetMaintenanceActivityPareto'
 import { AssetSearch } from '../components/AssetSearch'
@@ -29,6 +30,16 @@ export function AssetsPage() {
         description="Operasyonel envanter dağılımı ve güncel iş emri aktivitesi."
         actions={<DataTimestamp value={data.metadata.dataAsOf} />}
       />
+
+      <div className="assets-comparison-entry">
+        <div>
+          <strong>Varlıkları yan yana inceleyin</strong>
+          <span>İki veya üç varlığın güncel aktivite ve karar destek göstergelerini karşılaştırın.</span>
+        </div>
+        <Link className="btn btn-outline-secondary" to="/assets/compare">
+          Varlıkları karşılaştır
+        </Link>
+      </div>
 
       <AssetSearch />
 

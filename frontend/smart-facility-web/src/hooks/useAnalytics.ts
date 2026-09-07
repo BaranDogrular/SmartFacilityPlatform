@@ -34,10 +34,14 @@ export const useAssetOverview = (query: AssetOverviewQuery = {}) =>
     queryFn: () => getAssetOverview(query),
   })
 
+export const asset360SummaryQueryOptions = (assetId: number) => ({
+  queryKey: ['analytics', 'assets', assetId, 'summary'] as const,
+  queryFn: ({ signal }: { signal: AbortSignal }) => getAsset360Summary(assetId, signal),
+})
+
 export const useAsset360Summary = (assetId: number, enabled = true) =>
   useQuery({
-    queryKey: ['analytics', 'assets', assetId, 'summary'],
-    queryFn: () => getAsset360Summary(assetId),
+    ...asset360SummaryQueryOptions(assetId),
     enabled,
   })
 

@@ -5,6 +5,7 @@ import { LoadingState } from './components/DashboardUi'
 
 const OverviewPage = lazy(async () => ({ default: (await import('./pages/OverviewPage')).OverviewPage }))
 const AssetsPage = lazy(async () => ({ default: (await import('./pages/AssetsPage')).AssetsPage }))
+const AssetComparisonPage = lazy(async () => ({ default: (await import('./pages/AssetComparisonPage')).AssetComparisonPage }))
 const Asset360Page = lazy(async () => ({ default: (await import('./pages/Asset360Page')).Asset360Page }))
 const WorkOrdersPage = lazy(async () => ({ default: (await import('./pages/WorkOrdersPage')).WorkOrdersPage }))
 const SimilarCasesPage = lazy(async () => ({ default: (await import('./pages/SimilarCasesPage')).SimilarCasesPage }))
@@ -20,6 +21,7 @@ function App() {
         <Route element={<AppLayout />}>
           <Route index element={<OverviewPage />} />
           <Route path="assets" element={<AssetsPage />} />
+          <Route path="assets/compare" element={<AssetComparisonPage />} />
           <Route path="assets/:assetId" element={<Asset360Page />} />
           <Route path="work-orders" element={<WorkOrdersPage />} />
           <Route path="work-orders/:id/similar-cases" element={<SimilarCasesPage />} />

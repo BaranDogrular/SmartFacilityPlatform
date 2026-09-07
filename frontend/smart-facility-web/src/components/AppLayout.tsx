@@ -60,7 +60,9 @@ function NavigationGlyph({ name }: { name: NavigationIcon }) {
 export function AppLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const location = useLocation()
-  const page = location.pathname.startsWith('/work-orders/')
+  const page = location.pathname === '/assets/compare'
+    ? { title: 'Varlık Karşılaştırma', context: 'Varlık analitiği' }
+    : location.pathname.startsWith('/work-orders/')
     ? { title: 'Benzer Geçmiş Vakalar', context: 'Canonical vaka karşılaştırması' }
     : location.pathname.startsWith('/assets/')
       ? { title: 'Asset 360', context: 'Varlık karar desteği' }
