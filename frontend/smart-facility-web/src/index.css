@@ -2842,6 +2842,10 @@ select:focus-visible {
   background: #ffffff;
 }
 
+.asset-comparison-card__identity > div:last-child {
+  grid-column: 1 / -1;
+}
+
 .asset-comparison-card dt {
   color: var(--slate-500);
   font-size: 0.59rem;
@@ -2933,6 +2937,56 @@ select:focus-visible {
   display: flex;
   flex-wrap: wrap;
   gap: 7px;
+}
+
+.asset-comparison-report-actions {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+}
+
+.asset-comparison-print {
+  display: grid;
+  justify-items: end;
+  gap: 4px;
+}
+
+.asset-comparison-print p {
+  max-width: 250px;
+  margin: 0;
+  color: var(--slate-500);
+  font-size: 0.6rem;
+  line-height: 1.4;
+  text-align: right;
+}
+
+.asset-comparison-report-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  margin: 0;
+  padding: 9px 12px;
+  border: 1px solid var(--slate-200);
+  border-radius: 5px;
+  color: var(--slate-500);
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.asset-comparison-report-meta > div {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.asset-comparison-report-meta dt {
+  font-size: 0.62rem;
+}
+
+.asset-comparison-report-meta dd {
+  margin: 0;
+  color: var(--navy-900);
+  font-size: 0.67rem;
+  font-weight: 700;
 }
 
 .asset360-not-found {
@@ -3097,6 +3151,12 @@ select:focus-visible {
   .asset-search__form .form-control { grid-column: 1 / -1; }
   .assets-comparison-entry,
   .asset-comparison-selection { align-items: stretch; flex-direction: column; }
+  .asset-comparison-report-actions { width: 100%; align-items: stretch; flex-direction: column; }
+  .asset-comparison-report-actions > .btn,
+  .asset-comparison-print,
+  .asset-comparison-print .btn { width: 100%; }
+  .asset-comparison-print { justify-items: stretch; }
+  .asset-comparison-print p { max-width: none; text-align: left; }
   .assets-comparison-entry .btn,
   .asset-comparison-selection .btn { width: 100%; }
   .asset-search__selection-result { grid-template-columns: 1fr; }
@@ -3126,4 +3186,87 @@ select:focus-visible {
   }
   .operational-metric:last-child { border-bottom: 0; }
   .operational-metric > strong { margin-top: 0; font-size: 1rem; }
+}
+
+@media print {
+  body:has(.page-stack--asset-comparison) {
+    min-width: 0;
+    color: #000000;
+    background: #ffffff;
+  }
+
+  body:has(.page-stack--asset-comparison) .sidebar,
+  body:has(.page-stack--asset-comparison) .sidebar-backdrop,
+  body:has(.page-stack--asset-comparison) .topbar,
+  body:has(.page-stack--asset-comparison) .asset-search,
+  body:has(.page-stack--asset-comparison) .asset-comparison-selection,
+  body:has(.page-stack--asset-comparison) .asset-comparison-announcement,
+  body:has(.page-stack--asset-comparison) .comparison-screen-only,
+  body:has(.page-stack--asset-comparison) .asset-comparison-card__remove,
+  body:has(.page-stack--asset-comparison) .asset-comparison-card__detail,
+  body:has(.page-stack--asset-comparison) .asset-comparison-card__state-actions {
+    display: none !important;
+  }
+
+  body:has(.page-stack--asset-comparison) .app-body {
+    margin-left: 0;
+  }
+
+  body:has(.page-stack--asset-comparison) .main-content {
+    width: auto;
+    max-width: none;
+    padding: 0;
+  }
+
+  body:has(.page-stack--asset-comparison) .page-stack--asset-comparison {
+    gap: 10pt;
+    color: #000000;
+    background: #ffffff;
+  }
+
+  body:has(.page-stack--asset-comparison) .page-header,
+  body:has(.page-stack--asset-comparison) .asset-comparison-report-meta,
+  body:has(.page-stack--asset-comparison) .asset-comparison-card,
+  body:has(.page-stack--asset-comparison) .asset-comparison-snapshot-warning,
+  body:has(.page-stack--asset-comparison) .info-note {
+    color: #000000;
+    background: #ffffff;
+    box-shadow: none;
+  }
+
+  body:has(.page-stack--asset-comparison) .asset-comparison-grid,
+  body:has(.page-stack--asset-comparison) .asset-comparison-grid--1,
+  body:has(.page-stack--asset-comparison) .asset-comparison-grid--2,
+  body:has(.page-stack--asset-comparison) .asset-comparison-grid--3 {
+    grid-template-columns: 1fr;
+    gap: 10pt;
+  }
+
+  body:has(.page-stack--asset-comparison) .asset-comparison-card {
+    break-inside: avoid-page;
+    border: 1px solid #555555;
+  }
+
+  body:has(.page-stack--asset-comparison) .asset-comparison-card--state {
+    min-height: 0;
+  }
+
+  body:has(.page-stack--asset-comparison) .asset-comparison-card__identity,
+  body:has(.page-stack--asset-comparison) .asset-comparison-card__timestamps,
+  body:has(.page-stack--asset-comparison) .asset-comparison-card__metrics {
+    border-color: #777777;
+    background: #777777;
+  }
+
+  body:has(.page-stack--asset-comparison) .asset-comparison-card__identity > div,
+  body:has(.page-stack--asset-comparison) .asset-comparison-card__timestamps > div,
+  body:has(.page-stack--asset-comparison) .asset-comparison-card__metrics > div,
+  body:has(.page-stack--asset-comparison) .asset-comparison-card__explanation {
+    color: #000000;
+    background: #ffffff;
+  }
+
+  body:has(.page-stack--asset-comparison) a[href]::after {
+    content: none !important;
+  }
 }

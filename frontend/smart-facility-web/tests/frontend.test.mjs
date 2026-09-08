@@ -22,6 +22,7 @@ const { AssetsPage } = await vite.ssrLoadModule('/src/pages/AssetsPage.tsx')
 const { Asset360Page } = await vite.ssrLoadModule('/src/pages/Asset360Page.tsx')
 const { AssetSearch } = await vite.ssrLoadModule('/src/components/AssetSearch.tsx')
 const { AssetComparisonPage } = await vite.ssrLoadModule('/src/pages/AssetComparisonPage.tsx')
+const { AssetComparisonPrintButton } = await vite.ssrLoadModule('/src/components/AssetComparisonPrintButton.tsx')
 const { asset360SummaryQueryOptions } = await vite.ssrLoadModule('/src/hooks/useAnalytics.ts')
 const assetComparison = await vite.ssrLoadModule('/src/utils/assetComparison.ts')
 const { WorkOrdersPage } = await vite.ssrLoadModule('/src/pages/WorkOrdersPage.tsx')
@@ -1949,4 +1950,127 @@ test('Asset Search selection mode is explicit while existing link behavior remai
   assert.match(searchSource, /Karşılaştırmaya ekle/)
   assert.match(searchSource, /En fazla \$\{selectionLimit\} varlık/)
   assert.match(searchSource, /onSelect \? \(/)
+})
+
+test('Asset comparison print callback runs once only on explicit button activation', () => {
+  let printCalls = 0
+  const element = AssetComparisonPrintButton({
+    enabled: true,
+    disabledReason: null,
+    onPrint: () => { printCalls += 1 },
+  })
+
+  assert.equal(printCalls, 0)
+  const button = element.props.children[0]
+  button.props.onClick()
+  assert.equal(printCalls, 1)
+
+  const source = readFileSync(new URL('../src/components/AssetComparisonPrintButton.tsx', import.meta.url), 'utf8')
+  assert.match(source, /onPrint = \(\) => window\.print\(\)/)
+  assert.doesNotMatch(source, /useEffect|useLayoutEffect/)
+})
+
+test('Asset comparison print control is enabled only for two or three successful summaries', () => {
+  const noSelectionHtml = renderAssetComparisonPage('/assets/compare', createComparisonClient([]))
+  assert.match(noSelectionHtml, /Yazdır \/ PDF olarak kaydet/)
+  assert.match(noSelectionHtml, /Rapor için en az 2, en fazla 3 varlık seçilmelidir/)
+  assert.match(noSelectionHtml, /disabled=""/)
+
+  const oneSelectionHtml = renderAssetComparisonPage('/assets/compare?ids=651', createComparisonClient([651]))
+  assert.match(oneSelectionHtml, /Rapor için en az 2, en fazla 3 varlık seçilmelidir/)
+
+  const readyHtml = renderAssetComparisonPage('/assets/compare?ids=651,652', createComparisonClient([651, 652]))
+  const readyButton = readyHtml.match(/<button class="btn btn-primary"[^>]*>Yazdır \/ PDF olarak kaydet<\/button>/)?.[0]
+  assert.ok(readyButton)
+  assert.doesNotMatch(readyButton, /disabled/)
+
+  const threeReadyHtml = renderAssetComparisonPage()
+  const threeReadyButton = threeReadyHtml.match(/<button class="btn btn-primary"[^>]*>Yazdır \/ PDF olarak kaydet<\/button>/)?.[0]
+  assert.ok(threeReadyButton)
+  assert.doesNotMatch(threeReadyButton, /disabled/)
+})
+
+test('Asset comparison disables printing honestly during loading, partial error and 404', () => {
+  const loadingClient = createComparisonClient([651])
+  const loadingHtml = renderAssetComparisonPage('/assets/compare?ids=651,652', loadingClient)
+  assert.match(loadingHtml, /Rapor için varlık özetlerinin yüklenmesi bekleniyor/)
+  assert.match(loadingHtml, /Varlık özeti yükleniyor/)
+
+  const errorClient = createComparisonClient([651, 652])
+  errorClient.setDefaultOptions({
+    queries: { retry: false, retryOnMount: false, refetchOnMount: false, staleTime: Infinity },
+  })
+  const errorQuery = errorClient.getQueryCache().find({
+    queryKey: ['analytics', 'assets', 652, 'summary'],
+    exact: true,
+  })
+  errorQuery.setState({
+    ...errorQuery.state,
+    status: 'error',
+    fetchStatus: 'idle',
+    data: undefined,
+    error: new analytics.AnalyticsApiError('Varlık bulunamadı.', 404),
+  })
+  const errorHtml = renderAssetComparisonPage('/assets/compare?ids=651,652', errorClient)
+  assert.match(errorHtml, /Rapor için bütün varlık özetleri başarıyla yüklenmelidir/)
+  assert.match(errorHtml, /Varlık bulunamadı/)
+  const disabledButton = errorHtml.match(/<button class="btn btn-primary"[^>]*>Yazdır \/ PDF olarak kaydet<\/button>/)?.[0]
+  assert.match(disabledButton, /disabled=""/)
+})
+
+test('Asset comparison renders report identity, count, local generation time and honest semantics', () => {
+  const html = renderAssetComparisonPage('/assets/compare?ids=651,652', createComparisonClient([651, 652]))
+
+  assert.match(html, /<h1>Varlık Karşılaştırma Raporu<\/h1>/)
+  assert.match(html, /Rapora dahil edilen varlık<\/dt><dd>2<\/dd>/)
+  assert.match(html, /Rapor görünümü oluşturuldu<\/dt><dd>[^<]+<\/dd>/)
+  assert.equal((html.match(/Analiz tarihi/g) ?? []).length, 2)
+  assert.equal((html.match(/Yanıt üretim zamanı/g) ?? []).length, 2)
+  assert.match(html, /İnceleme Önceliği bakım iş yükünü/)
+  assert.match(html, /Erken Uyarı ise varlığın kendi geçmişinden sapmayı gösterir/)
+  assert.match(html, /arıza olasılığı değildir/)
+  assert.match(html, /URL yalnız varlık seçimlerini korur/)
+  assert.doesNotMatch(html, /Kesin rapor|tek snapshot|arıza riski|en sağlıklı|en iyi|kazanan|combined score/i)
+})
+
+test('Asset comparison print CSS is route-scoped, readable and hides only interactive chrome', () => {
+  const styleSource = readFileSync(new URL('../src/index.css', import.meta.url), 'utf8')
+  const printStart = styleSource.indexOf('@media print')
+  assert.ok(printStart >= 0)
+  const printSource = styleSource.slice(printStart)
+
+  assert.match(printSource, /body:has\(\.page-stack--asset-comparison\) \.sidebar/)
+  assert.match(printSource, /body:has\(\.page-stack--asset-comparison\) \.topbar/)
+  assert.match(printSource, /body:has\(\.page-stack--asset-comparison\) \.asset-search/)
+  assert.match(printSource, /body:has\(\.page-stack--asset-comparison\) \.comparison-screen-only/)
+  assert.match(printSource, /body:has\(\.page-stack--asset-comparison\) \.app-body \{[\s\S]*margin-left: 0/)
+  assert.match(printSource, /grid-template-columns: 1fr/)
+  assert.match(printSource, /break-inside: avoid-page/)
+  assert.match(printSource, /a\[href\]::after \{[\s\S]*content: none !important/)
+  assert.doesNotMatch(printSource, /(^|\n)\s*(\.sidebar|\.topbar|\.app-body)\s*\{/)
+})
+
+test('Asset comparison identity grid spans its fifth field without an empty decorative cell', () => {
+  const styleSource = readFileSync(new URL('../src/index.css', import.meta.url), 'utf8')
+  assert.match(
+    styleSource,
+    /\.asset-comparison-card__identity > div:last-child \{[\s\S]*grid-column: 1 \/ -1/,
+  )
+  const baseCardRule = styleSource.match(/\.asset-comparison-card \{([^}]*)\}/)?.[1] ?? ''
+  assert.doesNotMatch(baseCardRule, /(^|\n)\s*height:/)
+})
+
+test('Asset comparison accessibility keeps hierarchy, live status and focus recovery contracts', () => {
+  const html = renderAssetComparisonPage('/assets/compare?ids=651,652', createComparisonClient([651, 652]))
+  const pageSource = readFileSync(new URL('../src/pages/AssetComparisonPage.tsx', import.meta.url), 'utf8')
+  const cardSource = readFileSync(new URL('../src/components/AssetComparisonCard.tsx', import.meta.url), 'utf8')
+
+  assert.equal((html.match(/<h1>/g) ?? []).length, 1)
+  assert.match(html, /aria-live="polite"/)
+  assert.match(html, /aria-describedby="asset-comparison-print-reason"|Yazdır \/ PDF olarak kaydet/)
+  assert.match(pageSource, /selectionHeadingRef\.current\?\.focus\(\)/)
+  assert.match(pageSource, /tabIndex=\{-1\}/)
+  assert.match(cardSource, /role="alert"/)
+  assert.match(cardSource, /aria-busy="true" role="status"/)
+  assert.doesNotMatch(cardSource, /<button[^>]*>\s*<Link|<Link[^>]*>\s*<button/)
 })

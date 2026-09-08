@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useQueries } from '@tanstack/react-query'
 import { Link, useSearchParams } from 'react-router-dom'
 import type { AssetSearchItem } from '../api/analyticsTypes'
 import { AssetComparisonCard } from '../components/AssetComparisonCard'
+import { AssetComparisonPrintButton } from '../components/AssetComparisonPrintButton'
 import { AssetSearch } from '../components/AssetSearch'
 import { InfoNote, PageHeader } from '../components/DashboardUi'
 import { asset360SummaryQueryOptions } from '../hooks/useAnalytics'
@@ -20,6 +21,9 @@ export function AssetComparisonPage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const parsed = useMemo(() => parseAssetComparisonSearch(searchParams), [searchParams])
   const assetIds = parsed.ids
+  const selectionHeadingRef = useRef<HTMLHeadingElement>(null)
+  const shouldRestoreSelectionFocus = useRef(false)
+  const [reportGeneratedAt] = useState(() => new Date())
   const [announcement, setAnnouncement] = useState<string | null>(
     () => getAssetComparisonValidationMessage(parsed),
   )
@@ -38,6 +42,13 @@ export function AssetComparisonPage() {
       setSearchParams(normalized, { replace: true })
     }
   }, [assetIds, parsed, searchParams, setSearchParams])
+
+  useEffect(() => {
+    if (shouldRestoreSelectionFocus.current) {
+      selectionHeadingRef.current?.focus()
+      shouldRestoreSelectionFocus.current = false
+    }
+  }, [assetIds])
 
   const updateSelection = (nextIds: readonly number[]) => {
     setSearchParams(createSearchParamsWithIds(searchParams, nextIds))
@@ -58,11 +69,13 @@ export function AssetComparisonPage() {
   }
 
   const removeAsset = (assetId: number) => {
+    shouldRestoreSelectionFocus.current = true
     updateSelection(removeAssetComparisonId(assetIds, assetId))
     setAnnouncement(`Varlık ${assetId} karşılaştırmadan kaldırıldı.`)
   }
 
   const clearSelection = () => {
+    shouldRestoreSelectionFocus.current = true
     updateSelection(clearAssetComparisonIds())
     setAnnouncement('Tüm varlık seçimleri temizlendi.')
   }
@@ -72,15 +85,46 @@ export function AssetComparisonPage() {
     .map((summary) => summary.data?.asOf ?? null)
     .filter((_, index) => summaries[index].data !== undefined)
   const hasDifferentAsOf = asOfValues.length > 1 && new Set(asOfValues).size > 1
+  const hasRequiredSelection = assetIds.length >= 2 && assetIds.length <= maximumComparedAssets
+  const hasSummaryFailure = summaries.some((summary) => summary.error)
+  const allSummariesReady = hasRequiredSelection
+    && summaries.length === assetIds.length
+    && summaries.every((summary) => summary.data && !summary.isPending && !summary.isFetching && !summary.error)
+  const printDisabledReason = allSummariesReady
+    ? null
+    : !hasRequiredSelection
+      ? `Rapor için en az 2, en fazla ${maximumComparedAssets} varlık seçilmelidir.`
+      : hasSummaryFailure
+        ? 'Rapor için bütün varlık özetleri başarıyla yüklenmelidir.'
+        : 'Rapor için varlık özetlerinin yüklenmesi bekleniyor.'
 
   return (
     <div className="page-stack page-stack--asset-comparison">
       <PageHeader
         eyebrow="Varlık analitiği"
-        title="Varlık Karşılaştırma"
+        title="Varlık Karşılaştırma Raporu"
         description="İki veya üç varlığın güncel bakım aktivitesi ile karar destek göstergelerini seçim sırasına göre yan yana inceleyin."
-        actions={<Link className="btn btn-outline-secondary" to="/assets">← Varlıklara dön</Link>}
+        actions={(
+          <div className="asset-comparison-report-actions comparison-screen-only">
+            <Link className="btn btn-outline-secondary" to="/assets">← Varlıklara dön</Link>
+            <AssetComparisonPrintButton
+              enabled={allSummariesReady}
+              disabledReason={printDisabledReason}
+            />
+          </div>
+        )}
       />
+
+      <dl className="asset-comparison-report-meta" aria-label="Rapor bilgileri">
+        <div>
+          <dt>Rapora dahil edilen varlık</dt>
+          <dd>{assetIds.length}</dd>
+        </div>
+        <div>
+          <dt>Rapor görünümü oluşturuldu</dt>
+          <dd>{formatReportGeneratedAt(reportGeneratedAt)}</dd>
+        </div>
+      </dl>
 
       <AssetSearch
         onSelect={addAsset}
@@ -90,7 +134,7 @@ export function AssetComparisonPage() {
 
       <section className="asset-comparison-selection" aria-labelledby="comparison-selection-title">
         <div>
-          <h2 id="comparison-selection-title">Seçilen varlıklar</h2>
+          <h2 id="comparison-selection-title" ref={selectionHeadingRef} tabIndex={-1}>Seçilen varlıklar</h2>
           <p>{assetIds.length} / {maximumComparedAssets} varlık seçildi.</p>
         </div>
         {assetIds.length > 0 ? (
@@ -156,4 +200,11 @@ function createSearchParamsWithIds(
   const serialized = serializeAssetComparisonIds(assetIds)
   if (serialized) next.set('ids', serialized)
   return next
+}
+
+function formatReportGeneratedAt(value: Date): string {
+  return new Intl.DateTimeFormat('tr-TR', {
+    dateStyle: 'long',
+    timeStyle: 'short',
+  }).format(value)
 }

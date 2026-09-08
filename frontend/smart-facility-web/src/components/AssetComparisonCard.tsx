@@ -40,7 +40,7 @@ export function AssetComparisonCard({
 }: AssetComparisonCardProps) {
   if (isPending) {
     return (
-      <article className="asset-comparison-card asset-comparison-card--state" aria-busy="true">
+      <article className="asset-comparison-card asset-comparison-card--state" aria-busy="true" role="status">
         <h2>Varlık {assetId}</h2>
         <p>Varlık özeti yükleniyor…</p>
         <button className="btn btn-sm btn-outline-secondary" type="button" onClick={onRemove}>
@@ -53,7 +53,7 @@ export function AssetComparisonCard({
   if (error || !data) {
     const notFound = error instanceof AnalyticsApiError && error.status === 404
     return (
-      <article className="asset-comparison-card asset-comparison-card--state asset-comparison-card--error">
+      <article className="asset-comparison-card asset-comparison-card--state asset-comparison-card--error" role="alert">
         <h2>Varlık {assetId}</h2>
         <strong>{notFound ? 'Varlık bulunamadı' : 'Varlık özeti alınamadı'}</strong>
         <p>{notFound ? 'Bu kimlikle eşleşen varlık bulunamadı.' : getErrorMessage(error)}</p>
