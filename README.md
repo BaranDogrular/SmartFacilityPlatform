@@ -19,6 +19,16 @@ Source data / Excel
 
 Mimari ayrıntılar için [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), release ve production kontrol listesi için [docs/OPERATIONS.md](docs/OPERATIONS.md) kullanılmalıdır.
 
+## Ön İzleme
+
+<p align="center">
+  <img
+    src="docs/images/smartfacility-overview.png"
+    alt="SmartFacility bakım ve güvenilirlik operasyon genel bakış ekranı"
+    width="100%"
+  />
+</p>
+
 ## Tamamlanmış ürün kapsamı
 
 - Secure/import-aware workbook ingestion: yapılandırılmış profiller, read-only file access ve kontrollü caller
